@@ -1,0 +1,3906 @@
+<!DOCTYPE html>
+<html lang="id">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Sistem Monitoring Siswa</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      body {
+        font-family: "Inter", sans-serif;
+        background-color: #f3f4f6; /* Gray-100 */
+      }
+      .container {
+        max-width: 960px; /* Equivalent to container in common frameworks */
+      }
+      .section-hidden {
+        display: none;
+      }
+      /* Loading Overlay Styling */
+      #loading-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background-color: rgba(255, 255, 255, 0.9); /* Semi-transparent white */
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        z-index: 4000; /* Higher than everything */
+        opacity: 0;
+        visibility: hidden;
+        transition: opacity 0.3s ease-in-out, visibility 0.3s ease-in-out;
+      }
+      #loading-overlay.visible {
+        opacity: 1;
+        visibility: visible;
+      }
+      .spinner {
+        border: 4px solid rgba(0, 0, 0, 0.1);
+        border-left-color: #3b82f6; /* Blue-500 */
+        border-radius: 50%;
+        width: 40px;
+        height: 40px;
+        animation: spin 1s linear infinite;
+      }
+      @keyframes spin {
+        0% {
+          transform: rotate(0deg);
+        }
+        100% {
+          transform: rotate(360deg);
+        }
+      }
+
+      /* Toast Notification Styling */
+      #toast-container {
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        z-index: 3000; /* Higher than sidebar and modals */
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+      }
+      .toast {
+        padding: 12px 20px;
+        border-radius: 8px;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+        color: white;
+        opacity: 0;
+        transition: opacity 0.3s ease-in-out, transform 0.3s ease-in-out;
+        transform: translateY(-20px);
+      }
+      .toast.show {
+        opacity: 1;
+        transform: translateY(0);
+      }
+      .toast.success {
+        background-color: #10b981; /* Green-500 */
+      }
+      .toast.error {
+        background-color: #ef4444; /* Red-500 */
+      }
+      .toast.info {
+        background-color: #3b82f6; /* Blue-500 */
+      }
+      .toast.warning {
+        background-color: #f59e0b; /* Amber-500 */
+      }
+
+      /* Chart container responsiveness */
+      #kehadiran-chart-container {
+        position: relative;
+        width: 100%;
+        padding-bottom: 75%; /* Aspect ratio for square-ish pie chart */
+      }
+      #kehadiran-chart {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+      }
+      /* Disable input styling */
+      input:disabled,
+      select:disabled,
+      textarea:disabled,
+      button:disabled {
+        cursor: not-allowed;
+        background-color: #e2e8f0; /* bg-gray-200 */
+        color: #a0aec0; /* text-gray-500 */
+      }
+      /* Style for subject filter tabs */
+      .subject-tab-button {
+        padding: 8px 12px;
+        font-size: 0.875rem; /* text-sm */
+        font-weight: 500; /* font-medium */
+        color: #4b5563; /* text-gray-700 */
+        border-radius: 6px; /* rounded-md */
+        transition: all 0.15s ease-in-out;
+        margin-right: 8px; /* space-x-2 */
+        margin-bottom: 8px; /* For wrapping */
+        background-color: #e5e7eb; /* bg-gray-200 */
+      }
+      .subject-tab-button:hover {
+        background-color: #d1d5db; /* bg-gray-300 */
+        color: #1f2937; /* text-gray-900 */
+      }
+      .subject-tab-button.active {
+        background-color: #3b82f6; /* bg-blue-600 */
+        color: white;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+      }
+
+      /* Modal Styles */
+      .modal {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background-color: rgba(0, 0, 0, 0.5);
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        z-index: 2000;
+        opacity: 0;
+        visibility: hidden;
+        transition: opacity 0.3s ease-in-out, visibility 0.3s ease-in-out;
+      }
+      .modal.open {
+        opacity: 1;
+        visibility: visible;
+      }
+      .modal-content {
+        background-color: white;
+        padding: 1.5rem;
+        border-radius: 0.5rem;
+        box-shadow: 0 10px 20px rgba(0, 0, 0, 0.19),
+          0 6px 6px rgba(0, 0, 0, 0.23);
+        width: 90%;
+        max-width: 600px;
+        max-height: 80vh; /* Limit height for scrollability */
+        overflow-y: auto;
+        position: relative;
+        transform: translateY(-50px);
+        transition: transform 0.3s ease-in-out;
+      }
+      .modal.open .modal-content {
+        transform: translateY(0);
+      }
+      .modal-close-button {
+        position: absolute;
+        top: 0.75rem;
+        right: 0.75rem;
+        background: none;
+        border: none;
+        font-size: 1.5rem;
+        cursor: pointer;
+        color: #6b7280; /* Gray-500 */
+      }
+      .announcement-item {
+        padding: 0.75rem;
+        margin-bottom: 0.5rem;
+        background-color: #f9fafb; /* Gray-50 */
+        border-radius: 0.375rem;
+        border: 1px solid #e5e7eb; /* Gray-200 */
+      }
+      .announcement-item.unread {
+        background-color: #e0f2fe; /* Light Blue-50 */
+        border-left: 4px solid #3b82f6; /* Blue-600 */
+        font-weight: 600;
+      }
+      .announcement-item h5 {
+        font-size: 1.125rem; /* text-lg */
+        font-weight: 600;
+        color: #1f2937; /* Gray-900 */
+        margin-bottom: 0.25rem;
+      }
+      .announcement-item p {
+        font-size: 0.875rem; /* text-sm */
+        color: #4b5563; /* Gray-700 */
+      }
+      .announcement-item .date {
+        font-size: 0.75rem; /* text-xs */
+        color: #6b7280; /* Gray-500 */
+        margin-top: 0.5rem;
+        display: block;
+      }
+
+      /* Sidebar Styling */
+      #sidebar {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 280px; /* Fixed width for sidebar */
+        height: 100%;
+        background-color: #ffffff; /* White background for sidebar */
+        box-shadow: 2px 0 10px rgba(0, 0, 0, 0.2);
+        z-index: 2100; /* Higher than modal, lower than toast */
+        transform: translateX(-100%); /* Hidden by default */
+        transition: transform 0.3s ease-in-out;
+        display: flex;
+        flex-direction: column;
+        padding: 20px;
+      }
+      #sidebar.open {
+        transform: translateX(0); /* Slide in */
+      }
+      #sidebar-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background-color: rgba(0, 0, 0, 0.4); /* Darker overlay for sidebar */
+        z-index: 2050; /* Between modal and sidebar */
+        opacity: 0;
+        visibility: hidden;
+        transition: opacity 0.3s ease-in-out, visibility 0.3s ease-in-out;
+      }
+      #sidebar-overlay.visible {
+        opacity: 1;
+        visibility: visible;
+      }
+      .sidebar-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 20px;
+        padding-bottom: 10px;
+        border-bottom: 1px solid #e5e7eb;
+      }
+      .sidebar-close-button {
+        background: none;
+        border: none;
+        font-size: 2rem;
+        cursor: pointer;
+        color: #6b7280;
+      }
+      .sidebar-menu-item {
+        padding: 10px 15px;
+        font-size: 1rem;
+        color: #374151; /* Gray-800 */
+        text-decoration: none;
+        display: block;
+        border-radius: 5px;
+        transition: background-color 0.2s ease;
+      }
+      .sidebar-menu-item:hover {
+        background-color: #f3f4f6; /* Gray-100 */
+      }
+
+      /* Sidebar icon styling */
+      .sidebar-icon {
+        position: absolute;
+        top: 4px;
+        left: 12px;
+        font-size: 2rem; /* Larger icon */
+        cursor: pointer;
+        color: #3b82f6; /* Blue-600 */
+        display: none; /* Hidden by default, shown on dashboard sections */
+        z-index: 100;
+        padding: 8px; /* Add some padding for easier clicking */
+        border-radius: 50%;
+        transition: background-color 0.2s ease;
+      }
+      .sidebar-icon:hover {
+        background-color: rgba(59, 130, 246, 0.1); /* Light blue hover effect */
+      }
+
+      /* Fixed height for scrollable tables to prevent layout shift */
+      .scrollable-table-container {
+        height: 256px; /* h-64 in Tailwind */
+        overflow-y: auto;
+        overflow-x: auto; /* Keep horizontal scroll if needed */
+      }
+      /* Sticky table header */
+      .scrollable-table-container table thead {
+        position: sticky;
+        top: 0;
+        background-color: #f3f4f6; /* bg-gray-100 */
+        z-index: 10; /* Ensure header is above content */
+      }
+    </style>
+  </head>
+  <body class="min-h-screen flex items-center justify-center p-4">
+    <!-- Loading Overlay -->
+    <div id="loading-overlay">
+      <div class="spinner"></div>
+      <p class="mt-4 text-gray-700 text-lg font-semibold">Memuat data...</p>
+    </div>
+
+    <!-- Sidebar Menu (hidden by default) -->
+    <div id="sidebar">
+      <div class="sidebar-header">
+        <h4 class="text-xl font-bold text-gray-800">Menu Utama</h4>
+        <button class="sidebar-close-button" onclick="closeSidebar()">
+          &times;
+        </button>
+      </div>
+      <nav>
+        <a href="#" class="sidebar-menu-item">Beranda</a>
+        <a href="#" class="sidebar-menu-item">Profil Siswa</a>
+        <a href="#" class="sidebar-menu-item">Pengaturan</a>
+        <a href="#" class="sidebar-menu-item">Bantuan</a>
+        <!-- Add more menu items here -->
+      </nav>
+    </div>
+    <!-- Sidebar Overlay (for clicking outside to close) -->
+    <div id="sidebar-overlay" onclick="closeSidebar()"></div>
+
+    <div
+      class="container bg-white shadow-xl rounded-lg p-6 md:p-8 w-full relative"
+    >
+      <!-- Top Right Actions (Notification and Logout) -->
+      <div class="absolute top-4 right-4 flex items-center space-x-4 z-10">
+        <!-- Notification Icon and Badge -->
+        <div class="relative" id="notification-area">
+          <button
+            id="announcement-bell-icon"
+            class="text-blue-600 hover:text-blue-800 text-3xl p-2 rounded-full hover:bg-blue-50 transition duration-150 ease-in-out focus:outline-none"
+            style="display: none"
+          >
+            &#128276;
+            <!-- Bell emoji -->
+            <span
+              id="notification-badge"
+              class="absolute top-0 right-0 bg-red-500 text-white text-xs font-bold rounded-full h-5 w-5 flex items-center justify-center -mt-1 -mr-1 hidden"
+              >0</span
+            >
+          </button>
+        </div>
+        <!-- Logout button, visible when in dashboard sections -->
+        <button
+          onclick="logout()"
+          class="bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold py-1.5 px-3 rounded-md shadow-sm text-sm z-10 section-hidden"
+          id="logout-button"
+        >
+          Logout
+        </button>
+      </div>
+
+      <!-- Sidebar Menu Icon (Hidden by default, shown on dashboards) -->
+      <div id="sidebar-menu-icon" class="sidebar-icon" onclick="openSidebar()">
+        &#9776;
+        <!-- Hamburger icon -->
+      </div>
+
+      <!-- Login Section -->
+      <section id="login-section" class="">
+        <h2 class="text-3xl font-bold text-center text-gray-800 mb-8">
+          Sistem Monitoring Siswa
+        </h2>
+
+        <!-- Unified Login Form Card -->
+        <div
+          id="unified-login-card"
+          class="p-6 bg-blue-50 rounded-lg shadow-inner"
+        >
+          <h3
+            id="login-title"
+            class="text-2xl font-semibold text-blue-800 mb-4 text-center"
+          >
+            Login Wali Murid
+          </h3>
+
+          <form id="login-form" class="space-y-4">
+            <!-- NIS for Parent Login -->
+            <div id="parent-nis-group">
+              <label
+                for="login-nis"
+                class="block text-sm font-medium text-gray-700"
+                >NIS (Nomor Induk Siswa):</label
+              >
+              <input
+                type="text"
+                id="login-nis"
+                name="nis"
+                class="mt-1 block w-full px-4 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+              />
+            </div>
+
+            <!-- Email for Admin Login -->
+            <div id="admin-credentials-group" class="section-hidden">
+              <div>
+                <label
+                  for="login-email-admin"
+                  class="block text-sm font-medium text-gray-700"
+                  >Email Admin:</label
+                >
+                <input
+                  type="email"
+                  id="login-email-admin"
+                  name="email"
+                  class="mt-1 block w-full px-4 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-green-500 focus:border-green-500 sm:text-sm"
+                />
+              </div>
+            </div>
+
+            <button
+              type="submit"
+              id="main-login-button"
+              class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-md shadow-md transition duration-300 ease-in-out"
+            >
+              Login sebagai Wali Murid
+            </button>
+          </form>
+
+          <!-- Toggle Button -->
+          <button
+            id="toggle-login-mode-btn"
+            class="mt-4 w-full text-center text-blue-600 hover:text-blue-800 font-semibold text-sm"
+          >
+            Login sebagai Admin
+          </button>
+        </div>
+      </section>
+
+      <!-- Parent Dashboard Section -->
+      <section id="parent-dashboard-section" class="section-hidden">
+        <h2 class="text-3xl font-bold text-center text-gray-800 mb-6">
+          Dashboard Wali Murid
+        </h2>
+
+        <!-- Student Identity -->
+        <div class="bg-blue-100 p-6 rounded-lg shadow-md mb-6">
+          <h3 class="text-2xl font-semibold text-blue-900 mb-4">
+            Identitas Siswa
+          </h3>
+          <p><strong>Nama:</strong> <span id="student-name"></span></p>
+          <p><strong>NIS:</strong> <span id="student-nis"></span></p>
+          <p><strong>Kelas:</strong> <span id="student-class"></span></p>
+        </div>
+
+        <!-- Tabs for various data -->
+        <div class="mb-6">
+          <div
+            class="flex border-b border-gray-200 overflow-x-auto whitespace-nowrap"
+          >
+            <button
+              class="tab-button py-2 px-4 text-sm font-medium text-gray-700 hover:text-blue-600 hover:border-b-2 hover:border-blue-600 focus:outline-none"
+              data-tab="tugas-status"
+            >
+              Status Tugas
+            </button>
+            <button
+              class="tab-button py-2 px-4 text-sm font-medium text-gray-700 hover:text-blue-600 hover:border-b-2 hover:border-blue-600 focus:outline-none"
+              data-tab="kehadiran"
+            >
+              Kehadiran
+            </button>
+            <button
+              class="tab-button py-2 px-4 text-sm font-medium text-gray-700 hover:text-blue-600 hover:border-b-2 hover:border-blue-600 focus:outline-none"
+              data-tab="catatan-guru"
+            >
+              Catatan Guru
+            </button>
+            <button
+              class="tab-button py-2 px-4 text-sm font-medium text-gray-700 hover:text-blue-600 hover:border-b-2 hover:border-blue-600 focus:outline-none"
+              data-tab="jadwal-pelajaran"
+            >
+              Jadwal Pelajaran
+            </button>
+          </div>
+
+          <div
+            id="tab-content-container"
+            class="mt-4 p-4 bg-white rounded-lg shadow-md"
+          >
+            <!-- Tugas Status Table (now primary for tasks) -->
+            <div id="tugas-status" class="tab-content">
+              <h4 class="text-xl font-semibold text-gray-800 mb-3">
+                Tugas dan Status Pengerjaan
+              </h4>
+
+              <!-- Subject Filter Tabs -->
+              <div id="subject-filter-tabs" class="flex flex-wrap mb-4">
+                <!-- Tabs will be dynamically generated here -->
+              </div>
+
+              <div class="scrollable-table-container">
+                <table
+                  class="min-w-full bg-white border border-gray-200 rounded-md"
+                >
+                  <thead class="bg-gray-100">
+                    <tr>
+                      <th
+                        class="py-2 px-4 border-b text-left text-sm font-medium text-gray-600"
+                      >
+                        Nama Tugas
+                      </th>
+                      <th
+                        class="py-2 px-4 border-b text-left text-sm font-medium text-gray-600"
+                      >
+                        Mata Pelajaran
+                      </th>
+                      <th
+                        class="py-2 px-4 border-b text-left text-sm font-medium text-gray-600"
+                      >
+                        Batas Waktu
+                      </th>
+                      <th
+                        class="py-2 px-4 border-b text-left text-sm font-medium text-gray-600"
+                      >
+                        Nilai
+                      </th>
+                      <th
+                        class="py-2 px-4 border-b text-left text-sm font-medium text-gray-600"
+                      >
+                        Status
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody id="tugas-status-table-body">
+                    <tr>
+                      <td colspan="5" class="text-center py-4 text-gray-500">
+                        Memuat data...
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <!-- Kehadiran Section with Chart and Table side-by-side -->
+            <div id="kehadiran" class="tab-content section-hidden">
+              <h4 class="text-xl font-semibold text-gray-800 mb-3">
+                Kehadiran Siswa
+              </h4>
+
+              <div class="mb-4">
+                <label
+                  for="kehadiran-filter-period"
+                  class="block text-sm font-medium text-gray-700 mb-1"
+                  >Filter Periode:</label
+                >
+                <select
+                  id="kehadiran-filter-period"
+                  class="mt-1 block w-full md:w-1/3 px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
+                >
+                  <option value="all">Semua</option>
+                  <option value="week">Per Minggu</option>
+                  <option value="month">Per Bulan</option>
+                  <option value="3months">Per 3 Bulan</option>
+                </select>
+              </div>
+
+              <div class="flex flex-col md:flex-row gap-6">
+                <div
+                  class="w-full md:w-1/2 bg-gray-50 p-4 rounded-lg shadow-md"
+                >
+                  <h5
+                    class="text-lg font-semibold text-gray-700 mb-3 text-center"
+                  >
+                    Diagram Kehadiran
+                  </h5>
+                  <div id="kehadiran-chart-container">
+                    <canvas id="kehadiran-chart"></canvas>
+                  </div>
+                  <div
+                    id="kehadiran-chart-legend"
+                    class="flex flex-wrap justify-center gap-x-4 gap-y-2 text-sm mt-4"
+                  >
+                    <!-- Legend will be generated here -->
+                  </div>
+                </div>
+
+                <div
+                  class="w-full md:w-1/2 bg-gray-50 p-4 rounded-lg shadow-md"
+                >
+                  <h5 class="text-lg font-semibold text-gray-700 mb-3">
+                    Detail Kehadiran
+                  </h5>
+                  <div class="scrollable-table-container">
+                    <table
+                      class="min-w-full bg-white border border-gray-200 rounded-md"
+                    >
+                      <thead class="bg-gray-100">
+                        <tr>
+                          <th
+                            class="py-2 px-4 border-b text-left text-sm font-medium text-gray-600"
+                          >
+                            Tanggal
+                          </th>
+                          <th
+                            class="py-2 px-4 border-b text-left text-sm font-medium text-gray-600"
+                          >
+                            Status
+                          </th>
+                        </tr>
+                      </thead>
+                      <tbody id="kehadiran-table-body">
+                        <tr>
+                          <td
+                            colspan="2"
+                            class="text-center py-4 text-gray-500"
+                          >
+                            Memuat data...
+                          </td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Catatan Guru Table -->
+            <div id="catatan-guru" class="tab-content section-hidden">
+              <h4 class="text-xl font-semibold text-gray-800 mb-3">
+                Catatan Guru Mingguan
+              </h4>
+              <div class="scrollable-table-container">
+                <table
+                  class="min-w-full bg-white border border-gray-200 rounded-md"
+                >
+                  <thead class="bg-gray-100">
+                    <tr>
+                      <th
+                        class="py-2 px-4 border-b text-left text-sm font-medium text-gray-600"
+                      >
+                        Minggu Ke
+                      </th>
+                      <th
+                        class="py-2 px-4 border-b text-left text-sm font-medium text-gray-600"
+                      >
+                        Catatan
+                      </th>
+                      <th
+                        class="py-2 px-4 border-b text-left text-sm font-medium text-gray-600"
+                      >
+                        Tanggal Input
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody id="catatan-guru-table-body">
+                    <tr>
+                      <td colspan="3" class="text-center py-4 text-gray-500">
+                        Memuat data...
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <!-- Jadwal Pelajaran Table -->
+            <div id="jadwal-pelajaran" class="tab-content section-hidden">
+              <h4 class="text-xl font-semibold text-gray-800 mb-3">
+                Jadwal Pelajaran
+              </h4>
+              <div class="mb-4">
+                <label
+                  for="jadwal-filter-day"
+                  class="block text-sm font-medium text-gray-700 mb-1"
+                  >Filter Hari:</label
+                >
+                <select
+                  id="jadwal-filter-day"
+                  class="mt-1 block w-full md:w-1/3 px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
+                >
+                  <option value="all">Semua Hari</option>
+                  <option value="Senin">Senin</option>
+                  <option value="Selasa">Selasa</option>
+                  <option value="Rabu">Rabu</option>
+                  <option value="Kamis">Kamis</option>
+                  <option value="Jumat">Jumat</option>
+                  <option value="Sabtu">Sabtu</option>
+                  <option value="Minggu">Minggu</option>
+                </select>
+              </div>
+              <div class="scrollable-table-container">
+                <table
+                  class="min-w-full bg-white border border-gray-200 rounded-md"
+                >
+                  <thead class="bg-gray-100">
+                    <tr>
+                      <th
+                        class="py-2 px-4 border-b text-left text-sm font-medium text-gray-600"
+                      >
+                        Hari
+                      </th>
+                      <th
+                        class="py-2 px-4 border-b text-left text-sm font-medium text-gray-600"
+                      >
+                        Jam
+                      </th>
+                      <th
+                        class="py-2 px-4 border-b text-left text-sm font-medium text-gray-600"
+                      >
+                        Mata Pelajaran
+                      </th>
+                      <th
+                        class="py-2 px-4 border-b text-left text-sm font-medium text-gray-600"
+                      >
+                        Guru
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody id="jadwal-pelajaran-table-body">
+                    <tr>
+                      <td colspan="4" class="text-center py-4 text-gray-500">
+                        Memuat data...
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Admin Dashboard Section -->
+      <section id="admin-dashboard-section" class="section-hidden">
+        <h2 class="text-3xl font-bold text-center text-gray-800 mb-6">
+          Dashboard Admin (Guru)
+        </h2>
+
+        <!-- Tabs for admin actions -->
+        <div class="mb-6">
+          <div
+            class="flex border-b border-gray-200 overflow-x-auto whitespace-nowrap"
+          >
+            <button
+              class="admin-tab-button py-2 px-4 text-sm font-medium text-gray-700 hover:text-green-600 hover:border-b-2 hover:border-green-600 focus:outline-none"
+              data-tab="input-tugas"
+            >
+              Input Tugas Baru
+            </button>
+            <button
+              class="admin-tab-button py-2 px-4 text-sm font-medium text-gray-700 hover:text-green-600 hover:border-b-2 hover:border-green-600 focus:outline-none"
+              data-tab="input-nilai"
+            >
+              Input Nilai Siswa
+            </button>
+            <button
+              class="admin-tab-button py-2 px-4 text-sm font-medium text-gray-700 hover:text-green-600 hover:border-b-2 hover:border-green-600 focus:outline-none"
+              data-tab="input-kehadiran"
+            >
+              Input Kehadiran
+            </button>
+            <button
+              class="admin-tab-button py-2 px-4 text-sm font-medium text-gray-700 hover:text-green-600 hover:border-b-2 hover:border-green-600 focus:outline-none"
+              data-tab="input-catatan"
+            >
+              Input Catatan Siswa
+            </button>
+            <button
+              class="admin-tab-button py-2 px-4 text-sm font-medium text-gray-700 hover:text-green-600 hover:border-b-2 hover:border-green-600 focus:outline-none"
+              data-tab="input-jadwal"
+            >
+              Input Jadwal Pelajaran
+            </button>
+            <button
+              class="admin-tab-button py-2 px-4 text-sm font-medium text-gray-700 hover:text-green-600 hover:border-b-2 hover:border-green-600 focus:outline-none"
+              data-tab="input-pengumuman"
+            >
+              Input Pengumuman
+            </button>
+          </div>
+
+          <div
+            id="admin-tab-content-container"
+            class="mt-4 p-4 bg-white rounded-lg shadow-md"
+          >
+            <!-- Input Tugas Baru Form -->
+            <div id="input-tugas" class="admin-tab-content">
+              <h4 class="text-xl font-semibold text-gray-800 mb-3">
+                Input Tugas Baru
+              </h4>
+              <form id="form-input-tugas" class="space-y-4">
+                <input
+                  type="hidden"
+                  id="tugas-edit-id"
+                  name="original_ID_Tugas"
+                />
+                <input type="hidden" id="tugas-form-mode" value="create" />
+                <!-- 'create' or 'edit' -->
+                <div>
+                  <label
+                    for="tugas-id"
+                    class="block text-sm font-medium text-gray-700"
+                    >ID Tugas:</label
+                  >
+                  <input
+                    type="text"
+                    id="tugas-id"
+                    name="ID_Tugas"
+                    required
+                    readonly
+                    class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-green-500 focus:border-green-500 bg-gray-100 cursor-not-allowed"
+                    value="Dihasilkan Otomatis"
+                  />
+                </div>
+                <div>
+                  <label
+                    for="tugas-nama"
+                    class="block text-sm font-medium text-gray-700"
+                    >Nama Tugas:</label
+                  >
+                  <input
+                    type="text"
+                    id="tugas-nama"
+                    name="Nama_Tugas"
+                    required
+                    class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-green-500 focus:border-green-500"
+                  />
+                </div>
+                <div>
+                  <label
+                    for="tugas-mapel"
+                    class="block text-sm font-medium text-gray-700"
+                    >Mata Pelajaran:</label
+                  >
+                  <!-- Changed from input type="text" to select -->
+                  <select
+                    id="tugas-mapel"
+                    name="Mata_Pelajaran"
+                    required
+                    class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-green-500 focus:border-green-500"
+                  >
+                    <option value="">Pilih Mata Pelajaran...</option>
+                    <!-- Options will be populated by JS -->
+                  </select>
+                </div>
+                <div>
+                  <label
+                    for="tugas-deadline"
+                    class="block text-sm font-medium text-gray-700"
+                    >Batas Waktu:</label
+                  >
+                  <input
+                    type="date"
+                    id="tugas-deadline"
+                    name="Batas_Waktu"
+                    required
+                    class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-green-500 focus:border-green-500"
+                  />
+                </div>
+                <div>
+                  <label
+                    for="tugas-kelas"
+                    class="block text-sm font-medium text-gray-700"
+                    >Untuk Kelas:</label
+                  >
+                  <input
+                    type="text"
+                    id="tugas-kelas"
+                    name="Untuk_Kelas"
+                    required
+                    class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-green-500 focus:border-green-500"
+                  />
+                </div>
+                <button
+                  type="submit"
+                  id="submit-tugas"
+                  class="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-md shadow-md"
+                >
+                  Simpan Tugas
+                </button>
+              </form>
+
+              <div class="mt-6">
+                <h5 class="text-lg font-semibold text-gray-700 mb-2">
+                  Daftar Tugas
+                </h5>
+                <div class="scrollable-table-container">
+                  <table
+                    class="min-w-full bg-white border border-gray-200 rounded-md"
+                  >
+                    <thead class="bg-gray-100">
+                      <tr>
+                        <th
+                          class="py-2 px-4 border-b text-left text-sm font-medium text-gray-600"
+                        >
+                          ID Tugas
+                        </th>
+                        <th
+                          class="py-2 px-4 border-b text-left text-sm font-medium text-gray-600"
+                        >
+                          Nama Tugas
+                        </th>
+                        <th
+                          class="py-2 px-4 border-b text-left text-sm font-medium text-gray-600"
+                        >
+                          Mata Pelajaran
+                        </th>
+                        <th
+                          class="py-2 px-4 border-b text-left text-sm font-medium text-gray-600"
+                        >
+                          Batas Waktu
+                        </th>
+                        <th
+                          class="py-2 px-4 border-b text-left text-sm font-medium text-gray-600"
+                        >
+                          Kelas
+                        </th>
+                        <th
+                          class="py-2 px-4 border-b text-left text-sm font-medium text-gray-600"
+                        >
+                          Aksi
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody id="tugas-list-table-body">
+                      <tr>
+                        <td colspan="6" class="text-center py-4 text-gray-500">
+                          Memuat data...
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+
+            <!-- Input Nilai Siswa Form -->
+            <div id="input-nilai" class="admin-tab-content section-hidden">
+              <h4 class="text-xl font-semibold text-gray-800 mb-3">
+                Input Nilai Siswa
+              </h4>
+              <form id="form-input-nilai" class="space-y-4">
+                <input
+                  type="hidden"
+                  id="nilai-edit-id"
+                  name="original_ID_Nilai"
+                />
+                <input type="hidden" id="nilai-form-mode" value="create" />
+                <div>
+                  <label
+                    for="nilai-id"
+                    class="block text-sm font-medium text-gray-700"
+                    >ID Nilai:</label
+                  >
+                  <input
+                    type="text"
+                    id="nilai-id"
+                    name="ID_Nilai"
+                    required
+                    readonly
+                    class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-green-500 focus:border-green-500 bg-gray-100 cursor-not-allowed"
+                    placeholder="Akan Dihasilkan Otomatis"
+                  />
+                </div>
+                <div>
+                  <label
+                    for="nilai-nis"
+                    class="block text-sm font-medium text-gray-700"
+                    >Pilih Siswa:</label
+                  >
+                  <select
+                    id="nilai-nis"
+                    name="NIS"
+                    required
+                    class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-green-500 focus:border-green-500"
+                  >
+                    <option value="">Memuat siswa...</option>
+                  </select>
+                </div>
+                <div>
+                  <label
+                    for="nilai-tugas-id"
+                    class="block text-sm font-medium text-gray-700"
+                    >Pilih Tugas:</label
+                  >
+                  <select
+                    id="nilai-tugas-id"
+                    name="ID_Tugas"
+                    required
+                    class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-green-500 focus:border-green-500"
+                  >
+                    <option value="">Memuat tugas...</option>
+                  </select>
+                </div>
+                <div>
+                  <label
+                    for="nilai-input"
+                    class="block text-sm font-medium text-gray-700"
+                    >Nilai:</label
+                  >
+                  <input
+                    type="number"
+                    id="nilai-input"
+                    name="Nilai"
+                    required
+                    min="0"
+                    max="100"
+                    class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-green-500 focus:border-green-500"
+                  />
+                </div>
+                <div>
+                  <label
+                    for="nilai-status"
+                    class="block text-sm font-medium text-gray-700"
+                    >Status Pengerjaan:</label
+                  >
+                  <select
+                    id="nilai-status"
+                    name="Status_Pengerjaan"
+                    required
+                    class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-green-500 focus:border-green-500"
+                  >
+                    <option value="">Pilih Status</option>
+                    <option value="Tuntas">Tuntas</option>
+                    <option value="Remedial">Remedial</option>
+                  </select>
+                </div>
+                <button
+                  type="submit"
+                  id="submit-nilai"
+                  class="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-md shadow-md"
+                >
+                  Simpan Nilai
+                </button>
+              </form>
+
+              <div class="mt-6">
+                <h5 class="text-lg font-semibold text-gray-700 mb-2">
+                  Daftar Nilai
+                </h5>
+                <div class="scrollable-table-container">
+                  <table
+                    class="min-w-full bg-white border border-gray-200 rounded-md"
+                  >
+                    <thead class="bg-gray-100">
+                      <tr>
+                        <th
+                          class="py-2 px-4 border-b text-left text-sm font-medium text-gray-600"
+                        >
+                          ID Nilai
+                        </th>
+                        <th
+                          class="py-2 px-4 border-b text-left text-sm font-medium text-gray-600"
+                        >
+                          NIS
+                        </th>
+                        <th
+                          class="py-2 px-4 border-b text-left text-sm font-medium text-gray-600"
+                        >
+                          ID Tugas
+                        </th>
+                        <th
+                          class="py-2 px-4 border-b text-left text-sm font-medium text-gray-600"
+                        >
+                          Nilai
+                        </th>
+                        <th
+                          class="py-2 px-4 border-b text-left text-sm font-medium text-gray-600"
+                        >
+                          Status
+                        </th>
+                        <th
+                          class="py-2 px-4 border-b text-left text-sm font-medium text-gray-600"
+                        >
+                          Tgl Input
+                        </th>
+                        <th
+                          class="py-2 px-4 border-b text-left text-sm font-medium text-gray-600"
+                        >
+                          Aksi
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody id="nilai-list-table-body">
+                      <tr>
+                        <td colspan="7" class="text-center py-4 text-gray-500">
+                          Memuat data...
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+
+            <!-- Input Kehadiran Form -->
+            <div id="input-kehadiran" class="admin-tab-content section-hidden">
+              <h4 class="text-xl font-semibold text-gray-800 mb-3">
+                Input Kehadiran
+              </h4>
+              <form id="form-input-kehadiran" class="space-y-4">
+                <input
+                  type="hidden"
+                  id="kehadiran-edit-id"
+                  name="original_ID_Kehadiran"
+                />
+                <input type="hidden" id="kehadiran-form-mode" value="create" />
+                <div>
+                  <label
+                    for="kehadiran-id"
+                    class="block text-sm font-medium text-gray-700"
+                    >ID Kehadiran:</label
+                  >
+                  <input
+                    type="text"
+                    id="kehadiran-id"
+                    name="ID_Kehadiran"
+                    required
+                    readonly
+                    class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-green-500 focus:border-green-500 bg-gray-100 cursor-not-allowed"
+                    value="Dihasilkan Otomatis"
+                  />
+                </div>
+                <div>
+                  <label
+                    for="kehadiran-nis"
+                    class="block text-sm font-medium text-gray-700"
+                    >Pilih Siswa:</label
+                  >
+                  <select
+                    id="kehadiran-nis"
+                    name="NIS"
+                    required
+                    class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-green-500 focus:border-green-500"
+                  >
+                    <option value="">Memuat siswa...</option>
+                  </select>
+                </div>
+                <div>
+                  <label
+                    for="kehadiran-tanggal"
+                    class="block text-sm font-medium text-gray-700"
+                    >Tanggal:</label
+                  >
+                  <input
+                    type="date"
+                    id="kehadiran-tanggal"
+                    name="Tanggal"
+                    required
+                    class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-green-500 focus:border-green-500"
+                  />
+                </div>
+                <div>
+                  <label
+                    for="kehadiran-status"
+                    class="block text-sm font-medium text-gray-700"
+                    >Status Kehadiran:</label
+                  >
+                  <select
+                    id="kehadiran-status"
+                    name="Status"
+                    required
+                    class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-green-500 focus:border-green-500"
+                  >
+                    <option value="">Pilih Status</option>
+                    <option value="Hadir">Hadir</option>
+                    <option value="Izin">Izin</option>
+                    <option value="Sakit">Sakit</option>
+                    <option value="Alpha">Alpha</option>
+                  </select>
+                </div>
+                <button
+                  type="submit"
+                  id="submit-kehadiran"
+                  class="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-md shadow-md"
+                >
+                  Simpan Kehadiran
+                </button>
+              </form>
+
+              <div class="mt-6">
+                <h5 class="text-lg font-semibold text-gray-700 mb-2">
+                  Daftar Kehadiran
+                </h5>
+                <div class="scrollable-table-container">
+                  <table
+                    class="min-w-full bg-white border border-gray-200 rounded-md"
+                  >
+                    <thead class="bg-gray-100">
+                      <tr>
+                        <th
+                          class="py-2 px-4 border-b text-left text-sm font-medium text-gray-600"
+                        >
+                          ID Kehadiran
+                        </th>
+                        <th
+                          class="py-2 px-4 border-b text-left text-sm font-medium text-gray-600"
+                        >
+                          NIS
+                        </th>
+                        <th
+                          class="py-2 px-4 border-b text-left text-sm font-medium text-gray-600"
+                        >
+                          Tanggal
+                        </th>
+                        <th
+                          class="py-2 px-4 border-b text-left text-sm font-medium text-gray-600"
+                        >
+                          Status
+                        </th>
+                        <th
+                          class="py-2 px-4 border-b text-left text-sm font-medium text-gray-600"
+                        >
+                          Aksi
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody id="kehadiran-list-table-body">
+                      <tr>
+                        <td colspan="5" class="text-center py-4 text-gray-500">
+                          Memuat data...
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+
+            <!-- Catatan Guru Form -->
+            <div id="input-catatan" class="admin-tab-content section-hidden">
+              <h4 class="text-xl font-semibold text-gray-800 mb-3">
+                Input Catatan Siswa
+              </h4>
+              <form id="form-input-catatan" class="space-y-4">
+                <input
+                  type="hidden"
+                  id="catatan-edit-id"
+                  name="original_ID_Catatan"
+                />
+                <input type="hidden" id="catatan-form-mode" value="create" />
+                <div>
+                  <label
+                    for="catatan-id"
+                    class="block text-sm font-medium text-gray-700"
+                    >ID Catatan:</label
+                  >
+                  <input
+                    type="text"
+                    id="catatan-id"
+                    name="ID_Catatan"
+                    required
+                    readonly
+                    class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-green-500 focus:border-green-500 bg-gray-100 cursor-not-allowed"
+                    value="Dihasilkan Otomatis"
+                  />
+                </div>
+                <div>
+                  <label
+                    for="catatan-nis"
+                    class="block text-sm font-medium text-gray-700"
+                    >Pilih Siswa:</label
+                  >
+                  <select
+                    id="catatan-nis"
+                    name="NIS"
+                    required
+                    class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-green-500 focus:border-green-500"
+                  >
+                    <option value="">Memuat siswa...</option>
+                  </select>
+                </div>
+                <div>
+                  <label
+                    for="catatan-minggu"
+                    class="block text-sm font-medium text-gray-700"
+                    >Minggu Ke:</label
+                  >
+                  <input
+                    type="number"
+                    id="catatan-minggu"
+                    name="Minggu_Ke"
+                    required
+                    min="1"
+                    class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-green-500 focus:border-green-500"
+                  />
+                </div>
+                <div>
+                  <label
+                    for="catatan-isi"
+                    class="block text-sm font-medium text-gray-700"
+                    >Catatan:</label
+                  >
+                  <textarea
+                    id="catatan-isi"
+                    name="Catatan"
+                    rows="3"
+                    required
+                    class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-green-500 focus:border-green-500"
+                  ></textarea>
+                </div>
+                <button
+                  type="submit"
+                  id="submit-catatan"
+                  class="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-md shadow-md"
+                >
+                  Simpan Catatan
+                </button>
+              </form>
+
+              <div class="mt-6">
+                <h5 class="text-lg font-semibold text-gray-700 mb-2">
+                  Daftar Catatan Guru
+                </h5>
+                <div class="scrollable-table-container">
+                  <table
+                    class="min-w-full bg-white border border-gray-200 rounded-md"
+                  >
+                    <thead class="bg-gray-100">
+                      <tr>
+                        <th
+                          class="py-2 px-4 border-b text-left text-sm font-medium text-gray-600"
+                        >
+                          ID Catatan
+                        </th>
+                        <th
+                          class="py-2 px-4 border-b text-left text-sm font-medium text-gray-600"
+                        >
+                          NIS
+                        </th>
+                        <th
+                          class="py-2 px-4 border-b text-left text-sm font-medium text-gray-600"
+                        >
+                          Minggu Ke
+                        </th>
+                        <th
+                          class="py-2 px-4 border-b text-left text-sm font-medium text-gray-600"
+                        >
+                          Catatan
+                        </th>
+                        <th
+                          class="py-2 px-4 border-b text-left text-sm font-medium text-gray-600"
+                        >
+                          Tgl Input
+                        </th>
+                        <th
+                          class="py-2 px-4 border-b text-left text-sm font-medium text-gray-600"
+                        >
+                          Aksi
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody id="catatan-list-table-body">
+                      <tr>
+                        <td colspan="6" class="text-center py-4 text-gray-500">
+                          Memuat data...
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+
+            <!-- Jadwal Pelajaran Form -->
+            <div id="input-jadwal" class="admin-tab-content section-hidden">
+              <h4 class="text-xl font-semibold text-gray-800 mb-3">
+                Input Jadwal Pelajaran
+              </h4>
+              <form id="form-input-jadwal" class="space-y-4">
+                <input
+                  type="hidden"
+                  id="jadwal-edit-id"
+                  name="original_ID_Jadwal"
+                />
+                <input type="hidden" id="jadwal-form-mode" value="create" />
+                <div>
+                  <label
+                    for="jadwal-id"
+                    class="block text-sm font-medium text-gray-700"
+                    >ID Jadwal:</label
+                  >
+                  <input
+                    type="text"
+                    id="jadwal-id"
+                    name="ID_Jadwal"
+                    required
+                    readonly
+                    class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-green-500 focus:border-green-500 bg-gray-100 cursor-not-allowed"
+                    value="Dihasilkan Otomatis"
+                  />
+                </div>
+                <div>
+                  <label
+                    for="jadwal-kelas"
+                    class="block text-sm font-medium text-gray-700"
+                    >Kelas:</label
+                  >
+                  <input
+                    type="text"
+                    id="jadwal-kelas"
+                    name="Kelas"
+                    required
+                    class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-green-500 focus:border-green-500"
+                  />
+                </div>
+                <div>
+                  <label
+                    for="jadwal-hari"
+                    class="block text-sm font-medium text-gray-700"
+                    >Hari:</label
+                  >
+                  <input
+                    type="text"
+                    id="jadwal-hari"
+                    name="Hari"
+                    required
+                    class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-green-500 focus:border-green-500"
+                  />
+                </div>
+                <div>
+                  <label
+                    for="jadwal-jam"
+                    class="block text-sm font-medium text-gray-700"
+                    >Jam (ex: 08:00-09:30):</label
+                  >
+                  <input
+                    type="text"
+                    id="jadwal-jam"
+                    name="Jam"
+                    required
+                    class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-green-500 focus:border-green-500"
+                  />
+                </div>
+                <div>
+                  <label
+                    for="jadwal-mapel"
+                    class="block text-sm font-medium text-gray-700"
+                    >Mata Pelajaran:</label
+                  >
+                  <!-- Changed from input type="text" to select -->
+                  <select
+                    id="jadwal-mapel"
+                    name="Mata_Pelajaran"
+                    required
+                    class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-green-500 focus:border-green-500"
+                  >
+                    <option value="">Pilih Mata Pelajaran...</option>
+                    <!-- Options will be populated by JS -->
+                  </select>
+                </div>
+                <div>
+                  <label
+                    for="jadwal-guru"
+                    class="block text-sm font-medium text-gray-700"
+                    >Guru Pengampu:</label
+                  >
+                  <input
+                    type="text"
+                    id="jadwal-guru"
+                    name="Guru"
+                    required
+                    class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-green-500 focus:border-green-500"
+                  />
+                </div>
+                <button
+                  type="submit"
+                  id="submit-jadwal"
+                  class="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-md shadow-md"
+                >
+                  Simpan Jadwal
+                </button>
+              </form>
+
+              <div class="mt-6">
+                <h5 class="text-lg font-semibold text-gray-700 mb-2">
+                  Daftar Jadwal Pelajaran
+                </h5>
+                <div class="scrollable-table-container">
+                  <table
+                    class="min-w-full bg-white border border-gray-200 rounded-md"
+                  >
+                    <thead class="bg-gray-100">
+                      <tr>
+                        <th
+                          class="py-2 px-4 border-b text-left text-sm font-medium text-gray-600"
+                        >
+                          ID Jadwal
+                        </th>
+                        <th
+                          class="py-2 px-4 border-b text-left text-sm font-medium text-gray-600"
+                        >
+                          Kelas
+                        </th>
+                        <th
+                          class="py-2 px-4 border-b text-left text-sm font-medium text-gray-600"
+                        >
+                          Hari
+                        </th>
+                        <th
+                          class="py-2 px-4 border-b text-left text-sm font-medium text-gray-600"
+                        >
+                          Jam
+                        </th>
+                        <th
+                          class="py-2 px-4 border-b text-left text-sm font-medium text-gray-600"
+                        >
+                          Mata Pelajaran
+                        </th>
+                        <th
+                          class="py-2 px-4 border-b text-left text-sm font-medium text-gray-600"
+                        >
+                          Guru
+                        </th>
+                        <th
+                          class="py-2 px-4 border-b text-left text-sm font-medium text-gray-600"
+                        >
+                          Aksi
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody id="jadwal-list-table-body">
+                      <tr>
+                        <td colspan="7" class="text-center py-4 text-gray-500">
+                          Memuat data...
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+
+            <!-- Input Pengumuman Form -->
+            <div id="input-pengumuman" class="admin-tab-content section-hidden">
+              <h4 class="text-xl font-semibold text-gray-800 mb-3">
+                Input Pengumuman Baru
+              </h4>
+              <form id="form-input-pengumuman" class="space-y-4">
+                <input
+                  type="hidden"
+                  id="pengumuman-edit-id"
+                  name="original_ID_Pengumuman"
+                />
+                <input type="hidden" id="pengumuman-form-mode" value="create" />
+                <div>
+                  <label
+                    for="pengumuman-id"
+                    class="block text-sm font-medium text-gray-700"
+                    >ID Pengumuman:</label
+                  >
+                  <input
+                    type="text"
+                    id="pengumuman-id"
+                    name="ID_Pengumuman"
+                    required
+                    readonly
+                    class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-green-500 focus:border-green-500 bg-gray-100 cursor-not-allowed"
+                    value="Dihasilkan Otomatis"
+                  />
+                </div>
+                <div>
+                  <label
+                    for="pengumuman-judul"
+                    class="block text-sm font-medium text-gray-700"
+                    >Judul Pengumuman:</label
+                  >
+                  <input
+                    type="text"
+                    id="pengumuman-judul"
+                    name="Judul"
+                    required
+                    class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-green-500 focus:border-green-500"
+                  />
+                </div>
+                <div>
+                  <label
+                    for="pengumuman-isi"
+                    class="block text-sm font-medium text-gray-700"
+                    >Isi Pengumuman:</label
+                  >
+                  <textarea
+                    id="pengumuman-isi"
+                    name="Isi_Pengumuman"
+                    rows="4"
+                    required
+                    class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-green-500 focus:border-green-500"
+                  ></textarea>
+                </div>
+                <div>
+                  <label
+                    for="pengumuman-tanggal"
+                    class="block text-sm font-medium text-gray-700"
+                    >Tanggal Pengumuman:</label
+                  >
+                  <input
+                    type="date"
+                    id="pengumuman-tanggal"
+                    name="Tanggal_Pengumuman"
+                    required
+                    class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-green-500 focus:border-green-500"
+                  />
+                </div>
+                <div>
+                  <label
+                    for="pengumuman-untuk-kelas"
+                    class="block text-sm font-medium text-gray-700"
+                    >Untuk Kelas (Kosongkan untuk Semua Kelas):</label
+                  >
+                  <input
+                    type="text"
+                    id="pengumuman-untuk-kelas"
+                    name="Untuk_Kelas"
+                    placeholder="Contoh: 1A, 2B, Semua"
+                    class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-green-500 focus:border-green-500"
+                  />
+                </div>
+                <button
+                  type="submit"
+                  id="submit-pengumuman"
+                  class="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-md shadow-md"
+                >
+                  Simpan Pengumuman
+                </button>
+              </form>
+
+              <div class="mt-6">
+                <h5 class="text-lg font-semibold text-gray-700 mb-2">
+                  Daftar Pengumuman
+                </h5>
+                <div class="scrollable-table-container">
+                  <table
+                    class="min-w-full bg-white border border-gray-200 rounded-md"
+                  >
+                    <thead class="bg-gray-100">
+                      <tr>
+                        <th
+                          class="py-2 px-4 border-b text-left text-sm font-medium text-gray-600"
+                        >
+                          ID
+                        </th>
+                        <th
+                          class="py-2 px-4 border-b text-left text-sm font-medium text-gray-600"
+                        >
+                          Judul
+                        </th>
+                        <th
+                          class="py-2 px-4 border-b text-left text-sm font-medium text-gray-600"
+                        >
+                          Tanggal
+                        </th>
+                        <th
+                          class="py-2 px-4 border-b text-left text-sm font-medium text-gray-600"
+                        >
+                          Untuk Kelas
+                        </th>
+                        <th
+                          class="py-2 px-4 border-b text-left text-sm font-medium text-gray-600"
+                        >
+                          Aksi
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody id="pengumuman-list-table-body">
+                      <tr>
+                        <td colspan="5" class="text-center py-4 text-gray-500">
+                          Memuat data...
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <!-- Announcement Modal -->
+    <div id="announcement-modal" class="modal">
+      <div class="modal-content">
+        <button class="modal-close-button" onclick="closeAnnouncementModal()">
+          &times;
+        </button>
+        <h3 class="text-2xl font-bold text-gray-800 mb-4">Pengumuman</h3>
+        <div id="announcement-list" class="space-y-4">
+          <!-- Announcements will be loaded here -->
+          <p class="text-center text-gray-500">Memuat pengumuman...</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Toast Container -->
+    <div id="toast-container"></div>
+
+    <script>
+      // Ganti URL ini dengan URL Web App Google Apps Script Anda setelah di-deploy
+      const GOOGLE_APPS_SCRIPT_WEB_APP_URL =
+        "https://script.google.com/macros/s/AKfycbyA74lf_vJL6Z6Xq6WmuD6kBJlcFiGvY-ei6I283YGESmLuOA0iP3hVol40JGEzbpAO3g/exec";
+      const PASS_MARK = 75; // Nilai minimum untuk status "Tuntas"
+
+      // Hardcoded list of subjects
+      const HARDCODED_SUBJECTS = [
+        "PAI",
+        "Pancasila",
+        "Bahasa Indonesia",
+        "Matematika",
+        "IPAS",
+        "Seni Rupa",
+        "PJOK",
+        "Bahasa Jawa",
+        "Dawet Ayu",
+      ];
+
+      // Mapping for subject abbreviations for ID Tugas
+      const SUBJECT_ABBREVIATIONS = {
+        PAI: "PAI",
+        Pancasila: "PANC",
+        "Bahasa Indonesia": "BHSIN",
+        Matematika: "MTK",
+        IPAS: "IPAS",
+        "Seni Rupa": "SNI",
+        PJOK: "PJOK",
+        "Bahasa Jawa": "BHSJW",
+        "Dawet Ayu": "DWA",
+      };
+
+      let currentStudentNis = null; // Menyimpan NIS siswa yang sedang login
+      let currentStudentClass = null; // Menyimpan kelas siswa yang sedang login
+      let currentLoginMode = "parent"; // 'parent' or 'admin'
+
+      // Client-side cache for fetched data to reduce API calls
+      const dataCache = {
+        siswa: [],
+        tugas: [],
+        nilai: [],
+        kehadiran: [],
+        catatan_guru: [],
+        jadwal_pelajaran: [],
+        pengumuman: [],
+      };
+
+      // DOM Elements
+      const loadingOverlay = document.getElementById("loading-overlay"); // Loading overlay element
+      const loginSection = document.getElementById("login-section");
+      const parentDashboardSection = document.getElementById(
+        "parent-dashboard-section"
+      );
+      const adminDashboardSection = document.getElementById(
+        "admin-dashboard-section"
+      );
+      const toastContainer = document.getElementById("toast-container");
+      const logoutButton = document.getElementById("logout-button");
+      const sidebarMenuIcon = document.getElementById("sidebar-menu-icon"); // Sidebar Icon
+      const sidebar = document.getElementById("sidebar"); // Sidebar element
+      const sidebarOverlay = document.getElementById("sidebar-overlay"); // Sidebar overlay element
+      const announcementBellIcon = document.getElementById(
+        "announcement-bell-icon"
+      ); // Bell Icon
+      const notificationBadge = document.getElementById("notification-badge"); // Notification Badge
+
+      const unifiedLoginCard = document.getElementById("unified-login-card");
+      const loginTitle = document.getElementById("login-title");
+      const loginForm = document.getElementById("login-form");
+      const parentNisGroup = document.getElementById("parent-nis-group");
+      const loginNisInput = document.getElementById("login-nis");
+      const adminCredentialsGroup = document.getElementById(
+        "admin-credentials-group"
+      );
+      const loginAdminEmailInput = document.getElementById("login-email-admin");
+      const mainLoginButton = document.getElementById("main-login-button");
+      const toggleLoginModeBtn = document.getElementById(
+        "toggle-login-mode-btn"
+      );
+
+      // Admin form dropdowns
+      const nilaiNisSelect = document.getElementById("nilai-nis");
+      const nilaiTugasIdSelect = document.getElementById("nilai-tugas-id");
+      const kehadiranNisSelect = document.getElementById("kehadiran-nis");
+      const catatanNisSelect = document.getElementById("catatan-nis");
+      const tugasMapelSelect = document.getElementById("tugas-mapel"); // New: for admin input tugas
+      const jadwalMapelSelect = document.getElementById("jadwal-mapel"); // New: for admin input jadwal
+
+      // Admin form specific inputs for Nilai
+      const nilaiInput = document.getElementById("nilai-input");
+      const nilaiStatusSelect = document.getElementById("nilai-status");
+
+      // Admin form mode inputs
+      const tugasFormMode = document.getElementById("tugas-form-mode");
+      const nilaiFormMode = document.getElementById("nilai-form-mode");
+      const kehadiranFormMode = document.getElementById("kehadiran-form-mode");
+      const catatanFormMode = document.getElementById("catatan-form-mode");
+      const jadwalFormMode = document.getElementById("jadwal-form-mode");
+      const pengumumanFormMode = document.getElementById(
+        "pengumuman-form-mode"
+      );
+
+      // Admin form edit ID inputs
+      const tugasEditId = document.getElementById("tugas-edit-id");
+      const nilaiEditId = document.getElementById("nilai-edit-id");
+      const kehadiranEditId = document.getElementById("kehadiran-edit-id");
+      const catatanEditId = document.getElementById("catatan-edit-id");
+      const jadwalEditId = document.getElementById("jadwal-edit-id");
+      const pengumumanEditId = document.getElementById("pengumuman-edit-id");
+
+      // Admin form submit buttons
+      const submitTugasBtn = document.getElementById("submit-tugas");
+      const submitNilaiBtn = document.getElementById("submit-nilai");
+      const submitKehadiranBtn = document.getElementById("submit-kehadiran");
+      const submitCatatanBtn = document.getElementById("submit-catatan");
+      const submitJadwalBtn = document.getElementById("submit-jadwal");
+      const submitPengumumanBtn = document.getElementById("submit-pengumuman");
+
+      // Parent dashboard specific elements
+      const subjectFilterTabsContainer = document.getElementById(
+        "subject-filter-tabs"
+      );
+      const kehadiranFilterPeriodSelect = document.getElementById(
+        "kehadiran-filter-period"
+      );
+      const kehadiranChartLegend = document.getElementById(
+        "kehadiran-chart-legend"
+      );
+      const jadwalFilterDaySelect =
+        document.getElementById("jadwal-filter-day");
+
+      // Notification elements (bell icon and badge are removed, but modal related elements remain)
+      const announcementModal = document.getElementById("announcement-modal");
+      const announcementList = document.getElementById("announcement-list");
+
+      // --- Loading Overlay Functions ---
+      function showLoading() {
+        loadingOverlay.classList.add("visible");
+      }
+
+      function hideLoading() {
+        loadingOverlay.classList.remove("visible");
+      }
+
+      // Fungsi untuk menampilkan atau menyembunyikan bagian aplikasi
+      function showSection(sectionId) {
+        loginSection.classList.add("section-hidden");
+        parentDashboardSection.classList.add("section-hidden");
+        adminDashboardSection.classList.add("section-hidden");
+        document.getElementById(sectionId).classList.remove("section-hidden");
+
+        // Tampilkan tombol logout, ikon notifikasi, dan ikon sidebar hanya jika di dashboard
+        if (
+          sectionId === "parent-dashboard-section" ||
+          sectionId === "admin-dashboard-section"
+        ) {
+          logoutButton.classList.remove("section-hidden");
+          sidebarMenuIcon.style.display = "block"; // Show sidebar icon
+          if (sectionId === "parent-dashboard-section") {
+            // Show bell icon only for parent dashboard
+            announcementBellIcon.style.display = "block";
+          } else {
+            announcementBellIcon.style.display = "none";
+            notificationBadge.classList.add("hidden"); // Hide badge for admin
+          }
+        } else {
+          logoutButton.classList.add("section-hidden");
+          sidebarMenuIcon.style.display = "none"; // Hide sidebar icon
+          announcementBellIcon.style.display = "none"; // Hide bell icon
+          notificationBadge.classList.add("hidden"); // Ensure badge is hidden
+        }
+      }
+
+      // --- Sidebar Functions ---
+      function openSidebar() {
+        sidebar.classList.add("open");
+        sidebarOverlay.classList.add("visible");
+      }
+
+      function closeSidebar() {
+        sidebar.classList.remove("open");
+        sidebarOverlay.classList.remove("visible");
+      }
+
+      // --- Toast Notification Function ---
+      function showToast(message, type = "info", duration = 3000) {
+        const toast = document.createElement("div");
+        toast.classList.add("toast", type);
+        toast.textContent = message;
+        toastContainer.appendChild(toast);
+
+        void toast.offsetWidth; // Trigger reflow
+        toast.classList.add("show");
+
+        setTimeout(() => {
+          toast.classList.remove("show");
+          toast.addEventListener("transitionend", () => {
+            toast.remove();
+          });
+        }, duration);
+      }
+
+      // --- Generate Unique ID (Generic) ---
+      function generateUniqueId(prefix) {
+        // A simple unique ID generation. For robust applications, consider UUIDs.
+        return (
+          prefix +
+          "_" +
+          Date.now().toString(36) +
+          Math.random().toString(36).substring(2, 5).toUpperCase()
+        );
+      }
+
+      // --- Generate Task ID based on subject, task number, and month ---
+      function generateTugasId(subjectAbbr, taskNumber, month) {
+        const formattedTaskNumber = String(taskNumber).padStart(2, "0");
+        const formattedMonth = String(month).padStart(2, "0");
+        return `${subjectAbbr}${formattedTaskNumber}${formattedMonth}`;
+      }
+
+      // Universal tab switching function
+      function switchTab(targetTabId, buttons, prefix = "") {
+        document
+          .querySelectorAll(`.${prefix}tab-content`)
+          .forEach((content) => {
+            content.classList.add("section-hidden");
+          });
+
+        buttons.forEach((btn) => {
+          btn.classList.remove(
+            "text-blue-600",
+            "border-blue-600",
+            "border-b-2",
+            "text-green-600",
+            "border-green-600"
+          );
+          btn.classList.add("text-gray-700");
+        });
+
+        document.getElementById(targetTabId).classList.remove("section-hidden");
+
+        const clickedButton = Array.from(buttons).find(
+          (btn) => btn.dataset.tab === targetTabId
+        );
+        if (clickedButton) {
+          clickedButton.classList.remove("text-gray-700");
+          clickedButton.classList.add(
+            prefix === "admin-" ? "text-green-600" : "text-blue-600",
+            "border-b-2",
+            prefix === "admin-" ? "border-green-600" : "border-blue-600"
+          );
+        }
+      }
+
+      // --- Login Form Submission ---
+      loginForm.addEventListener("submit", async (e) => {
+        e.preventDefault();
+        showLoading(); // Show loading immediately on login attempt
+
+        try {
+          if (currentLoginMode === "parent") {
+            const nis = loginNisInput.value.trim();
+            if (!nis) {
+              showToast("NIS tidak boleh kosong.", "error");
+              hideLoading(); // Hide loading if validation fails
+              return;
+            }
+
+            // Hanya ambil data siswa berdasarkan NIS
+            const studentData = await fetchData("Siswa", nis);
+
+            if (studentData && studentData.length > 0) {
+              const student = studentData[0];
+              currentStudentNis = student.NIS;
+              currentStudentClass = student.Kelas; // Set student class
+              document.getElementById("student-name").textContent =
+                student.Nama;
+              document.getElementById("student-nis").textContent = student.NIS;
+              document.getElementById("student-class").textContent =
+                student.Kelas;
+
+              await loadParentDashboardData(currentStudentNis); // Await all data loading
+              showSection("parent-dashboard-section");
+              // Set 'tugas-status' as the initial active tab
+              switchTab(
+                "tugas-status",
+                document.querySelectorAll(".tab-button")
+              );
+              updateNotificationBadge(); // Update badge after data loads
+            } else {
+              showToast(
+                "NIS tidak ditemukan. Mohon periksa kembali NIS Anda.",
+                "error"
+              );
+            }
+          } else {
+            // Admin login
+            const adminEmail = loginAdminEmailInput.value.trim();
+            if (!adminEmail) {
+              showToast("Email admin tidak boleh kosong.", "error");
+              hideLoading(); // Hide loading if validation fails
+              return;
+            }
+
+            const authorizedEmails = await fetchData("Admin_Users");
+
+            const emailExists = authorizedEmails.some(
+              (user) =>
+                user.Email &&
+                user.Email.toLowerCase() === adminEmail.toLowerCase()
+            );
+
+            if (emailExists) {
+              showToast("Login admin berhasil!", "success");
+              await loadAdminDropdownData(); // Await dropdown data
+              await loadAdminTableData("Tugas"); // Await initial table data
+              updateTugasIdField(); // Initial generation for Tugas ID
+              showSection("admin-dashboard-section");
+              switchTab(
+                "input-tugas",
+                document.querySelectorAll(".admin-tab-button")
+              );
+            } else {
+              showToast("Email admin tidak terdaftar. Akses ditolak.", "error");
+            }
+          }
+        } catch (error) {
+          console.error("Login Error:", error);
+          showToast("Terjadi kesalahan saat login.", "error");
+        } finally {
+          hideLoading(); // Always hide loading after login attempt (success or fail)
+        }
+      });
+
+      // --- Toggle Login Mode ---
+      toggleLoginModeBtn.addEventListener("click", () => {
+        if (currentLoginMode === "parent") {
+          currentLoginMode = "admin";
+          loginTitle.textContent = "Login Admin (Guru)";
+          unifiedLoginCard.classList.remove("bg-blue-50");
+          unifiedLoginCard.classList.add("bg-green-50");
+          loginTitle.classList.remove("text-blue-800");
+          loginTitle.classList.add("text-green-800");
+          mainLoginButton.classList.remove("bg-blue-600", "hover:bg-blue-700");
+          mainLoginButton.classList.add("bg-green-600", "hover:bg-green-700");
+          toggleLoginModeBtn.textContent = "Login sebagai Wali Murid";
+          toggleLoginModeBtn.classList.remove(
+            "text-blue-600",
+            "hover:text-blue-800"
+          );
+          toggleLoginModeBtn.classList.add(
+            "text-green-600",
+            "hover:text-green-800"
+          );
+
+          parentNisGroup.classList.add("section-hidden");
+          adminCredentialsGroup.classList.remove("section-hidden");
+          loginNisInput.removeAttribute("required");
+          loginAdminEmailInput.setAttribute("required", "true");
+          mainLoginButton.textContent = "Login sebagai Admin"; // Reset button text immediately
+        } else {
+          currentLoginMode = "parent";
+          loginTitle.textContent = "Login Wali Murid";
+          unifiedLoginCard.classList.remove("bg-green-50");
+          unifiedLoginCard.classList.add("bg-blue-50");
+          loginTitle.classList.remove("text-green-800");
+          loginTitle.classList.add("text-blue-800");
+          mainLoginButton.classList.remove(
+            "bg-green-600",
+            "hover:bg-green-700"
+          );
+          mainLoginButton.classList.add("bg-blue-600", "hover:bg-blue-700");
+          toggleLoginModeBtn.textContent = "Login sebagai Admin";
+          toggleLoginModeBtn.classList.remove(
+            "text-green-600",
+            "hover:text-green-800"
+          );
+          toggleLoginModeBtn.classList.add(
+            "text-blue-600",
+            "hover:text-blue-800"
+          );
+
+          parentNisGroup.classList.remove("section-hidden");
+          adminCredentialsGroup.classList.add("section-hidden");
+          loginNisInput.setAttribute("required", "true");
+          loginAdminEmailInput.removeAttribute("required");
+          mainLoginButton.textContent = "Login sebagai Wali Murid"; // Reset button text immediately
+        }
+        // Clear inputs when switching modes
+        loginNisInput.value = "";
+        loginAdminEmailInput.value = "";
+      });
+
+      // --- Logout Function ---
+      function logout() {
+        currentStudentNis = null;
+        currentStudentClass = null;
+        localStorage.clear(); // Clear all local storage for a clean logout
+        // Clear all data cache on logout
+        for (const key in dataCache) {
+          if (dataCache.hasOwnProperty(key)) {
+            dataCache[key] = [];
+          }
+        }
+
+        loginNisInput.value = "";
+        loginAdminEmailInput.value = "";
+        showSection("login-section");
+        // Reset to parent login view after logout
+        currentLoginMode = "parent";
+        loginTitle.textContent = "Login Wali Murid";
+        unifiedLoginCard.classList.remove("bg-green-50");
+        unifiedLoginCard.classList.add("bg-blue-50");
+        loginTitle.classList.remove("text-green-800");
+        loginTitle.classList.add("text-blue-800");
+        mainLoginButton.classList.remove("bg-green-600", "hover:bg-green-700");
+        mainLoginButton.classList.add("bg-blue-600", "hover:bg-blue-700");
+        toggleLoginModeBtn.textContent = "Login sebagai Admin";
+        toggleLoginModeBtn.classList.remove(
+          "text-green-600",
+          "hover:text-green-800"
+        );
+        toggleLoginModeBtn.classList.add(
+          "text-blue-600",
+          "hover:text-blue-800"
+        );
+        parentNisGroup.classList.remove("section-hidden");
+        adminCredentialsGroup.classList.add("section-hidden");
+        loginNisInput.setAttribute("required", "true");
+        loginAdminEmailInput.removeAttribute("required");
+        mainLoginButton.textContent = "Login sebagai Wali Murid"; // Reset button text immediately
+      }
+
+      // --- Tab Switching Logic for Parent Dashboard ---
+      document.querySelectorAll(".tab-button").forEach((button) => {
+        button.addEventListener("click", async () => {
+          const targetTab = button.dataset.tab;
+          switchTab(targetTab, document.querySelectorAll(".tab-button"));
+          showLoading(); // Show loading when switching tabs
+          try {
+            // Ensure data is re-rendered with current filters when tab is activated
+            if (targetTab === "kehadiran" && dataCache.kehadiran.length > 0) {
+              const currentFilter = kehadiranFilterPeriodSelect.value;
+              renderKehadiranChartAndTable(dataCache.kehadiran, currentFilter);
+            } else if (
+              targetTab === "jadwal-pelajaran" &&
+              dataCache.jadwal_pelajaran.length > 0
+            ) {
+              const currentFilterDay = jadwalFilterDaySelect.value;
+              renderJadwalPelajaran(
+                dataCache.jadwal_pelajaran,
+                currentStudentClass,
+                currentFilterDay
+              );
+            }
+          } catch (error) {
+            console.error("Error loading tab data:", error);
+            showToast("Gagal memuat data untuk tab ini.", "error");
+          } finally {
+            hideLoading(); // Hide loading after tab data is rendered
+          }
+        });
+      });
+
+      // --- Tab Switching Logic for Admin Dashboard ---
+      document.querySelectorAll(".admin-tab-button").forEach((button) => {
+        button.addEventListener("click", async () => {
+          const targetTab = button.dataset.tab;
+          switchTab(
+            targetTab,
+            document.querySelectorAll(".admin-tab-button"),
+            "admin-"
+          );
+          showLoading(); // Show loading when switching admin tabs
+          try {
+            // Reset forms to 'create' mode when switching tabs
+            resetAdminForm(
+              document.getElementById("form-input-tugas"),
+              tugasFormMode,
+              "ID_Tugas",
+              submitTugasBtn,
+              "Simpan Tugas",
+              document.getElementById("tugas-id")
+            );
+            resetAdminForm(
+              document.getElementById("form-input-nilai"),
+              nilaiFormMode,
+              "ID_Nilai",
+              submitNilaiBtn,
+              "Simpan Nilai",
+              document.getElementById("nilai-id")
+            );
+            resetAdminForm(
+              document.getElementById("form-input-kehadiran"),
+              kehadiranFormMode,
+              "ID_Kehadiran",
+              submitKehadiranBtn,
+              "Simpan Kehadiran",
+              document.getElementById("kehadiran-id")
+            );
+            resetAdminForm(
+              document.getElementById("form-input-catatan"),
+              catatanFormMode,
+              "ID_Catatan",
+              submitCatatanBtn,
+              "Simpan Catatan",
+              document.getElementById("catatan-id")
+            );
+            resetAdminForm(
+              document.getElementById("form-input-jadwal"),
+              jadwalFormMode,
+              "ID_Jadwal",
+              submitJadwalBtn,
+              "Simpan Jadwal",
+              document.getElementById("jadwal-id")
+            );
+            resetAdminForm(
+              document.getElementById("form-input-pengumuman"),
+              pengumumanFormMode,
+              "ID_Pengumuman",
+              submitPengumumanBtn,
+              "Simpan Pengumuman",
+              document.getElementById("pengumuman-id")
+            );
+
+            // Reload dropdowns and tables if navigating to a form that uses them
+            if (
+              [
+                "input-nilai",
+                "input-kehadiran",
+                "input-catatan",
+                "input-tugas",
+                "input-jadwal",
+                "input-pengumuman",
+              ].includes(targetTab)
+            ) {
+              await loadAdminDropdownData(); // Ensure subject dropdown is populated
+              if (targetTab === "input-nilai") {
+                configureNilaiFormBasedOnSelection(); // Trigger initial configuration for Nilai form
+              } else if (targetTab === "input-tugas") {
+                updateTugasIdField(); // Trigger initial ID generation for Tugas form
+              } else if (targetTab === "input-pengumuman") {
+                // New: for pengumuman ID
+                updatePengumumanIdField();
+              }
+            }
+
+            let sheetNameForTable;
+            switch (targetTab) {
+              case "input-tugas":
+                sheetNameForTable = "Tugas";
+                break;
+              case "input-nilai":
+                sheetNameForTable = "Nilai";
+                break;
+              case "input-kehadiran":
+                sheetNameForTable = "Kehadiran";
+                break;
+              case "input-catatan":
+                sheetNameForTable = "Catatan_Guru";
+                break;
+              case "input-jadwal":
+                sheetNameForTable = "Jadwal_Pelajaran";
+                break;
+              case "input-pengumuman":
+                sheetNameForTable = "Pengumuman";
+                break;
+              default:
+                sheetNameForTable = "";
+            }
+            if (sheetNameForTable) {
+              await loadAdminTableData(sheetNameForTable);
+            }
+          } catch (error) {
+            console.error("Error loading admin tab data:", error);
+            showToast("Gagal memuat data untuk tab admin ini.", "error");
+          } finally {
+            hideLoading(); // Hide loading after admin tab data is rendered
+          }
+        });
+      });
+
+      // Helper function to reset admin forms to create mode
+      function resetAdminForm(
+        formElement,
+        formModeInput,
+        idKey,
+        submitButton,
+        defaultButtonText,
+        idInputElement
+      ) {
+        formElement.reset();
+        formModeInput.value = "create";
+        if (idInputElement) {
+          idInputElement.readOnly = true;
+          if (idKey === "ID_Nilai") {
+            idInputElement.placeholder = "Akan Dihasilkan Otomatis";
+            idInputElement.value = ""; // Clear value for dynamic generation
+            // Also clear and enable other Nilai-specific fields
+            nilaiInput.disabled = false;
+            nilaiStatusSelect.disabled = false;
+            if (nilaiNisSelect) nilaiNisSelect.disabled = false;
+            if (nilaiTugasIdSelect) nilaiTugasIdSelect.disabled = false;
+          } else {
+            idInputElement.value = "Dihasilkan Otomatis";
+          }
+          idInputElement.classList.add("bg-gray-100", "cursor-not-allowed");
+          idInputElement.classList.remove("bg-white"); // Ensure it looks disabled
+        }
+        submitButton.textContent = defaultButtonText; // Reset button text directly
+        submitButton.disabled = false; // Ensure submit button is enabled on reset
+      }
+
+      // --- Data Fetching Function (GET) ---
+      async function fetchData(sheetName, param = null) {
+        let url = `${GOOGLE_APPS_SCRIPT_WEB_APP_URL}?sheet=${sheetName}`;
+        if (param) {
+          if (
+            sheetName === "Siswa" ||
+            sheetName === "Nilai" ||
+            sheetName === "Kehadiran" ||
+            sheetName === "Catatan_Guru"
+          ) {
+            if (typeof param === "object") {
+              // Composite param for Nilai lookup
+              url += `&nis=${param.nis}&id_tugas=${param.id_tugas}`;
+            } else {
+              // Single NIS param
+              url += `&nis=${param}`;
+            }
+          } else if (sheetName === "Jadwal_Pelajaran" && param.class) {
+            // Jadwal is fetched per class
+            url += `&class=${param.class}`;
+          } else if (sheetName === "Pengumuman" && param.class) {
+            // Pengumuman is fetched per class
+            url += `&class=${param.class}`;
+          }
+          // Tugas is always fetched fully (no class filter here, filtered on client side for display)
+        }
+        try {
+          const response = await fetch(url);
+          if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+          }
+          const data = await response.json();
+          console.log(`Fetched data from ${sheetName}:`, data);
+          return data;
+        } catch (error) {
+          console.error(`Error fetching data from ${sheetName}:`, error);
+          showToast(
+            `Gagal mengambil data dari ${sheetName}. Error: ${error.message}`,
+            "error"
+          );
+          return null;
+        }
+      }
+
+      // --- Data Posting/Updating/Deleting Function (POST) ---
+      async function sendData(sheetName, data, action) {
+        const url = `${GOOGLE_APPS_SCRIPT_WEB_APP_URL}`;
+        try {
+          const response = await fetch(url, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/x-www-form-urlencoded",
+            },
+            body: new URLSearchParams({
+              sheet: sheetName,
+              action: action, // 'create', 'update', 'delete'
+              data: JSON.stringify(data),
+            }),
+          });
+          if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+          }
+          const result = await response.json();
+          console.log(`Response from ${sheetName} (${action}):`, result);
+          return result;
+        } catch (error) {
+          console.error(
+            `Error sending data to ${sheetName} (${action}):`,
+            error
+          );
+          showToast(
+            `Gagal ${action} data ke ${sheetName}. Error: ${error.message}`,
+            "error"
+          );
+          return { success: false, message: `Error: ${error.message}` };
+        }
+      }
+
+      // --- Parent Dashboard Data Loading and Rendering ---
+      async function loadParentDashboardData(nis) {
+        // Fetch all required data once
+        const nilaiData = await fetchData("Nilai", nis);
+        const tugasData = await fetchData("Tugas"); // Fetch all tasks
+        const kehadiranData = await fetchData("Kehadiran", nis);
+        const catatanGuruData = await fetchData("Catatan_Guru", nis);
+        const studentInfo = await fetchData("Siswa", nis);
+
+        // Store in cache
+        dataCache.nilai = nilaiData;
+        dataCache.tugas = tugasData;
+        dataCache.kehadiran = kehadiranData;
+        dataCache.catatan_guru = catatanGuruData;
+        dataCache.siswa = studentInfo; // Update student cache
+
+        // Fetch pengumuman relevant to the student's class
+        const pengumumanData = await fetchData("Pengumuman", {
+          class: currentStudentClass,
+        });
+        dataCache.pengumuman = pengumumanData;
+
+        // Populate subject filter tabs and render tugas status table with 'Semua' initially
+        populateSubjectFilterTabs();
+        renderTugasStatus(dataCache.tugas, dataCache.nilai, nis, "Semua"); // Initial render with all tasks
+
+        // Render other sections using cached data
+        // Initialize kehadiran with 'all' filter
+        kehadiranFilterPeriodSelect.value = "all"; // Set default filter to 'all'
+        renderKehadiranChartAndTable(dataCache.kehadiran, "all");
+
+        renderCatatanGuru(dataCache.catatan_guru);
+        if (studentInfo && studentInfo.length > 0) {
+          const studentClass = studentInfo[0].Kelas;
+          // Fetch jadwal pelajaran for specific class
+          const jadwalData = await fetchData("Jadwal_Pelajaran", {
+            class: studentClass,
+          });
+          dataCache.jadwal_pelajaran = jadwalData; // Cache jadwal
+          // Initialize jadwal with 'all' filter
+          jadwalFilterDaySelect.value = "all"; // Set default filter to 'all'
+          renderJadwalPelajaran(
+            dataCache.jadwal_pelajaran,
+            studentClass,
+            "all"
+          );
+        }
+      }
+
+      function renderTugasStatus(
+        allTugasData,
+        nilaiData,
+        currentNis,
+        filterSubject = "Semua"
+      ) {
+        const tbody = document.getElementById("tugas-status-table-body");
+        tbody.innerHTML = "";
+
+        let filteredTugasData = allTugasData;
+        if (filterSubject !== "Semua") {
+          filteredTugasData = allTugasData.filter(
+            (tugas) => tugas.Mata_Pelajaran === filterSubject
+          );
+        }
+
+        if (!filteredTugasData || filteredTugasData.length === 0) {
+          tbody.innerHTML =
+            '<tr><td colspan="5" class="text-center py-4 text-gray-500">Tidak ada tugas yang terdaftar.</td></tr>';
+          return;
+        }
+
+        filteredTugasData.forEach((tugas) => {
+          // Find the specific nilai for this student and this task
+          const studentNilai = nilaiData.find(
+            (n) =>
+              n.ID_Tugas === tugas.ID_Tugas &&
+              String(n.NIS) === String(currentNis)
+          );
+
+          let nilaiDisplay = "N/A";
+          let status = "Belum Dikerjakan";
+          let statusColor = "text-red-600";
+
+          if (studentNilai) {
+            nilaiDisplay = studentNilai.Nilai;
+            status = studentNilai.Status_Pengerjaan;
+            statusColor =
+              studentNilai.Status_Pengerjaan === "Tuntas"
+                ? "text-green-600"
+                : "text-red-600";
+          }
+
+          const row = `
+                    <tr>
+                        <td class="py-2 px-4 border-b text-sm text-gray-700">${tugas.Nama_Tugas}</td>
+                        <td class="py-2 px-4 border-b text-sm text-gray-700">${tugas.Mata_Pelajaran}</td>
+                        <td class="py-2 px-4 border-b text-sm text-gray-700">${tugas.Batas_Waktu}</td>
+                        <td class="py-2 px-4 border-b text-sm text-gray-700">${nilaiDisplay}</td>
+                        <td class="py-2 px-4 border-b text-sm ${statusColor}">${status}</td>
+                    </tr>
+                `;
+          tbody.innerHTML += row;
+        });
+      }
+
+      function populateSubjectFilterTabs() {
+        subjectFilterTabsContainer.innerHTML = ""; // Clear existing tabs
+
+        // Add "Semua" tab
+        const allTab = document.createElement("button");
+        allTab.textContent = "Semua";
+        allTab.classList.add("subject-tab-button", "active"); // 'Semua' is active by default
+        allTab.addEventListener("click", () => {
+          renderTugasStatus(
+            dataCache.tugas,
+            dataCache.nilai,
+            currentStudentNis,
+            "Semua"
+          );
+          highlightSubjectTab(allTab);
+        });
+        subjectFilterTabsContainer.appendChild(allTab);
+
+        // Add subject-specific tabs
+        HARDCODED_SUBJECTS.forEach((subject) => {
+          const tab = document.createElement("button");
+          tab.textContent = subject;
+          tab.classList.add("subject-tab-button");
+          tab.addEventListener("click", () => {
+            renderTugasStatus(
+              dataCache.tugas,
+              dataCache.nilai,
+              currentStudentNis,
+              subject
+            );
+            highlightSubjectTab(tab);
+          });
+          subjectFilterTabsContainer.appendChild(tab);
+        });
+      }
+
+      function highlightSubjectTab(activeTab) {
+        document.querySelectorAll(".subject-tab-button").forEach((tab) => {
+          tab.classList.remove("active");
+        });
+        activeTab.classList.add("active");
+      }
+
+      // --- Filter Attendance Data ---
+      function filterAttendanceData(allData, period) {
+        const now = new Date();
+        let startDate = null;
+
+        if (!allData || allData.length === 0) return [];
+
+        // Ensure dates are parsed correctly and sort by date (newest first)
+        const sortedData = [...allData].sort(
+          (a, b) => new Date(b.Tanggal) - new Date(a.Tanggal)
+        );
+        const latestRecordDate =
+          sortedData.length > 0 ? new Date(sortedData[0].Tanggal) : now;
+
+        switch (period) {
+          case "week":
+            startDate = new Date(latestRecordDate);
+            startDate.setDate(latestRecordDate.getDate() - 7);
+            break;
+          case "month":
+            startDate = new Date(
+              latestRecordDate.getFullYear(),
+              latestRecordDate.getMonth(),
+              1
+            );
+            break;
+          case "3months":
+            startDate = new Date(latestRecordDate);
+            startDate.setMonth(latestRecordDate.getMonth() - 3);
+            break;
+          case "all":
+          default:
+            return allData; // No filter
+        }
+
+        return allData.filter((item) => {
+          const itemDate = new Date(item.Tanggal);
+          // Ensure the date is within the desired range (inclusive of start and end)
+          return itemDate >= startDate && itemDate <= latestRecordDate;
+        });
+      }
+
+      // --- Render Kehadiran Chart and Table ---
+      function renderKehadiranChartAndTable(allKehadiranData, filterPeriod) {
+        const filteredData = filterAttendanceData(
+          allKehadiranData,
+          filterPeriod
+        );
+        renderAttendanceChart(filteredData);
+        renderKehadiranTable(filteredData);
+      }
+
+      // --- Render Kehadiran Table ---
+      function renderKehadiranTable(kehadiranData) {
+        const tbody = document.getElementById("kehadiran-table-body");
+        tbody.innerHTML = "";
+
+        if (!kehadiranData || kehadiranData.length === 0) {
+          tbody.innerHTML =
+            '<tr><td colspan="2" class="text-center py-4 text-gray-500">Tidak ada data kehadiran untuk periode ini.</td></tr>';
+          return;
+        }
+
+        // Sort data by date in descending order (latest first)
+        kehadiranData.sort((a, b) => new Date(b.Tanggal) - new Date(a.Tanggal));
+
+        kehadiranData.forEach((data) => {
+          const row = `
+                    <tr>
+                        <td class="py-2 px-4 border-b text-sm text-gray-700">${data.Tanggal}</td>
+                        <td class="py-2 px-4 border-b text-sm text-gray-700">${data.Status}</td>
+                    </tr>
+                `;
+          tbody.innerHTML += row;
+        });
+      }
+
+      // --- Render Pie Chart for Kehadiran ---
+      function renderAttendanceChart(kehadiranData) {
+        const canvas = document.getElementById("kehadiran-chart");
+        const legendContainer = document.getElementById(
+          "kehadiran-chart-legend"
+        );
+        if (!canvas) {
+          console.warn("Canvas element 'kehadiran-chart' not found.");
+          return;
+        }
+
+        const ctx = canvas.getContext("2d");
+        ctx.clearRect(0, 0, canvas.width, canvas.height); // Clear previous drawings
+
+        // Get the actual CSS dimensions of the canvas
+        const cssWidth = canvas.offsetWidth;
+        const cssHeight = canvas.offsetHeight;
+
+        // Get device pixel ratio for high-DPI screens
+        const devicePixelRatio = window.devicePixelRatio || 1;
+
+        // Set canvas drawing buffer size to match device pixels
+        canvas.width = cssWidth * devicePixelRatio;
+        canvas.height = cssHeight * devicePixelRatio;
+
+        // Scale the context to ensure drawings are crisp
+        ctx.scale(devicePixelRatio, devicePixelRatio);
+
+        const statusCounts = {
+          Hadir: 0,
+          Izin: 0,
+          Sakit: 0,
+          Alpha: 0,
+        };
+
+        kehadiranData.forEach((item) => {
+          const status = item.Status;
+          if (statusCounts.hasOwnProperty(status)) {
+            statusCounts[status]++;
+          }
+        });
+
+        const labels = Object.keys(statusCounts);
+        const data = Object.values(statusCounts);
+        const colors = ["#4CAF50", "#FFC107", "#2196F3", "#F44336"]; // Green (Hadir), Amber (Izin), Blue (Sakit), Red (Alpha)
+        const legendLabels = {
+          Hadir: "Hadir",
+          Izin: "Izin",
+          Sakit: "Sakit",
+          Alpha: "Alpha",
+        };
+
+        let total = data.reduce((sum, value) => sum + value, 0);
+
+        if (total === 0) {
+          // Display a message if no data to show
+          ctx.fillStyle = "#6b7280"; // gray-500
+          ctx.font = `bold ${16 / devicePixelRatio}px Inter`; // Adjust font size for clarity
+          ctx.textAlign = "center";
+          ctx.textBaseline = "middle";
+          // Adjust text position to be in the center of the CSS size canvas
+          ctx.fillText(
+            "Tidak ada data kehadiran untuk periode ini.",
+            cssWidth / 2,
+            cssHeight / 2
+          );
+          legendContainer.innerHTML = ""; // Clear legend
+          return;
+        }
+
+        let currentAngle = 0;
+        const centerX = cssWidth / 2; // Use CSS dimensions for drawing coordinates
+        const centerY = cssHeight / 2;
+        const radius = Math.min(centerX, centerY) * 0.7; // 70% of the smaller CSS dimension for radius
+
+        // Draw slices
+        data.forEach((value, index) => {
+          const sliceAngle = (value / total) * Math.PI * 2;
+
+          ctx.beginPath();
+          ctx.moveTo(centerX, centerY);
+          ctx.arc(
+            centerX,
+            centerY,
+            radius,
+            currentAngle,
+            currentAngle + sliceAngle
+          );
+          ctx.closePath();
+          ctx.fillStyle = colors[index];
+          ctx.fill();
+          ctx.strokeStyle = "#ffffff"; // White border between slices
+          ctx.lineWidth = 2 / devicePixelRatio; // Adjust line width based on pixel ratio
+          ctx.stroke();
+
+          // Add percentage label to the slice
+          if (value > 0) {
+            // Only label slices with values
+            const midAngle = currentAngle + sliceAngle / 2;
+            const textX = centerX + Math.cos(midAngle) * (radius / 1.5);
+            const textY = centerY + Math.sin(midAngle) * (radius / 1.5);
+
+            ctx.fillStyle = "#fff"; // White text for visibility on colors
+            ctx.font = `bold ${14 / devicePixelRatio}px Inter`; // Adjust font size based on pixel ratio
+            ctx.textAlign = "center";
+            ctx.textBaseline = "middle";
+            ctx.fillText(
+              `${((value / total) * 100).toFixed(1)}%`,
+              textX,
+              textY
+            );
+          }
+
+          currentAngle += sliceAngle;
+        });
+
+        // Draw Legend
+        legendContainer.innerHTML = ""; // Clear existing legend
+        labels.forEach((label, index) => {
+          const color = colors[index];
+          const count = statusCounts[label];
+          const legendItem = document.createElement("div");
+          legendItem.classList.add("flex", "items-center", "space-x-1");
+          legendItem.innerHTML = `
+                    <span class="inline-block w-3 h-3 rounded-full" style="background-color: ${color};"></span>
+                    <span class="text-gray-700">${legendLabels[label]} (${count})</span>
+                `;
+          legendContainer.appendChild(legendItem);
+        });
+      }
+
+      // Add event listener for window resize to redraw chart
+      window.addEventListener("resize", () => {
+        if (!parentDashboardSection.classList.contains("section-hidden")) {
+          // Check if dataCache.kehadiran is available before trying to render
+          if (dataCache.kehadiran && dataCache.kehadiran.length > 0) {
+            const currentFilter = kehadiranFilterPeriodSelect.value;
+            renderKehadiranChartAndTable(dataCache.kehadiran, currentFilter);
+          }
+        }
+      });
+
+      // Add event listener for filter period change
+      kehadiranFilterPeriodSelect.addEventListener("change", (event) => {
+        const selectedPeriod = event.target.value;
+        renderKehadiranChartAndTable(dataCache.kehadiran, selectedPeriod);
+      });
+
+      function renderCatatanGuru(catatanData) {
+        const tbody = document.getElementById("catatan-guru-table-body");
+        tbody.innerHTML = "";
+
+        if (!catatanData || catatanData.length === 0) {
+          tbody.innerHTML =
+            '<tr><td colspan="3" class="text-center py-4 text-gray-500">Tidak ada catatan guru.</td></tr>';
+          return;
+        }
+
+        catatanData.forEach((data) => {
+          const row = `
+                    <tr>
+                        <td class="py-2 px-4 border-b text-sm text-gray-700">${
+                          data.Minggu_Ke
+                        }</td>
+                        <td class="py-2 px-4 border-b text-sm text-gray-700">${
+                          data.Catatan
+                        }</td>
+                        <td class="py-2 px-4 border-b text-sm text-gray-700">${
+                          data.Tanggal_Input || "N/A"
+                        }</td>
+                    </tr>
+                `;
+          tbody.innerHTML += row;
+        });
+      }
+
+      function renderJadwalPelajaran(
+        allJadwalData,
+        studentClass,
+        filterDay = "all"
+      ) {
+        const tbody = document.getElementById("jadwal-pelajaran-table-body");
+        tbody.innerHTML = "";
+
+        if (!allJadwalData || allJadwalData.length === 0) {
+          tbody.innerHTML =
+            '<tr><td colspan="4" class="text-center py-4 text-gray-500">Tidak ada data jadwal pelajaran.</td></tr>';
+          return;
+        }
+
+        let filteredJadwal = allJadwalData;
+        // Assuming data is already filtered by studentClass from API,
+        // now filter by day if selected.
+        if (filterDay !== "all") {
+          filteredJadwal = allJadwalData.filter(
+            (jadwal) => jadwal.Hari === filterDay
+          );
+        }
+
+        if (filteredJadwal.length === 0) {
+          tbody.innerHTML = `<tr><td colspan="4" class="text-center py-4 text-gray-500">Tidak ada jadwal pelajaran untuk kelas ${studentClass} pada hari ${
+            filterDay === "all" ? "ini" : filterDay
+          }.</td></tr>`;
+          return;
+        }
+
+        filteredJadwal.sort((a, b) => {
+          const days = [
+            "Senin",
+            "Selasa",
+            "Rabu",
+            "Kamis",
+            "Jumat",
+            "Sabtu",
+            "Minggu",
+          ];
+          const dayA = days.indexOf(a.Hari);
+          const dayB = days.indexOf(b.Hari);
+          if (dayA !== dayB) return dayA - dayB;
+          return a.Jam.localeCompare(b.Jam); // Sort by time if day is same
+        });
+
+        filteredJadwal.forEach((data) => {
+          const row = `
+                    <tr>
+                        <td class="py-2 px-4 border-b text-sm text-gray-700">${data.Hari}</td>
+                        <td class="py-2 px-4 border-b text-sm text-gray-700">${data.Jam}</td>
+                        <td class="py-2 px-4 border-b text-sm text-gray-700">${data.Mata_Pelajaran}</td>
+                        <td class="py-2 px-4 border-b text-sm text-gray-700">${data.Guru}</td>
+                    </tr>
+                `;
+          tbody.innerHTML += row;
+        });
+      }
+
+      // Add event listener for jadwal filter day change
+      jadwalFilterDaySelect.addEventListener("change", (event) => {
+        const selectedDay = event.target.value;
+        // currentStudentClass is already set on login
+        if (currentStudentClass) {
+          renderJadwalPelajaran(
+            dataCache.jadwal_pelajaran,
+            currentStudentClass,
+            selectedDay
+          );
+        }
+      });
+
+      // --- Helper function to populate dropdowns ---
+      function populateDropdown(
+        selectElement,
+        data,
+        valueKey,
+        textKey,
+        initialOptionText = "Pilih..."
+      ) {
+        selectElement.innerHTML = `<option value="">${initialOptionText}</option>`; // Clear and add default option
+        if (data && data.length > 0) {
+          data.forEach((item) => {
+            const option = document.createElement("option");
+            option.value = item[valueKey];
+            option.textContent = item[textKey];
+            selectElement.appendChild(option);
+          });
+        } else {
+          selectElement.innerHTML = `<option value="">Tidak ada data tersedia</option>`;
+        }
+      }
+
+      // --- Load Data for Admin Dropdowns and Tables ---
+      async function loadAdminDropdownData() {
+        populateDropdown(nilaiNisSelect, null, "", "", "Memuat siswa...");
+        populateDropdown(kehadiranNisSelect, null, "", "", "Memuat siswa...");
+        populateDropdown(catatanNisSelect, null, "", "", "Memuat siswa...");
+
+        const siswaData = await fetchData("Siswa");
+        if (siswaData) {
+          dataCache.siswa = siswaData;
+          populateDropdown(
+            nilaiNisSelect,
+            siswaData,
+            "NIS",
+            "Nama",
+            "Pilih Siswa..."
+          );
+          populateDropdown(
+            kehadiranNisSelect,
+            siswaData,
+            "NIS",
+            "Nama",
+            "Pilih Siswa..."
+          );
+          populateDropdown(
+            catatanNisSelect,
+            siswaData,
+            "NIS",
+            "Nama",
+            "Pilih Siswa..."
+          );
+        } else {
+          showToast("Gagal memuat daftar siswa untuk dropdown.", "error");
+        }
+
+        // Populate Mata Pelajaran dropdowns using HARDCODED_SUBJECTS and SUBJECT_ABBREVIATIONS
+        const subjectOptions = HARDCODED_SUBJECTS.map((s) => ({
+          value: s,
+          text: s,
+        }));
+        populateDropdown(
+          tugasMapelSelect,
+          subjectOptions,
+          "value",
+          "text",
+          "Pilih Mata Pelajaran..."
+        );
+        populateDropdown(
+          jadwalMapelSelect,
+          subjectOptions,
+          "value",
+          "text",
+          "Pilih Mata Pelajaran..."
+        );
+
+        if (nilaiTugasIdSelect) {
+          // Check if element exists before populating
+          populateDropdown(nilaiTugasIdSelect, null, "", "", "Memuat tugas...");
+          const tugasData = await fetchData("Tugas");
+          if (tugasData) {
+            dataCache.tugas = tugasData;
+            populateDropdown(
+              nilaiTugasIdSelect,
+              tugasData,
+              "ID_Tugas",
+              "Nama_Tugas",
+              "Pilih Tugas..."
+            );
+          } else {
+            showToast("Gagal memuat daftar tugas untuk dropdown.", "error");
+          }
+        }
+      }
+
+      async function loadAdminTableData(sheetName) {
+        let tableBody;
+        let idKey;
+        let dataFetch;
+        let renderFunction;
+
+        switch (sheetName) {
+          case "Tugas":
+            tableBody = document.getElementById("tugas-list-table-body");
+            idKey = "ID_Tugas";
+            dataFetch = await fetchData("Tugas");
+            dataCache.tugas = dataFetch;
+            renderFunction = (item) => `
+                        <td class="py-2 px-4 border-b text-sm text-gray-700">${item.ID_Tugas}</td>
+                        <td class="py-2 px-4 border-b text-sm text-gray-700">${item.Nama_Tugas}</td>
+                        <td class="py-2 px-4 border-b text-sm text-gray-700">${item.Mata_Pelajaran}</td>
+                        <td class="py-2 px-4 border-b text-sm text-gray-700">${item.Batas_Waktu}</td>
+                        <td class="py-2 px-4 border-b text-sm text-gray-700">${item.Untuk_Kelas}</td>
+                    `;
+            break;
+          case "Nilai":
+            tableBody = document.getElementById("nilai-list-table-body");
+            idKey = "ID_Nilai";
+            // Fetches ALL Nilai for Admin table, not filtered by NIS
+            dataFetch = await fetchData("Nilai");
+            dataCache.nilai = dataFetch; // Update cache
+            renderFunction = (item) => `
+                        <td class="py-2 px-4 border-b text-sm text-gray-700">${
+                          item.ID_Nilai
+                        }</td>
+                        <td class="py-2 px-4 border-b text-sm text-gray-700">${
+                          item.NIS
+                        }</td>
+                        <td class="py-2 px-4 border-b text-sm text-gray-700">${
+                          item.ID_Tugas
+                        }</td>
+                        <td class="py-2 px-4 border-b text-sm text-gray-700">${
+                          item.Nilai
+                        }</td>
+                        <td class="py-2 px-4 border-b text-sm text-gray-700">${
+                          item.Status_Pengerjaan
+                        }</td>
+                        <td class="py-2 px-4 border-b text-sm text-gray-700">${
+                          item.Tanggal_Input || "N/A"
+                        }</td>
+                    `;
+            break;
+          case "Kehadiran":
+            tableBody = document.getElementById("kehadiran-list-table-body");
+            idKey = "ID_Kehadiran";
+            // Fetches ALL Kehadiran for Admin table, not filtered by NIS
+            dataFetch = await fetchData("Kehadiran");
+            dataCache.kehadiran = dataFetch; // Update cache
+            renderFunction = (item) => `
+                        <td class="py-2 px-4 border-b text-sm text-gray-700">${item.ID_Kehadiran}</td>
+                        <td class="py-2 px-4 border-b text-sm text-gray-700">${item.NIS}</td>
+                        <td class="py-2 px-4 border-b text-sm text-gray-700">${item.Tanggal}</td>
+                        <td class="py-2 px-4 border-b text-sm text-gray-700">${item.Status}</td>
+                    `;
+            break;
+          case "Catatan_Guru":
+            tableBody = document.getElementById("catatan-list-table-body");
+            idKey = "ID_Catatan";
+            // Fetches ALL Catatan_Guru for Admin table, not filtered by NIS
+            dataFetch = await fetchData("Catatan_Guru");
+            dataCache.catatan_guru = dataFetch; // Update cache
+            renderFunction = (item) => `
+                        <td class="py-2 px-4 border-b text-sm text-gray-700">${
+                          item.ID_Catatan
+                        }</td>
+                        <td class="py-2 px-4 border-b text-sm text-gray-700">${
+                          item.NIS
+                        }</td>
+                        <td class="py-2 px-4 border-b text-sm text-gray-700">${
+                          item.Minggu_Ke
+                        }</td>
+                        <td class="py-2 px-4 border-b text-sm text-gray-700">${
+                          item.Catatan
+                        }</td>
+                        <td class="py-2 px-4 border-b text-sm text-gray-700">${
+                          item.Tanggal_Input || "N/A"
+                        }</td>
+                    `;
+            break;
+          case "Jadwal_Pelajaran":
+            tableBody = document.getElementById("jadwal-list-table-body");
+            idKey = "ID_Jadwal";
+            dataFetch = await fetchData("Jadwal_Pelajaran"); // Fetch all, then display
+            dataCache.jadwal_pelajaran = dataFetch; // Update cache
+            renderFunction = (item) => `
+                        <td class="py-2 px-4 border-b text-sm text-gray-700">${item.ID_Jadwal}</td>
+                        <td class="py-2 px-4 border-b text-sm text-gray-700">${item.Kelas}</td>
+                        <td class="py-2 px-4 border-b text-sm text-gray-700">${item.Hari}</td>
+                        <td class="py-2 px-4 border-b text-sm text-gray-700">${item.Jam}</td>
+                        <td class="py-2 px-4 border-b text-sm text-gray-700">${item.Mata_Pelajaran}</td>
+                        <td class="py-2 px-4 border-b text-sm text-gray-700">${item.Guru}</td>
+                    `;
+            break;
+          case "Pengumuman":
+            tableBody = document.getElementById("pengumuman-list-table-body");
+            idKey = "ID_Pengumuman";
+            // Admin should see all announcements, no class filter here
+            dataFetch = await fetchData("Pengumuman");
+            dataCache.pengumuman = dataFetch; // Update cache
+            renderFunction = (item) => `
+                        <td class="py-2 px-4 border-b text-sm text-gray-700">${
+                          item.ID_Pengumuman
+                        }</td>
+                        <td class="py-2 px-4 border-b text-sm text-gray-700">${
+                          item.Judul
+                        }</td>
+                        <td class="py-2 px-4 border-b text-sm text-gray-700">${
+                          item.Tanggal_Pengumuman
+                        }</td>
+                        <td class="py-2 px-4 border-b text-sm text-gray-700">${
+                          item.Untuk_Kelas || "Semua Kelas"
+                        }</td>
+                    `;
+            break;
+          default:
+            showToast("Nama sheet tidak valid untuk tabel admin.", "error");
+            return;
+        }
+
+        tableBody.innerHTML = ""; // Clear existing rows
+
+        if (!dataFetch || dataFetch.length === 0) {
+          tableBody.innerHTML = `<tr><td colspan="99" class="text-center py-4 text-gray-500">Tidak ada data ${sheetName}.</td></tr>`;
+          return;
+        }
+
+        dataFetch.forEach((item) => {
+          const row = document.createElement("tr");
+          row.innerHTML =
+            renderFunction(item) +
+            `
+                    <td class="py-2 px-4 border-b text-sm text-gray-700">
+                        <button onclick="editEntry('${sheetName}', '${item[idKey]}')" class="bg-yellow-500 hover:bg-yellow-600 text-white py-1 px-2 rounded-md text-xs mr-2">Edit</button>
+                        <button onclick="deleteEntry('${sheetName}', '${item[idKey]}')" class="bg-red-500 hover:bg-red-600 text-white py-1 px-2 rounded-md text-xs">Hapus</button>
+                    </td>
+                `;
+          tableBody.appendChild(row);
+        });
+      }
+
+      // --- Configure Nilai Form based on NIS and ID Tugas selection ---
+      async function configureNilaiFormBasedOnSelection() {
+        const nis = nilaiNisSelect.value;
+        const tugasId = nilaiTugasIdSelect.value;
+        const nilaiIdInput = document.getElementById("nilai-id");
+
+        // Reset form elements to default enabled state first
+        nilaiInput.disabled = false;
+        nilaiStatusSelect.disabled = false;
+        submitNilaiBtn.disabled = false;
+        nilaiInput.value = ""; // Clear value
+        nilaiStatusSelect.value = ""; // Clear selection
+        nilaiEditId.value = ""; // Clear edit ID
+        nilaiFormMode.value = "create"; // Default to create mode
+        submitNilaiBtn.textContent = "Simpan Nilai"; // Default button text
+
+        if (nis && tugasId) {
+          // Generate composite ID
+          nilaiIdInput.value = `${nis}_${tugasId}`;
+          nilaiIdInput.classList.remove("bg-gray-100", "cursor-not-allowed");
+          nilaiIdInput.classList.add("bg-white");
+
+          // Fetch existing Nilai for this student and task combination
+          const existingNilai = await fetchData("Nilai", {
+            nis: nis,
+            id_tugas: tugasId,
+          });
+
+          if (existingNilai && existingNilai.length > 0) {
+            const foundNilai = existingNilai[0];
+            showToast(
+              "Nilai untuk siswa dan tugas ini sudah ada. Mode Edit diaktifkan.",
+              "info"
+            );
+
+            // Populate form fields with existing data
+            nilaiInput.value = foundNilai.Nilai;
+            nilaiStatusSelect.value = foundNilai.Status_Pengerjaan;
+            nilaiEditId.value = foundNilai.ID_Nilai; // Set the original ID for update
+            nilaiFormMode.value = "edit"; // Set form mode to edit
+            submitNilaiBtn.textContent = "Perbarui Nilai";
+
+            if (foundNilai.Status_Pengerjaan === "Tuntas") {
+              showToast(
+                "Nilai ini sudah Tuntas. Input tidak bisa dilakukan ulang.",
+                "warning",
+                5000
+              );
+              nilaiInput.disabled = true;
+              nilaiStatusSelect.disabled = true;
+              submitNilaiBtn.disabled = true; // Disable submit button
+            }
+          }
+        } else {
+          nilaiIdInput.value = "";
+          nilaiIdInput.placeholder = "Akan Dihasilkan Otomatis";
+          nilaiIdInput.classList.add("bg-gray-100", "cursor-not-allowed");
+          nilaiIdInput.classList.remove("bg-white");
+        }
+      }
+
+      // Attach listeners for dynamic Nilai form configuration
+      if (nilaiNisSelect)
+        nilaiNisSelect.addEventListener(
+          "change",
+          configureNilaiFormBasedOnSelection
+        );
+      if (nilaiTugasIdSelect)
+        nilaiTugasIdSelect.addEventListener(
+          "change",
+          configureNilaiFormBasedOnSelection
+        );
+
+      // --- Update Tugas ID field based on Mata Pelajaran selection ---
+      async function updateTugasIdField() {
+        const selectedSubject = tugasMapelSelect.value;
+        const tugasIdInput = document.getElementById("tugas-id");
+
+        if (selectedSubject) {
+          const subjectAbbr = SUBJECT_ABBREVIATIONS[selectedSubject] || "OTH"; // Default to OTH if not found
+          const currentMonth = new Date().getMonth() + 1; // getMonth() is 0-indexed
+
+          // Fetch all existing tasks to determine the next sequential number for the selected subject and month
+          const allTugas =
+            dataCache.tugas.length > 0
+              ? dataCache.tugas
+              : (await fetchData("Tugas")) || [];
+          dataCache.tugas = allTugas; // Update cache
+
+          const tasksForSubjectInMonth = allTugas.filter((task) => {
+            const taskSubject = task.Mata_Pelajaran;
+            // Assuming Tanggal_Input is added to Tugas sheet for creation date, otherwise use current date for filtering.
+            // For now, let's derive month from `ID_Tugas` if it follows the pattern, or assume current month.
+            // A more robust solution might require a 'Tanggal_Input' column in the Tugas sheet.
+            let taskMonth = currentMonth; // Default to current month for existing tasks if no date field
+            if (task.ID_Tugas && task.ID_Tugas.length >= 6) {
+              // e.g., MTK0106
+              const monthFromId = parseInt(
+                task.ID_Tugas.substring(task.ID_Tugas.length - 2)
+              );
+              if (
+                !isNaN(monthFromId) &&
+                monthFromId >= 1 &&
+                monthFromId <= 12
+              ) {
+                taskMonth = monthFromId;
+              }
+            }
+
+            // Filter tasks that match subject and are from the current month
+            return (
+              taskSubject === selectedSubject && taskMonth === currentMonth
+            );
+          });
+
+          const nextTaskNumber = tasksForSubjectInMonth.length + 1;
+          const newTugasId = generateTugasId(
+            subjectAbbr,
+            nextTaskNumber,
+            currentMonth
+          );
+
+          tugasIdInput.value = newTugasId;
+          tugasIdInput.classList.remove("bg-gray-100", "cursor-not-allowed");
+          tugasIdInput.classList.add("bg-white");
+        } else {
+          tugasIdInput.value = "Dihasilkan Otomatis";
+          tugasIdInput.classList.add("bg-gray-100", "cursor-not-allowed");
+          tugasIdInput.classList.remove("bg-white");
+        }
+      }
+
+      // Attach listener for dynamic Tugas ID generation
+      tugasMapelSelect.addEventListener("change", updateTugasIdField);
+
+      // --- Update Pengumuman ID field ---
+      async function updatePengumumanIdField() {
+        const pengumumanIdInput = document.getElementById("pengumuman-id");
+        const allPengumuman =
+          dataCache.pengumuman.length > 0
+            ? dataCache.pengumuman
+            : (await fetchData("Pengumuman")) || [];
+        dataCache.pengumuman = allPengumuman; // Update cache
+
+        const nextPengumumanNumber = allPengumuman.length + 1;
+        const newPengumumanId = `PGM_${String(nextPengumumanNumber).padStart(
+          3,
+          "0"
+        )}`;
+
+        pengumumanIdInput.value = newPengumumanId;
+        pengumumanIdInput.classList.remove("bg-gray-100", "cursor-not-allowed");
+        pengumumanIdInput.classList.add("bg-white");
+      }
+
+      // --- Edit Entry Function ---
+      async function editEntry(sheetName, id) {
+        let formElement;
+        let idInput;
+        let modeInput;
+        let submitButton;
+        let itemToEdit;
+        let idKey; // To get the correct ID key for the sheet
+
+        try {
+          // Fetch the latest data for editing, in case it's not in cache or has changed
+          const currentData = await fetchData(sheetName);
+          if (!currentData) {
+            showToast("Gagal memuat data untuk edit.", "error");
+            return;
+          }
+          // Update the cache with the latest data
+          dataCache[sheetName.toLowerCase().replace("_", "")] = currentData; // Normalize sheetName for cache key
+
+          switch (sheetName) {
+            case "Tugas":
+              formElement = document.getElementById("form-input-tugas");
+              idInput = document.getElementById("tugas-id");
+              modeInput = tugasFormMode;
+              submitButton = submitTugasBtn;
+              itemToEdit = dataCache.tugas.find((item) => item.ID_Tugas === id);
+              idKey = "ID_Tugas";
+              document.getElementById("tugas-nama").value =
+                itemToEdit.Nama_Tugas;
+              tugasMapelSelect.value = itemToEdit.Mata_Pelajaran; // Set dropdown value
+              document.getElementById("tugas-deadline").value =
+                itemToEdit.Batas_Waktu;
+              document.getElementById("tugas-kelas").value =
+                itemToEdit.Untuk_Kelas;
+              tugasEditId.value = itemToEdit.ID_Tugas; // Store original ID for update
+              break;
+            case "Nilai":
+              formElement = document.getElementById("form-input-nilai");
+              idInput = document.getElementById("nilai-id");
+              modeInput = nilaiFormMode;
+              submitButton = submitNilaiBtn;
+              itemToEdit = dataCache.nilai.find((item) => item.ID_Nilai === id);
+              idKey = "ID_Nilai";
+              if (nilaiNisSelect) nilaiNisSelect.value = itemToEdit.NIS;
+              if (nilaiTugasIdSelect)
+                nilaiTugasIdSelect.value = itemToEdit.ID_Tugas;
+              nilaiInput.value = itemToEdit.Nilai;
+              nilaiStatusSelect.value = itemToEdit.Status_Pengerjaan;
+              nilaiEditId.value = itemToEdit.ID_Nilai;
+              // Re-enable form fields when editing (in case they were disabled by Tuntas check)
+              nilaiInput.disabled = false;
+              nilaiStatusSelect.disabled = false;
+              if (nilaiNisSelect) nilaiNisSelect.disabled = true; // NIS and Tugas ID should remain read-only during edit
+              if (nilaiTugasIdSelect) nilaiTugasIdSelect.disabled = true;
+              break;
+            case "Kehadiran":
+              formElement = document.getElementById("form-input-kehadiran");
+              idInput = document.getElementById("kehadiran-id");
+              modeInput = kehadiranFormMode;
+              submitButton = submitKehadiranBtn;
+              itemToEdit = dataCache.kehadiran.find(
+                (item) => item.ID_Kehadiran === id
+              );
+              idKey = "ID_Kehadiran";
+              kehadiranNisSelect.value = itemToEdit.NIS;
+              document.getElementById("kehadiran-tanggal").value =
+                itemToEdit.Tanggal;
+              document.getElementById("kehadiran-status").value =
+                itemToEdit.Status;
+              kehadiranEditId.value = itemToEdit.ID_Kehadiran;
+              break;
+            case "Catatan_Guru":
+              formElement = document.getElementById("form-input-catatan");
+              idInput = document.getElementById("catatan-id");
+              modeInput = catatanFormMode;
+              submitButton = submitCatatanBtn;
+              itemToEdit = dataCache.catatan_guru.find(
+                (item) => item.ID_Catatan === id
+              );
+              idKey = "ID_Catatan";
+              catatanNisSelect.value = itemToEdit.NIS;
+              document.getElementById("catatan-minggu").value =
+                itemToEdit.Minggu_Ke;
+              document.getElementById("catatan-isi").value = itemToEdit.Catatan;
+              catatanEditId.value = itemToEdit.ID_Catatan;
+              break;
+            case "Jadwal_Pelajaran":
+              formElement = document.getElementById("form-input-jadwal");
+              idInput = document.getElementById("jadwal-id");
+              modeInput = jadwalFormMode;
+              submitButton = submitJadwalBtn;
+              itemToEdit = dataCache.jadwal_pelajaran.find(
+                (item) => item.ID_Jadwal === id
+              );
+              idKey = "ID_Jadwal";
+              document.getElementById("jadwal-kelas").value = itemToEdit.Kelas;
+              document.getElementById("jadwal-hari").value = itemToEdit.Hari;
+              document.getElementById("jadwal-jam").value = itemToEdit.Jam;
+              jadwalMapelSelect.value = itemToEdit.Mata_Pelajaran; // Set dropdown value
+              document.getElementById("jadwal-guru").value = itemToEdit.Guru;
+              jadwalEditId.value = itemToEdit.ID_Jadwal;
+              break;
+            case "Pengumuman":
+              formElement = document.getElementById("form-input-pengumuman");
+              idInput = document.getElementById("pengumuman-id");
+              modeInput = pengumumanFormMode;
+              submitButton = submitPengumumanBtn;
+              itemToEdit = dataCache.pengumuman.find(
+                (item) => item.ID_Pengumuman === id
+              );
+              idKey = "ID_Pengumuman";
+              document.getElementById("pengumuman-judul").value =
+                itemToEdit.Judul;
+              document.getElementById("pengumuman-isi").value =
+                itemToEdit.Isi_Pengumuman;
+              document.getElementById("pengumuman-tanggal").value =
+                itemToEdit.Tanggal_Pengumuman;
+              document.getElementById("pengumuman-untuk-kelas").value =
+                itemToEdit.Untuk_Kelas || "";
+              pengumumanEditId.value = itemToEdit.ID_Pengumuman;
+              break;
+            default:
+              showToast("Aksi edit tidak didukung untuk sheet ini.", "error");
+              return;
+          }
+
+          if (itemToEdit) {
+            idInput.value = itemToEdit[idKey]; // Populate ID input
+            idInput.readOnly = true; // Make ID non-editable during edit
+            idInput.classList.remove("bg-gray-100", "cursor-not-allowed"); // Remove styling for auto-generated
+            idInput.classList.add("bg-white"); // Add the regular background for non-auto-generated but readonly
+            modeInput.value = "edit";
+            submitButton.textContent = "Perbarui Data"; // Change button text
+            submitButton.disabled = false; // Ensure submit button is enabled for editing
+
+            showToast(`Mode Edit: ${sheetName} ID ${id}`, "info");
+          } else {
+            showToast(
+              `Data dengan ID ${id} tidak ditemukan di ${sheetName}.`,
+              "error"
+            );
+          }
+        } catch (error) {
+          console.error("Edit Entry Error:", error);
+          showToast("Terjadi kesalahan saat mencoba mengedit data.", "error");
+        }
+      }
+
+      // --- Delete Entry Function ---
+      async function deleteEntry(sheetName, id) {
+        if (
+          !confirm(
+            `Apakah Anda yakin ingin menghapus data dengan ID ${id} dari ${sheetName}?`
+          )
+        ) {
+          return;
+        }
+
+        let idKey;
+        switch (sheetName) {
+          case "Tugas":
+            idKey = "ID_Tugas";
+            break;
+          case "Nilai":
+            idKey = "ID_Nilai";
+            break;
+          case "Kehadiran":
+            idKey = "ID_Kehadiran";
+            break;
+          case "Catatan_Guru":
+            idKey = "ID_Catatan";
+            break;
+          case "Jadwal_Pelajaran":
+            idKey = "ID_Jadwal";
+            break;
+          case "Pengumuman":
+            idKey = "ID_Pengumuman";
+            break;
+          case "Siswa":
+            idKey = "NIS";
+            break;
+          case "Admin_Users":
+            idKey = "Email";
+            break;
+          default:
+            showToast("Aksi hapus tidak didukung untuk sheet ini.", "error");
+            return;
+        }
+
+        const dataToDelete = {};
+        dataToDelete[idKey] = id; // Send the ID for deletion
+
+        try {
+          showLoading(); // Show loading before deletion
+          const result = await sendData(sheetName, dataToDelete, "delete");
+          if (result.success) {
+            showToast(
+              `${sheetName} dengan ID ${id} berhasil dihapus!`,
+              "success"
+            );
+            await loadAdminTableData(sheetName); // Reload table after deletion
+            // Refresh dropdowns if relevant data is modified
+            if (sheetName === "Siswa" || sheetName === "Tugas") {
+              await loadAdminDropdownData();
+            }
+            if (sheetName === "Pengumuman") {
+              if (currentStudentNis && currentStudentClass) {
+                const pengumumanData = await fetchData("Pengumuman", {
+                  class: currentStudentClass,
+                });
+                dataCache.pengumuman = pengumumanData;
+                updateNotificationBadge(); // Update badge after deletion
+              }
+            }
+          } else {
+            showToast(
+              `Gagal menghapus ${sheetName} dengan ID ${id}: ${result.message}`,
+              "error"
+            );
+          }
+        } catch (error) {
+          console.error("Delete Entry Error:", error);
+          showToast("Terjadi kesalahan saat menghapus data.", "error");
+        } finally {
+          hideLoading(); // Hide loading after deletion attempt
+        }
+      }
+
+      // --- Admin Form Submissions ---
+
+      // Generic form submission handler for create/update
+      async function handleAdminFormSubmit(
+        e,
+        sheetName,
+        idKeyName,
+        formModeElement,
+        editIdElement,
+        submitButtonElement
+      ) {
+        e.preventDefault();
+        showLoading(); // Show loading on form submission
+
+        try {
+          const formData = new FormData(e.target);
+          const data = Object.fromEntries(formData.entries());
+          let action = formModeElement.value; // 'create' or 'edit'
+          let idInputElement = e.target.querySelector(
+            `input[name="${idKeyName}"]`
+          );
+
+          let result;
+
+          if (action === "create") {
+            // Specific logic for ID_Tugas generation check
+            if (
+              idKeyName === "ID_Tugas" &&
+              idInputElement.value === "Dihasilkan Otomatis"
+            ) {
+              showToast(
+                "Silakan pilih Mata Pelajaran untuk menghasilkan ID Tugas.",
+                "error"
+              );
+              hideLoading();
+              return;
+            } else if (
+              idKeyName === "ID_Nilai" &&
+              (!idInputElement.value || idInputElement.value.trim() === "")
+            ) {
+              showToast(
+                "NIS dan ID Tugas harus dipilih untuk menghasilkan ID Nilai.",
+                "error"
+              );
+              hideLoading();
+              return;
+            } else if (
+              idKeyName === "ID_Pengumuman" &&
+              idInputElement.value === "Dihasilkan Otomatis"
+            ) {
+              showToast("Silakan tunggu ID Pengumuman dihasilkan.", "error");
+              hideLoading();
+              return;
+            }
+
+            // For other auto-generated IDs (Kehadiran, Catatan_Guru, Jadwal_Pelajaran, Pengumuman)
+            // or if ID_Tugas/ID_Nilai/ID_Pengumuman was populated by selection, use the current value
+            if (
+              idKeyName !== "ID_Nilai" &&
+              idKeyName !== "ID_Tugas" &&
+              idKeyName !== "ID_Pengumuman" &&
+              idInputElement &&
+              (idInputElement.value === "Dihasilkan Otomatis" ||
+                idInputElement.value.trim() === "")
+            ) {
+              data[idKeyName] = generateUniqueId(
+                idKeyName.split("_")[0].substring(0, 3).toUpperCase()
+              );
+            } else if (idInputElement && idInputElement.value.trim() !== "") {
+              data[idKeyName] = idInputElement.value; // Use the already generated/entered ID
+            }
+
+            result = await sendData(sheetName, data, "create");
+          } else if (action === "edit") {
+            data.originalId = editIdElement.value; // Pass the original ID for lookup in Apps Script
+            result = await sendData(sheetName, data, "update");
+          }
+
+          if (result.success) {
+            showToast(
+              `${sheetName} berhasil ${
+                action === "create" ? "disimpan" : "diperbarui"
+              }!`,
+              "success"
+            );
+            e.target.reset(); // Clear form
+
+            // Reset form to create mode after submission
+            resetAdminForm(
+              e.target,
+              formModeElement,
+              idKeyName,
+              submitButtonElement,
+              `Simpan ${sheetName.replace("_", " ")}`,
+              idInputElement
+            );
+
+            await loadAdminTableData(sheetName); // Reload table after submission
+            await loadAdminDropdownData(); // Reload dropdowns just in case (e.g., new tasks added or subjects)
+            if (idKeyName === "ID_Nilai") {
+              configureNilaiFormBasedOnSelection(); // Re-trigger for Nilai to reset its field state
+            } else if (idKeyName === "ID_Tugas") {
+              updateTugasIdField(); // Re-trigger for Tugas to reset its field state
+            } else if (idKeyName === "ID_Pengumuman") {
+              updatePengumumanIdField();
+              if (currentStudentNis && currentStudentClass) {
+                const pengumumanData = await fetchData("Pengumuman", {
+                  class: currentStudentClass,
+                });
+                dataCache.pengumuman = pengumumanData;
+                updateNotificationBadge(); // Update badge if new announcement is created/updated
+              }
+            }
+          } else {
+            showToast(
+              `Gagal ${action} ${sheetName}: ${result.message}`,
+              "error"
+            );
+          }
+        } catch (error) {
+          console.error("Admin Form Submit Error:", error);
+          showToast("Terjadi kesalahan saat submit data.", "error");
+        } finally {
+          hideLoading(); // Hide loading after form submission
+        }
+      }
+
+      document
+        .getElementById("form-input-tugas")
+        .addEventListener("submit", (e) => {
+          handleAdminFormSubmit(
+            e,
+            "Tugas",
+            "ID_Tugas",
+            tugasFormMode,
+            tugasEditId,
+            submitTugasBtn
+          );
+        });
+
+      document
+        .getElementById("form-input-nilai")
+        .addEventListener("submit", (e) => {
+          handleAdminFormSubmit(
+            e,
+            "Nilai",
+            "ID_Nilai",
+            nilaiFormMode,
+            nilaiEditId,
+            submitNilaiBtn
+          );
+        });
+
+      document
+        .getElementById("form-input-kehadiran")
+        .addEventListener("submit", (e) => {
+          handleAdminFormSubmit(
+            e,
+            "Kehadiran",
+            "ID_Kehadiran",
+            kehadiranFormMode,
+            kehadiranEditId,
+            submitKehadiranBtn
+          );
+        });
+
+      document
+        .getElementById("form-input-catatan")
+        .addEventListener("submit", (e) => {
+          handleAdminFormSubmit(
+            e,
+            "Catatan_Guru",
+            "ID_Catatan",
+            catatanFormMode,
+            catatanEditId,
+            submitCatatanBtn
+          );
+        });
+
+      document
+        .getElementById("form-input-jadwal")
+        .addEventListener("submit", (e) => {
+          handleAdminFormSubmit(
+            e,
+            "Jadwal_Pelajaran",
+            "ID_Jadwal",
+            jadwalFormMode,
+            jadwalEditId,
+            submitJadwalBtn
+          );
+        });
+
+      document
+        .getElementById("form-input-pengumuman")
+        .addEventListener("submit", (e) => {
+          handleAdminFormSubmit(
+            e,
+            "Pengumuman",
+            "ID_Pengumuman",
+            pengumumanFormMode,
+            pengumumanEditId,
+            submitPengumumanBtn
+          );
+        });
+
+      // --- Notification Logic ---
+      function getReadAnnouncements() {
+        if (!currentStudentNis) return new Set(); // No user, no read announcements
+        const readAnnouncements = localStorage.getItem(
+          `readAnnouncements_${currentStudentNis}`
+        );
+        return readAnnouncements
+          ? new Set(JSON.parse(readAnnouncements))
+          : new Set();
+      }
+
+      function saveReadAnnouncements(readSet) {
+        if (!currentStudentNis) return; // No user to save for
+        localStorage.setItem(
+          `readAnnouncements_${currentStudentNis}`,
+          JSON.stringify(Array.from(readSet))
+        );
+      }
+
+      function updateNotificationBadge() {
+        if (
+          !currentStudentNis ||
+          !dataCache.pengumuman ||
+          dataCache.pengumuman.length === 0
+        ) {
+          notificationBadge.classList.add("hidden");
+          return;
+        }
+
+        const readAnnouncements = getReadAnnouncements();
+        const unreadCount = dataCache.pengumuman.filter((announcement) => {
+          // Only count announcements for current student's class or "Semua Kelas"
+          const relevantToStudent =
+            !announcement.Untuk_Kelas ||
+            announcement.Untuk_Kelas === "" ||
+            announcement.Untuk_Kelas === "Semua" ||
+            announcement.Untuk_Kelas.split(",")
+              .map((c) => c.trim())
+              .includes(currentStudentClass);
+          return (
+            relevantToStudent &&
+            !readAnnouncements.has(announcement.ID_Pengumuman)
+          );
+        }).length;
+
+        if (unreadCount > 0) {
+          notificationBadge.textContent = unreadCount;
+          notificationBadge.classList.remove("hidden");
+        } else {
+          notificationBadge.classList.add("hidden");
+        }
+      }
+
+      function openAnnouncementModal() {
+        if (!currentStudentNis) {
+          showToast(
+            "Anda harus login sebagai wali murid untuk melihat pengumuman.",
+            "info"
+          );
+          return;
+        }
+        announcementModal.classList.add("open");
+        renderAnnouncementsInModal(dataCache.pengumuman);
+        markAllAnnouncementsAsRead(dataCache.pengumuman); // Mark all as read when modal is opened
+        updateNotificationBadge(); // Update badge immediately after marking as read
+      }
+
+      function closeAnnouncementModal() {
+        announcementModal.classList.remove("open");
+      }
+
+      function renderAnnouncementsInModal(announcements) {
+        announcementList.innerHTML = ""; // Clear previous list
+
+        if (!announcements || announcements.length === 0) {
+          announcementList.innerHTML =
+            '<p class="text-center text-gray-500">Tidak ada pengumuman terbaru.</p>';
+          return;
+        }
+
+        const readAnnouncements = getReadAnnouncements();
+
+        // Filter for announcements relevant to the current student's class
+        const relevantAnnouncements = announcements.filter((announcement) => {
+          return (
+            !announcement.Untuk_Kelas ||
+            announcement.Untuk_Kelas === "" ||
+            announcement.Untuk_Kelas === "Semua" ||
+            announcement.Untuk_Kelas.split(",")
+              .map((c) => c.trim())
+              .includes(currentStudentClass)
+          );
+        });
+
+        // Sort by date descending (newest first)
+        relevantAnnouncements.sort(
+          (a, b) =>
+            new Date(b.Tanggal_Pengumuman) - new Date(a.Tanggal_Pengumuman)
+        );
+
+        if (relevantAnnouncements.length === 0) {
+          announcementList.innerHTML =
+            '<p class="text-center text-gray-500">Tidak ada pengumuman terbaru untuk kelas Anda.</p>';
+          return;
+        }
+
+        relevantAnnouncements.forEach((announcement) => {
+          const isRead = readAnnouncements.has(announcement.ID_Pengumuman);
+          const itemDiv = document.createElement("div");
+          itemDiv.classList.add("announcement-item");
+          if (!isRead) {
+            itemDiv.classList.add("unread");
+          }
+          itemDiv.innerHTML = `
+                    <h5>${announcement.Judul}</h5>
+                    <p>${announcement.Isi_Pengumuman}</p>
+                    <span class="date">Tanggal: ${
+                      announcement.Tanggal_Pengumuman
+                    }</span>
+                    <span class="date">Kelas: ${
+                      announcement.Untuk_Kelas || "Semua Kelas"
+                    }</span>
+                `;
+          announcementList.appendChild(itemDiv);
+        });
+      }
+
+      function markAllAnnouncementsAsRead(announcements) {
+        const readAnnouncements = getReadAnnouncements();
+        // Only mark as read those relevant to the current student
+        announcements.forEach((announcement) => {
+          const relevantToStudent =
+            !announcement.Untuk_Kelas ||
+            announcement.Untuk_Kelas === "" ||
+            announcement.Untuk_Kelas === "Semua" ||
+            announcement.Untuk_Kelas.split(",")
+              .map((c) => c.trim())
+              .includes(currentStudentClass);
+          if (relevantToStudent) {
+            readAnnouncements.add(announcement.ID_Pengumuman);
+          }
+        });
+        saveReadAnnouncements(readAnnouncements);
+      }
+
+      // Attach event listener to the bell icon
+      announcementBellIcon.addEventListener("click", openAnnouncementModal);
+
+      // Initialize view: show parent login by default
+      showSection("login-section");
+      // Ensure initial state is parent login
+      parentNisGroup.classList.remove("section-hidden");
+      adminCredentialsGroup.classList.add("section-hidden");
+      loginNisInput.setAttribute("required", "true");
+      loginAdminEmailInput.removeAttribute("required");
+      loginTitle.textContent = "Login Wali Murid";
+      unifiedLoginCard.classList.remove("bg-green-50");
+      unifiedLoginCard.classList.add("bg-blue-50");
+      loginTitle.classList.remove("text-green-800");
+      loginTitle.classList.add("text-blue-800");
+      mainLoginButton.classList.remove("bg-green-600", "hover:bg-green-700");
+      mainLoginButton.classList.add("bg-blue-600", "hover:bg-blue-700");
+      toggleLoginModeBtn.textContent = "Login sebagai Admin";
+      toggleLoginModeBtn.classList.remove(
+        "text-green-600",
+        "hover:text-green-800"
+      );
+      toggleLoginModeBtn.classList.add("text-blue-600", "hover:text-blue-800");
+
+      // Apply initial 'Dihasilkan Otomatis' and readonly state to admin ID fields
+      document.getElementById("tugas-id").readOnly = true;
+      document.getElementById("tugas-id").value = "Dihasilkan Otomatis";
+      document
+        .getElementById("tugas-id")
+        .classList.add("bg-gray-100", "cursor-not-allowed");
+
+      document.getElementById("nilai-id").readOnly = true;
+      document.getElementById("nilai-id").value = ""; // Empty initially for Nilai to be dynamically generated
+      document.getElementById("nilai-id").placeholder =
+        "Akan Dihasilkan Otomatis";
+      document
+        .getElementById("nilai-id")
+        .classList.add("bg-gray-100", "cursor-not-allowed");
+
+      document.getElementById("kehadiran-id").readOnly = true;
+      document.getElementById("kehadiran-id").value = "Dihasilkan Otomatis";
+      document
+        .getElementById("kehadiran-id")
+        .classList.add("bg-gray-100", "cursor-not-allowed");
+
+      document.getElementById("catatan-id").readOnly = true;
+      document.getElementById("catatan-id").value = "Dihasilkan Otomatis";
+      document
+        .getElementById("catatan-id")
+        .classList.add("bg-gray-100", "cursor-not-allowed");
+
+      document.getElementById("jadwal-id").readOnly = true;
+      document.getElementById("jadwal-id").value = "Dihasilkan Otomatis";
+      document
+        .getElementById("jadwal-id")
+        .classList.add("bg-gray-100", "cursor-not-allowed");
+
+      document.getElementById("pengumuman-id").readOnly = true;
+      document.getElementById("pengumuman-id").value = "Dihasilkan Otomatis";
+      document
+        .getElementById("pengumuman-id")
+        .classList.add("bg-gray-100", "cursor-not-allowed");
+    </script>
+  </body>
+</html>
