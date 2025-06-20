@@ -389,10 +389,13 @@
             border-radius: 8px; /* rounded-lg to rounded-md */
             box-shadow: none; /* Remove subtle shadow */
         }
-        /* Ensure table container has padding if it's the top-level element in a tab */
-        .tab-content > .scrollable-table-container {
-             margin-left: 0.5rem;
-             margin-right: 0.5rem;
+        /* Ensure table container takes full width of its parent (tab-content-container) */
+        .scrollable-table-container {
+             margin-left: 0; /* REMOVED margin to align with parent padding */
+             margin-right: 0; /* REMOVED margin to align with parent padding */
+             width: 100%; /* Ensure it fills parent */
+             padding-left: 0; /* Remove internal padding, let child rows handle it */
+             padding-right: 0; /* Remove internal padding, let child rows handle it */
         }
 
         /* Smaller text for titles */
@@ -498,8 +501,11 @@
           border-radius: 0.5rem; /* Rounded corners for cards */
           box-shadow: none; /* No shadow for flat design */
           background-color: #ffffff; /* Explicitly white for cards */
-          margin-left: 0.5rem; /* Match main content padding */
-          margin-right: 0.5rem;
+          /* Now that container has no margin, these can have margin to push themselves */
+          margin-left: 0; /* Ensure no extra margin */
+          margin-right: 0;
+          /* Add padding to the rows themselves if they are acting as cards */
+          padding: 0; /* Remove internal padding if td handles it */
         }
 
         .scrollable-table-container td {
@@ -513,7 +519,7 @@
           display: flex; /* Use flexbox for label and value alignment */
           align-items: center;
           justify-content: space-between; /* Space out label and value */
-          padding-right: 12px; /* Consistent padding on right */
+          padding-right: 1rem; /* Consistent padding on right */
         }
 
         .scrollable-table-container td:last-child {
@@ -525,7 +531,7 @@
             data-label
           ); /* Display the label from data-label attribute */
           position: absolute;
-          left: 12px; /* Align label to the left */
+          left: 1rem; /* Align label to the left */
           width: 45%; /* Give label space */
           white-space: nowrap; /* Prevent label from wrapping */
           text-align: left;
@@ -551,7 +557,8 @@
           display: flex;
           flex-wrap: wrap; /* Allow buttons to wrap */
           justify-content: flex-end; /* Align buttons to the right */
-          padding-left: 12px !important; /* Adjust padding for button row */
+          padding-left: 1rem !important; /* Adjust padding for button row */
+          padding-right: 1rem !important; /* Adjust padding for button row */
         }
         .scrollable-table-container td:has(button)::before {
           content: ""; /* Hide data-label for action column */
@@ -590,9 +597,15 @@
         }
 
         /* Styling for ALL simplified rows on mobile */
+        .tugas-simplified-row {
+            margin-left: 0; /* Ensure no extra margin */
+            margin-right: 0;
+            padding: 0; /* Remove any padding on the row itself */
+        }
+
         .tugas-simplified-row td {
-            padding-left: 12px !important; /* Keep a minimal padding here */
-            padding-right: 12px !important;
+            padding-left: 1rem !important; /* Consistent padding with other cards */
+            padding-right: 1rem !important;
             text-align: left; /* Align text left */
             font-size: 0.875rem; /* text-sm */
             border-bottom: none; /* No border for these simplified rows */
