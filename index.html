@@ -15,8 +15,10 @@
         font-family: "Inter", sans-serif;
         background-color: #f3f4f6; /* Gray-100 */
       }
-      .container {
-        max-width: 960px; /* Equivalent to container in common frameworks */
+      /* Ensure main content takes full width on smaller screens, removing max-width */
+      .main-content-area {
+        width: 100%;
+        max-width: 960px; /* Keep max-width for larger screens */
       }
       .section-hidden {
         display: none;
@@ -117,26 +119,20 @@
         background-color: #e2e8f0; /* bg-gray-200 */
         color: #a0aec0; /* text-gray-500 */
       }
-      /* Style for subject filter tabs */
-      .subject-tab-button {
+      /* Style for subject filter dropdown */
+      #subject-filter-select {
         padding: 8px 12px;
         font-size: 0.875rem; /* text-sm */
         font-weight: 500; /* font-medium */
         color: #4b5563; /* text-gray-700 */
         border-radius: 6px; /* rounded-md */
-        transition: all 0.15s ease-in-out;
-        margin-right: 8px; /* space-x-2 */
-        margin-bottom: 8px; /* For wrapping */
-        background-color: #e5e7eb; /* bg-gray-200 */
+        border: 1px solid #d1d5db; /* border-gray-300 */
+        background-color: #f9fafb; /* bg-gray-50 */
       }
-      .subject-tab-button:hover {
-        background-color: #d1d5db; /* bg-gray-300 */
-        color: #1f2937; /* text-gray-900 */
-      }
-      .subject-tab-button.active {
-        background-color: #3b82f6; /* bg-blue-600 */
-        color: white;
-        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+      #subject-filter-select:focus {
+        outline: none;
+        border-color: #3b82f6; /* blue-500 */
+        box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.25);
       }
 
       /* Modal Styles */
@@ -300,7 +296,7 @@
       .scrollable-table-container {
         height: 256px; /* h-64 in Tailwind */
         overflow-y: auto;
-        overflow-x: auto; /* Keep horizontal scroll if needed */
+        /* overflow-x: auto; - Removed for mobile table transformation */
       }
       /* Sticky table header */
       .scrollable-table-container table thead {
@@ -308,6 +304,306 @@
         top: 0;
         background-color: #f3f4f6; /* bg-gray-100 */
         z-index: 10; /* Ensure header is above content */
+      }
+
+      /* --- MOBILE SPECIFIC STYLES (Media Query) --- */
+      @media (max-width: 768px) {
+        /* Applies to screens smaller than md breakpoint */
+        body {
+          padding: 8px; /* Reduced padding on body for mobile */
+        }
+        .main-content-area {
+          padding: 12px; /* Reduced padding on main container for mobile */
+          border-radius: 8px; /* Slightly smaller border-radius */
+          box-shadow: none; /* Remove subtle shadow for a flatter look */
+        }
+        .container {
+            /* Override general .container max-width for full width on mobile */
+            max-width: 100%;
+        }
+
+        /* Smaller text for titles */
+        h1 {
+            font-size: 1.75rem; /* text-3xl to text-2xl on mobile */
+            margin-bottom: 1rem; /* mb-4 */
+        }
+        h2 {
+            font-size: 1.5rem; /* text-2xl to text-xl on mobile */
+            margin-bottom: 1rem; /* mb-4 */
+        }
+        h3 {
+            font-size: 1.125rem; /* text-xl to text-lg on mobile */
+            margin-bottom: 0.75rem; /* mb-3 */
+            padding-bottom: 0.25rem; /* pb-1 */
+        }
+        h4 {
+            font-size: 1rem; /* text-xl to text-base on mobile */
+            margin-bottom: 0.75rem; /* mb-3 */
+        }
+
+        /* Input form adjustments */
+        #input-section {
+          margin-bottom: 1.5rem; /* mb-6 */
+        }
+        #input-section .mb-4 { /* Label and input group */
+          margin-bottom: 0.75rem; /* mb-3 */
+        }
+        #input-section label {
+          margin-bottom: 0.25rem; /* mb-1 */
+        }
+        #input-section input {
+          padding-top: 0.5rem; /* py-2 to py-1.5 */
+          padding-bottom: 0.5rem; /* py-2 to py-1.5 */
+          border-radius: 6px; /* rounded-lg to rounded-md */
+          box-shadow: none; /* Remove shadow */
+        }
+        #search-button {
+          padding-top: 0.5rem; /* py-2 to py-1.5 */
+          padding-bottom: 0.5rem; /* py-2 to py-1.5 */
+          border-radius: 6px; /* rounded-lg to rounded-md */
+          box-shadow: none; /* Remove shadow */
+        }
+
+        /* Data display sections (profile, etc.) */
+        .grid.gap-6 {
+          gap: 1rem; /* gap-4 */
+        }
+        .bg-gray-50 {
+          padding: 1rem; /* p-4 */
+          border-radius: 8px; /* rounded-lg to rounded-md */
+          box-shadow: none; /* Remove subtle shadow */
+        }
+        .space-y-6 {
+          gap: 1rem; /* space-y-4 */
+        }
+        .space-y-3 {
+          gap: 0.75rem; /* space-y-2 */
+        }
+        label.block.text-sm {
+          font-size: 0.75rem; /* text-xs */
+        }
+        input.mt-1 {
+          margin-top: 0.25rem; /* mt-0.5 */
+          padding: 0.375rem 0.75rem; /* p-1.5 */
+          border-radius: 4px; /* rounded-md to rounded-sm */
+          box-shadow: none; /* Remove shadow */
+          font-size: 0.875rem; /* text-sm */
+        }
+        textarea.mt-1 {
+          margin-top: 0.25rem; /* mt-0.5 */
+          padding: 0.375rem 0.75rem; /* p-1.5 */
+          border-radius: 4px; /* rounded-md to rounded-sm */
+          box-shadow: none; /* Remove shadow */
+          font-size: 0.875rem; /* text-sm */
+        }
+
+        /* Tabs and admin tabs */
+        .tab-button, .admin-tab-button {
+            padding-left: 0.5rem; /* px-2 */
+            padding-right: 0.5rem; /* px-2 */
+            font-size: 0.75rem; /* text-sm to text-xs */
+        }
+        #tab-content-container, #admin-tab-content-container {
+            padding: 1rem; /* p-4 */
+            border-radius: 8px; /* rounded-lg to rounded-md */
+            box-shadow: none; /* Remove shadow */
+        }
+
+        /* Unified login card */
+        #unified-login-card {
+            padding: 1rem; /* p-4 */
+            border-radius: 8px; /* rounded-lg to rounded-md */
+            box-shadow: none; /* Remove shadow */
+        }
+        #login-title {
+            font-size: 1.5rem; /* text-2xl to text-xl */
+            margin-bottom: 1rem; /* mb-4 */
+        }
+        #login-form .space-y-4 > div { /* Individual form groups */
+            margin-bottom: 0.75rem; /* space-y-3 */
+        }
+        #login-form label {
+            font-size: 0.75rem; /* text-xs */
+        }
+        #login-form input {
+            padding: 0.5rem 0.75rem; /* px-3 py-2 to px-2 py-1.5 */
+            font-size: 0.875rem; /* text-sm */
+            border-radius: 6px; /* rounded-md to rounded-sm */
+            box-shadow: none; /* Remove shadow */
+        }
+        #main-login-button {
+            padding: 0.5rem 0.75rem; /* py-2 to py-1.5 */
+            font-size: 0.875rem; /* text-sm */
+            border-radius: 6px; /* rounded-md to rounded-sm */
+            box-shadow: none; /* Remove shadow */
+        }
+        #toggle-login-mode-btn {
+            font-size: 0.75rem; /* text-xs */
+        }
+
+        /* Student identity box */
+        .bg-blue-100 {
+            padding: 1rem; /* p-4 */
+            border-radius: 8px; /* rounded-lg to rounded-md */
+            box-shadow: none; /* Remove shadow */
+        }
+        .bg-blue-100 h3 {
+            font-size: 1.5rem; /* text-2xl to text-xl */
+            margin-bottom: 0.75rem; /* mb-3 */
+        }
+        .bg-blue-100 p {
+            font-size: 0.875rem; /* text-sm */
+        }
+
+        /* Table Transformation for Mobile - Retained and adjusted for new padding */
+        .scrollable-table-container {
+          height: auto; /* Remove fixed height on mobile for card-like view */
+          overflow-y: visible; /* Allow content to push container height */
+          overflow-x: hidden; /* Prevent horizontal scrolling */
+        }
+
+        .scrollable-table-container table,
+        .scrollable-table-container thead,
+        .scrollable-table-container tbody,
+        .scrollable-table-container th,
+        .scrollable-table-container td,
+        .scrollable-table-container tr {
+          display: block; /* Make all table elements behave as blocks */
+        }
+
+        .scrollable-table-container thead tr {
+          position: absolute; /* Hide table headers */
+          top: -9999px;
+          left: -9999px;
+        }
+
+        .scrollable-table-container tr {
+          border: 1px solid #e5e7eb; /* Add border to each 'card' (row) */
+          margin-bottom: 0.75rem; /* space between cards */
+          border-radius: 0.5rem; /* Rounded corners for cards */
+          box-shadow: none; /* No shadow for flat design */
+          background-color: #ffffff; /* Explicitly white for cards */
+        }
+
+        .scrollable-table-container td {
+          border: none; /* Remove individual cell borders */
+          border-bottom: 1px solid #eee; /* Add separator between fields within a card */
+          position: relative;
+          padding-left: 50% !important; /* Space for the data-label */
+          text-align: right; /* Align data to the right */
+          font-size: 0.875rem; /* text-sm */
+          min-height: 35px; /* Ensure minimum height for tap target */
+          display: flex; /* Use flexbox for label and value alignment */
+          align-items: center;
+          justify-content: space-between; /* Space out label and value */
+          padding-right: 12px; /* Consistent padding on right */
+        }
+
+        .scrollable-table-container td:last-child {
+          border-bottom: 0; /* No border on the last field in a card */
+        }
+
+        .scrollable-table-container td::before {
+          content: attr(
+            data-label
+          ); /* Display the label from data-label attribute */
+          position: absolute;
+          left: 12px; /* Align label to the left */
+          width: 45%; /* Give label space */
+          white-space: nowrap; /* Prevent label from wrapping */
+          text-align: left;
+          font-weight: 600; /* font-semibold */
+          color: #4b5563; /* text-gray-700 */
+          flex-shrink: 0; /* Prevent label from shrinking */
+        }
+
+        /* Adjust action button styling for mobile */
+        .scrollable-table-container td button {
+          width: auto; /* Allow buttons to size naturally */
+          padding: 0.375rem 0.625rem; /* py-1.5 px-2.5 */
+          font-size: 0.75rem; /* text-xs */
+          margin-left: 0.5rem; /* space between buttons */
+          box-shadow: none; /* Remove button shadows */
+          border-radius: 4px; /* Slightly smaller button radius */
+        }
+        .scrollable-table-container td button:first-child {
+          margin-left: auto; /* Push first button to the right for flex layout */
+        }
+        .scrollable-table-container td:has(button) {
+          /* Style the cell containing buttons */
+          display: flex;
+          flex-wrap: wrap; /* Allow buttons to wrap */
+          justify-content: flex-end; /* Align buttons to the right */
+          padding-left: 12px !important; /* Adjust padding for button row */
+        }
+        .scrollable-table-container td:has(button)::before {
+          content: ""; /* Hide data-label for action column */
+          display: none;
+        }
+
+        /* Specific mobile adjustments for Admin Form Inputs */
+        #admin-tab-content-container input,
+        #admin-tab-content-container select,
+        #admin-tab-content-container textarea {
+          padding: 0.5rem 0.75rem; /* Smaller padding */
+          font-size: 0.875rem; /* Smaller font size */
+          border-radius: 6px; /* Smaller border radius */
+          box-shadow: none; /* Remove shadows */
+        }
+        #admin-tab-content-container button[type="submit"] {
+            padding: 0.5rem 0.75rem;
+            font-size: 0.875rem;
+            border-radius: 6px;
+            box-shadow: none;
+        }
+        #admin-tab-content-container .space-y-4 > div {
+            margin-bottom: 0.75rem; /* Reduce vertical spacing */
+        }
+
+        /* Mobile specific adjustments for Notification icon */
+        #announcement-bell-icon {
+            font-size: 2rem; /* Adjusted from text-3xl for better mobile fit */
+            padding: 6px; /* Slightly reduced padding */
+        }
+        #notification-badge {
+            font-size: 0.65rem; /* Smaller badge text */
+            height: 18px; /* Smaller badge size */
+            width: 18px;
+            -mt-1.5 -mr-1.5; /* Adjust position */
+        }
+
+        /* Styling for ALL simplified rows on mobile */
+        .tugas-simplified-row td {
+            padding-left: 12px !important; /* Remove data-label indentation */
+            text-align: left; /* Align text left */
+            font-size: 0.875rem; /* text-sm */
+            border-bottom: none; /* No border for these simplified rows */
+            display: block; /* Ensure it behaves as a block */
+        }
+        .tugas-simplified-row td::before {
+            content: ""; /* Hide data-label */
+            display: none;
+        }
+        .tugas-simplified-row > td > div {
+            /* Flex container inside the single TD for simplified view */
+            display: flex;
+            flex-direction: column; /* Stack on mobile */
+            align-items: flex-start;
+            justify-content: center;
+            width: 100%;
+            padding: 0.5rem 0; /* Add some padding */
+            border-bottom: 1px solid #e5e7eb; /* Subtle separator */
+        }
+        .tugas-simplified-row:last-child > td > div {
+            border-bottom: none; /* No border on the very last item */
+        }
+
+        /* Ensure table header is hidden for parent dashboard tugas status on mobile */
+        #tugas-status table thead tr {
+            position: absolute;
+            top: -9999px;
+            left: -9999px;
+        }
       }
     </style>
   </head>
@@ -331,16 +627,23 @@
         <a href="#" class="sidebar-menu-item">Profil Siswa</a>
         <a href="#" class="sidebar-menu-item">Pengaturan</a>
         <a href="#" class="sidebar-menu-item">Bantuan</a>
-        <!-- Add more menu items here -->
+        <!-- Logout button moved inside sidebar -->
+        <button
+          onclick="logout()"
+          class="sidebar-menu-item w-full text-left bg-gray-100 hover:bg-gray-200 text-gray-800 font-bold"
+          id="logout-button-sidebar"
+        >
+          Logout
+        </button>
       </nav>
     </div>
     <!-- Sidebar Overlay (for clicking outside to close) -->
     <div id="sidebar-overlay" onclick="closeSidebar()"></div>
 
     <div
-      class="container bg-white shadow-xl rounded-lg p-6 md:p-8 w-full relative"
+      class="main-content-area mx-auto bg-white shadow-xl rounded-lg p-6 md:p-8 w-full relative"
     >
-      <!-- Top Right Actions (Notification and Logout) -->
+      <!-- Top Right Actions (Notification) - Logout moved to sidebar -->
       <div class="absolute top-4 right-4 flex items-center space-x-4 z-10">
         <!-- Notification Icon and Badge -->
         <div class="relative" id="notification-area">
@@ -358,14 +661,6 @@
             >
           </button>
         </div>
-        <!-- Logout button, visible when in dashboard sections -->
-        <button
-          onclick="logout()"
-          class="bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold py-1.5 px-3 rounded-md shadow-sm text-sm z-10 section-hidden"
-          id="logout-button"
-        >
-          Logout
-        </button>
       </div>
 
       <!-- Sidebar Menu Icon (Hidden by default, shown on dashboards) -->
@@ -501,9 +796,17 @@
                 Tugas dan Status Pengerjaan
               </h4>
 
-              <!-- Subject Filter Tabs -->
-              <div id="subject-filter-tabs" class="flex flex-wrap mb-4">
-                <!-- Tabs will be dynamically generated here -->
+              <!-- Subject Filter Dropdown -->
+              <div class="mb-4">
+                <label
+                  for="subject-filter-select"
+                  class="block text-sm font-medium text-gray-700 mb-1"
+                  >Filter Mata Pelajaran:</label
+                >
+                <select id="subject-filter-select" class="w-full">
+                  <option value="Semua">Semua Mata Pelajaran</option>
+                  <!-- Options will be dynamically generated here -->
+                </select>
               </div>
 
               <div class="scrollable-table-container">
@@ -1700,6 +2003,35 @@
       </div>
     </div>
 
+    <!-- Custom Confirmation Modal -->
+    <div id="confirm-modal" class="modal">
+      <div class="modal-content max-w-sm">
+        <h3
+          class="text-xl font-bold text-gray-800 mb-4"
+          id="confirm-modal-title"
+        >
+          Konfirmasi
+        </h3>
+        <p class="mb-6 text-gray-700" id="confirm-modal-message">
+          Apakah Anda yakin?
+        </p>
+        <div class="flex justify-end space-x-3">
+          <button
+            id="confirm-cancel-btn"
+            class="px-4 py-2 bg-gray-200 text-gray-800 rounded-md hover:bg-gray-300"
+          >
+            Batal
+          </button>
+          <button
+            id="confirm-ok-btn"
+            class="px-4 py-2 bg-red-500 text-white rounded-md hover:bg-red-600"
+          >
+            Ya, Hapus
+          </button>
+        </div>
+      </div>
+    </div>
+
     <!-- Toast Container -->
     <div id="toast-container"></div>
 
@@ -1760,7 +2092,10 @@
         "admin-dashboard-section"
       );
       const toastContainer = document.getElementById("toast-container");
-      const logoutButton = document.getElementById("logout-button");
+      // const logoutButton = document.getElementById("logout-button"); // Removed standalone logout button
+      const logoutButtonSidebar = document.getElementById(
+        "logout-button-sidebar"
+      ); // New logout button in sidebar
       const sidebarMenuIcon = document.getElementById("sidebar-menu-icon"); // Sidebar Icon
       const sidebar = document.getElementById("sidebar"); // Sidebar element
       const sidebarOverlay = document.getElementById("sidebar-overlay"); // Sidebar overlay element
@@ -1822,9 +2157,9 @@
       const submitPengumumanBtn = document.getElementById("submit-pengumuman");
 
       // Parent dashboard specific elements
-      const subjectFilterTabsContainer = document.getElementById(
-        "subject-filter-tabs"
-      );
+      const subjectFilterSelect = document.getElementById(
+        "subject-filter-select"
+      ); // Changed from tabs container to select
       const kehadiranFilterPeriodSelect = document.getElementById(
         "kehadiran-filter-period"
       );
@@ -1837,6 +2172,16 @@
       // Notification elements (bell icon and badge are removed, but modal related elements remain)
       const announcementModal = document.getElementById("announcement-modal");
       const announcementList = document.getElementById("announcement-list");
+
+      // Confirmation Modal Elements
+      const confirmModal = document.getElementById("confirm-modal");
+      const confirmModalTitle = document.getElementById("confirm-modal-title");
+      const confirmModalMessage = document.getElementById(
+        "confirm-modal-message"
+      );
+      const confirmCancelBtn = document.getElementById("confirm-cancel-btn");
+      const confirmOkBtn = document.getElementById("confirm-ok-btn");
+      let onConfirmCallback = null; // Store callback for confirmation
 
       // --- Loading Overlay Functions ---
       function showLoading() {
@@ -1854,12 +2199,11 @@
         adminDashboardSection.classList.add("section-hidden");
         document.getElementById(sectionId).classList.remove("section-hidden");
 
-        // Tampilkan tombol logout, ikon notifikasi, dan ikon sidebar hanya jika di dashboard
+        // Tampilkan ikon sidebar hanya jika di dashboard
         if (
           sectionId === "parent-dashboard-section" ||
           sectionId === "admin-dashboard-section"
         ) {
-          logoutButton.classList.remove("section-hidden");
           sidebarMenuIcon.style.display = "block"; // Show sidebar icon
           if (sectionId === "parent-dashboard-section") {
             // Show bell icon only for parent dashboard
@@ -1869,7 +2213,6 @@
             notificationBadge.classList.add("hidden"); // Hide badge for admin
           }
         } else {
-          logoutButton.classList.add("section-hidden");
           sidebarMenuIcon.style.display = "none"; // Hide sidebar icon
           announcementBellIcon.style.display = "none"; // Hide bell icon
           notificationBadge.classList.add("hidden"); // Ensure badge is hidden
@@ -1884,8 +2227,10 @@
 
       function closeSidebar() {
         sidebar.classList.remove("open");
-        sidebarOverlay.classList.remove("visible");
+        sidebarOverlay.classList.remove("visible"); // Overlay is still visible for click to close
       }
+      // Attach click listener to overlay to close sidebar
+      sidebarOverlay.addEventListener("click", closeSidebar);
 
       // --- Toast Notification Function ---
       function showToast(message, type = "info", duration = 3000) {
@@ -1904,6 +2249,27 @@
           });
         }, duration);
       }
+
+      // --- Custom Confirmation Modal Functions ---
+      function showConfirmModal(message, onConfirm, title = "Konfirmasi") {
+        confirmModalTitle.textContent = title;
+        confirmModalMessage.textContent = message;
+        onConfirmCallback = onConfirm; // Set the callback function
+        confirmModal.classList.add("open");
+      }
+
+      function hideConfirmModal() {
+        confirmModal.classList.remove("open");
+        onConfirmCallback = null; // Clear the callback
+      }
+
+      confirmCancelBtn.addEventListener("click", hideConfirmModal);
+      confirmOkBtn.addEventListener("click", () => {
+        if (onConfirmCallback) {
+          onConfirmCallback();
+        }
+        hideConfirmModal();
+      });
 
       // --- Generate Unique ID (Generic) ---
       function generateUniqueId(prefix) {
@@ -2107,6 +2473,7 @@
             dataCache[key] = [];
           }
         }
+        closeSidebar(); // Close sidebar on logout
 
         loginNisInput.value = "";
         loginAdminEmailInput.value = "";
@@ -2135,6 +2502,8 @@
         loginAdminEmailInput.removeAttribute("required");
         mainLoginButton.textContent = "Login sebagai Wali Murid"; // Reset button text immediately
       }
+      // Attach logout function to the new sidebar logout button
+      logoutButtonSidebar.addEventListener("click", logout);
 
       // --- Tab Switching Logic for Parent Dashboard ---
       document.querySelectorAll(".tab-button").forEach((button) => {
@@ -2322,15 +2691,21 @@
         if (param) {
           if (
             sheetName === "Siswa" ||
-            sheetName === "Nilai" ||
             sheetName === "Kehadiran" ||
             sheetName === "Catatan_Guru"
           ) {
             if (typeof param === "object") {
+              // Should not happen for these sheets, but for safety
+              url += `&nis=${param.nis || ""}`;
+            } else {
+              url += `&nis=${param}`;
+            }
+          } else if (sheetName === "Nilai") {
+            if (typeof param === "object" && param.nis && param.id_tugas) {
               // Composite param for Nilai lookup
               url += `&nis=${param.nis}&id_tugas=${param.id_tugas}`;
-            } else {
-              // Single NIS param
+            } else if (typeof param === "string") {
+              // Single NIS param, to get all nilai for a student
               url += `&nis=${param}`;
             }
           } else if (sheetName === "Jadwal_Pelajaran" && param.class) {
@@ -2416,8 +2791,8 @@
         });
         dataCache.pengumuman = pengumumanData;
 
-        // Populate subject filter tabs and render tugas status table with 'Semua' initially
-        populateSubjectFilterTabs();
+        // Populate subject filter dropdown and render tugas status table with 'Semua' initially
+        populateSubjectFilterSelect(); // Changed to select
         renderTugasStatus(dataCache.tugas, dataCache.nilai, nis, "Semua"); // Initial render with all tasks
 
         // Render other sections using cached data
@@ -2443,6 +2818,18 @@
         }
       }
 
+      // Helper function to get header labels for data-label attribute
+      function getHeaderLabels(tableBodyId) {
+        let headers = [];
+        const table = document.getElementById(tableBodyId).closest("table");
+        if (table && table.querySelector("thead tr")) {
+          table.querySelectorAll("thead th").forEach((th) => {
+            headers.push(th.textContent.trim());
+          });
+        }
+        return headers;
+      }
+
       function renderTugasStatus(
         allTugasData,
         nilaiData,
@@ -2465,82 +2852,123 @@
           return;
         }
 
+        // Categorize tasks
+        const belumDikerjakan = [];
+        const remedial = [];
+        const tuntas = [];
+
         filteredTugasData.forEach((tugas) => {
-          // Find the specific nilai for this student and this task
           const studentNilai = nilaiData.find(
             (n) =>
               n.ID_Tugas === tugas.ID_Tugas &&
               String(n.NIS) === String(currentNis)
           );
 
-          let nilaiDisplay = "N/A";
-          let status = "Belum Dikerjakan";
-          let statusColor = "text-red-600";
+          if (!studentNilai) {
+            belumDikerjakan.push({
+              ...tugas,
+              status: "Belum Dikerjakan",
+              nilaiDisplay: "N/A",
+            });
+          } else if (studentNilai.Status_Pengerjaan === "Remedial") {
+            remedial.push({
+              ...tugas,
+              status: "Remedial",
+              nilaiDisplay: studentNilai.Nilai,
+            });
+          } else if (studentNilai.Status_Pengerjaan === "Tuntas") {
+            tuntas.push({
+              ...tugas,
+              status: "Tuntas",
+              nilaiDisplay: studentNilai.Nilai,
+            });
+          } else {
+            // Fallback for any other unexpected status
+            belumDikerjakan.push({
+              ...tugas,
+              status: "Belum Dikerjakan",
+              nilaiDisplay: "N/A",
+            });
+          }
+        });
 
-          if (studentNilai) {
-            nilaiDisplay = studentNilai.Nilai;
-            status = studentNilai.Status_Pengerjaan;
-            statusColor =
-              studentNilai.Status_Pengerjaan === "Tuntas"
-                ? "text-green-600"
-                : "text-red-600";
+        // Sort each category by Batas_Waktu (due date) ascending
+        const sortByBatasWaktu = (a, b) =>
+          new Date(a.Batas_Waktu) - new Date(b.Batas_Waktu);
+
+        belumDikerjakan.sort(sortByBatasWaktu);
+        remedial.sort(sortByBatasWaktu);
+        tuntas.sort(sortByBatasWaktu);
+
+        // Combine in desired order
+        const orderedTasks = [...belumDikerjakan, ...remedial, ...tuntas];
+
+        orderedTasks.forEach((task) => {
+          const row = document.createElement("tr");
+          let statusColorClass;
+          let statusText;
+
+          if (task.status === "Tuntas") {
+            statusColorClass = "text-green-600";
+            statusText = `Tuntas! Nilai: ${task.nilaiDisplay}`;
+            row.classList.add("bg-green-50"); // Light green background for tuntas
+          } else if (task.status === "Remedial") {
+            statusColorClass = "text-red-600";
+            statusText = `Remedial. Nilai: ${task.nilaiDisplay}`;
+            row.classList.add("bg-yellow-50"); // Light yellow for remedial
+          } else {
+            // Belum Dikerjakan
+            statusColorClass = "text-red-600";
+            statusText = `Belum Dikerjakan. Batas: ${task.Batas_Waktu}`;
+            row.classList.add("bg-blue-50"); // Light blue for belum dikerjakan
           }
 
-          const row = `
-                    <tr>
-                        <td class="py-2 px-4 border-b text-sm text-gray-700">${tugas.Nama_Tugas}</td>
-                        <td class="py-2 px-4 border-b text-sm text-gray-700">${tugas.Mata_Pelajaran}</td>
-                        <td class="py-2 px-4 border-b text-sm text-gray-700">${tugas.Batas_Waktu}</td>
-                        <td class="py-2 px-4 border-b text-sm text-gray-700">${nilaiDisplay}</td>
-                        <td class="py-2 px-4 border-b text-sm ${statusColor}">${status}</td>
-                    </tr>
-                `;
-          tbody.innerHTML += row;
-        });
-      }
-
-      function populateSubjectFilterTabs() {
-        subjectFilterTabsContainer.innerHTML = ""; // Clear existing tabs
-
-        // Add "Semua" tab
-        const allTab = document.createElement("button");
-        allTab.textContent = "Semua";
-        allTab.classList.add("subject-tab-button", "active"); // 'Semua' is active by default
-        allTab.addEventListener("click", () => {
-          renderTugasStatus(
-            dataCache.tugas,
-            dataCache.nilai,
-            currentStudentNis,
-            "Semua"
+          // Apply the simplified row styling to all tasks
+          row.classList.add(
+            "tugas-simplified-row",
+            "rounded-md",
+            "mb-2",
+            "shadow-sm"
           );
-          highlightSubjectTab(allTab);
+          row.innerHTML = `
+              <td colspan="5">
+                  <div class="flex flex-col md:flex-row md:justify-between items-start md:items-center py-2 px-2 border-b border-gray-100 last:border-none">
+                      <div class="flex-grow">
+                          <span class="font-semibold text-gray-800">${task.Nama_Tugas} (${task.Mata_Pelajaran})</span>
+                      </div>
+                      <div class="text-right ${statusColorClass} mt-1 md:mt-0 font-medium">
+                          ${statusText}
+                      </div>
+                  </div>
+              </td>
+          `;
+          tbody.appendChild(row);
         });
-        subjectFilterTabsContainer.appendChild(allTab);
+      }
 
-        // Add subject-specific tabs
+      function populateSubjectFilterSelect() {
+        // Changed to populate select dropdown
+        subjectFilterSelect.innerHTML =
+          '<option value="Semua">Semua Mata Pelajaran</option>'; // Clear and add default option
+
         HARDCODED_SUBJECTS.forEach((subject) => {
-          const tab = document.createElement("button");
-          tab.textContent = subject;
-          tab.classList.add("subject-tab-button");
-          tab.addEventListener("click", () => {
-            renderTugasStatus(
-              dataCache.tugas,
-              dataCache.nilai,
-              currentStudentNis,
-              subject
-            );
-            highlightSubjectTab(tab);
-          });
-          subjectFilterTabsContainer.appendChild(tab);
+          const option = document.createElement("option");
+          option.value = subject;
+          option.textContent = subject;
+          subjectFilterSelect.appendChild(option);
         });
       }
 
-      function highlightSubjectTab(activeTab) {
-        document.querySelectorAll(".subject-tab-button").forEach((tab) => {
-          tab.classList.remove("active");
-        });
-        activeTab.classList.add("active");
-      }
+      // Event listener for subject filter dropdown change
+      subjectFilterSelect.addEventListener("change", (event) => {
+        const selectedSubject = event.target.value;
+        renderTugasStatus(
+          dataCache.tugas,
+          dataCache.nilai,
+          currentStudentNis,
+          selectedSubject
+        );
+      });
 
       // --- Filter Attendance Data ---
       function filterAttendanceData(allData, period) {
@@ -2604,18 +3032,18 @@
             '<tr><td colspan="2" class="text-center py-4 text-gray-500">Tidak ada data kehadiran untuk periode ini.</td></tr>';
           return;
         }
+        const headers = getHeaderLabels("kehadiran-table-body");
 
         // Sort data by date in descending order (latest first)
         kehadiranData.sort((a, b) => new Date(b.Tanggal) - new Date(a.Tanggal));
 
         kehadiranData.forEach((data) => {
-          const row = `
-                    <tr>
-                        <td class="py-2 px-4 border-b text-sm text-gray-700">${data.Tanggal}</td>
-                        <td class="py-2 px-4 border-b text-sm text-gray-700">${data.Status}</td>
-                    </tr>
+          const row = document.createElement("tr");
+          row.innerHTML = `
+                    <td data-label="${headers[0]}">${data.Tanggal}</td>
+                    <td data-label="${headers[1]}">${data.Status}</td>
                 `;
-          tbody.innerHTML += row;
+          tbody.appendChild(row);
         });
       }
 
@@ -2776,22 +3204,18 @@
             '<tr><td colspan="3" class="text-center py-4 text-gray-500">Tidak ada catatan guru.</td></tr>';
           return;
         }
+        const headers = getHeaderLabels("catatan-guru-table-body");
 
         catatanData.forEach((data) => {
-          const row = `
-                    <tr>
-                        <td class="py-2 px-4 border-b text-sm text-gray-700">${
-                          data.Minggu_Ke
-                        }</td>
-                        <td class="py-2 px-4 border-b text-sm text-gray-700">${
-                          data.Catatan
-                        }</td>
-                        <td class="py-2 px-4 border-b text-sm text-gray-700">${
-                          data.Tanggal_Input || "N/A"
-                        }</td>
-                    </tr>
+          const row = document.createElement("tr");
+          row.innerHTML = `
+                    <td data-label="${headers[0]}">${data.Minggu_Ke}</td>
+                    <td data-label="${headers[1]}">${data.Catatan}</td>
+                    <td data-label="${headers[2]}">${
+            data.Tanggal_Input || "N/A"
+          }</td>
                 `;
-          tbody.innerHTML += row;
+          tbody.appendChild(row);
         });
       }
 
@@ -2804,10 +3228,10 @@
         tbody.innerHTML = "";
 
         if (!allJadwalData || allJadwalData.length === 0) {
-          tbody.innerHTML =
-            '<tr><td colspan="4" class="text-center py-4 text-gray-500">Tidak ada data jadwal pelajaran.</td></tr>';
+          tbody.innerHTML = `<tr><td colspan="4" class="text-center py-4 text-gray-500">Tidak ada jadwal pelajaran untuk kelas ${studentClass}.</td></tr>`;
           return;
         }
+        const headers = getHeaderLabels("jadwal-pelajaran-table-body");
 
         let filteredJadwal = allJadwalData;
         // Assuming data is already filtered by studentClass from API,
@@ -2842,15 +3266,15 @@
         });
 
         filteredJadwal.forEach((data) => {
-          const row = `
-                    <tr>
-                        <td class="py-2 px-4 border-b text-sm text-gray-700">${data.Hari}</td>
-                        <td class="py-2 px-4 border-b text-sm text-gray-700">${data.Jam}</td>
-                        <td class="py-2 px-4 border-b text-sm text-gray-700">${data.Mata_Pelajaran}</td>
-                        <td class="py-2 px-4 border-b text-sm text-gray-700">${data.Guru}</td>
-                    </tr>
+          // Use jadwalData directly
+          const row = document.createElement("tr");
+          row.innerHTML = `
+                    <td data-label="${headers[0]}">${data.Hari}</td>
+                    <td data-label="${headers[1]}">${data.Jam}</td>
+                    <td data-label="${headers[2]}">${data.Mata_Pelajaran}</td>
+                    <td data-label="${headers[3]}">${data.Guru}</td>
                 `;
-          tbody.innerHTML += row;
+          tbody.appendChild(row);
         });
       }
 
@@ -2973,12 +3397,12 @@
             idKey = "ID_Tugas";
             dataFetch = await fetchData("Tugas");
             dataCache.tugas = dataFetch;
-            renderFunction = (item) => `
-                        <td class="py-2 px-4 border-b text-sm text-gray-700">${item.ID_Tugas}</td>
-                        <td class="py-2 px-4 border-b text-sm text-gray-700">${item.Nama_Tugas}</td>
-                        <td class="py-2 px-4 border-b text-sm text-gray-700">${item.Mata_Pelajaran}</td>
-                        <td class="py-2 px-4 border-b text-sm text-gray-700">${item.Batas_Waktu}</td>
-                        <td class="py-2 px-4 border-b text-sm text-gray-700">${item.Untuk_Kelas}</td>
+            renderFunction = (item, headers) => `
+                        <td data-label="${headers[0]}">${item.ID_Tugas}</td>
+                        <td data-label="${headers[1]}">${item.Nama_Tugas}</td>
+                        <td data-label="${headers[2]}">${item.Mata_Pelajaran}</td>
+                        <td data-label="${headers[3]}">${item.Batas_Waktu}</td>
+                        <td data-label="${headers[4]}">${item.Untuk_Kelas}</td>
                     `;
             break;
           case "Nilai":
@@ -2987,25 +3411,17 @@
             // Fetches ALL Nilai for Admin table, not filtered by NIS
             dataFetch = await fetchData("Nilai");
             dataCache.nilai = dataFetch; // Update cache
-            renderFunction = (item) => `
-                        <td class="py-2 px-4 border-b text-sm text-gray-700">${
-                          item.ID_Nilai
-                        }</td>
-                        <td class="py-2 px-4 border-b text-sm text-gray-700">${
-                          item.NIS
-                        }</td>
-                        <td class="py-2 px-4 border-b text-sm text-gray-700">${
-                          item.ID_Tugas
-                        }</td>
-                        <td class="py-2 px-4 border-b text-sm text-gray-700">${
-                          item.Nilai
-                        }</td>
-                        <td class="py-2 px-4 border-b text-sm text-gray-700">${
-                          item.Status_Pengerjaan
-                        }</td>
-                        <td class="py-2 px-4 border-b text-sm text-gray-700">${
-                          item.Tanggal_Input || "N/A"
-                        }</td>
+            renderFunction = (item, headers) => `
+                        <td data-label="${headers[0]}">${item.ID_Nilai}</td>
+                        <td data-label="${headers[1]}">${item.NIS}</td>
+                        <td data-label="${headers[2]}">${item.ID_Tugas}</td>
+                        <td data-label="${headers[3]}">${item.Nilai}</td>
+                        <td data-label="${headers[4]}">${
+              item.Status_Pengerjaan
+            }</td>
+                        <td data-label="${headers[5]}">${
+              item.Tanggal_Input || "N/A"
+            }</td>
                     `;
             break;
           case "Kehadiran":
@@ -3014,11 +3430,11 @@
             // Fetches ALL Kehadiran for Admin table, not filtered by NIS
             dataFetch = await fetchData("Kehadiran");
             dataCache.kehadiran = dataFetch; // Update cache
-            renderFunction = (item) => `
-                        <td class="py-2 px-4 border-b text-sm text-gray-700">${item.ID_Kehadiran}</td>
-                        <td class="py-2 px-4 border-b text-sm text-gray-700">${item.NIS}</td>
-                        <td class="py-2 px-4 border-b text-sm text-gray-700">${item.Tanggal}</td>
-                        <td class="py-2 px-4 border-b text-sm text-gray-700">${item.Status}</td>
+            renderFunction = (item, headers) => `
+                        <td data-label="${headers[0]}">${item.ID_Kehadiran}</td>
+                        <td data-label="${headers[1]}">${item.NIS}</td>
+                        <td data-label="${headers[2]}">${item.Tanggal}</td>
+                        <td data-label="${headers[3]}">${item.Status}</td>
                     `;
             break;
           case "Catatan_Guru":
@@ -3027,22 +3443,14 @@
             // Fetches ALL Catatan_Guru for Admin table, not filtered by NIS
             dataFetch = await fetchData("Catatan_Guru");
             dataCache.catatan_guru = dataFetch; // Update cache
-            renderFunction = (item) => `
-                        <td class="py-2 px-4 border-b text-sm text-gray-700">${
-                          item.ID_Catatan
-                        }</td>
-                        <td class="py-2 px-4 border-b text-sm text-gray-700">${
-                          item.NIS
-                        }</td>
-                        <td class="py-2 px-4 border-b text-sm text-gray-700">${
-                          item.Minggu_Ke
-                        }</td>
-                        <td class="py-2 px-4 border-b text-sm text-gray-700">${
-                          item.Catatan
-                        }</td>
-                        <td class="py-2 px-4 border-b text-sm text-gray-700">${
-                          item.Tanggal_Input || "N/A"
-                        }</td>
+            renderFunction = (item, headers) => `
+                        <td data-label="${headers[0]}">${item.ID_Catatan}</td>
+                        <td data-label="${headers[1]}">${item.NIS}</td>
+                        <td data-label="${headers[2]}">${item.Minggu_Ke}</td>
+                        <td data-label="${headers[3]}">${item.Catatan}</td>
+                        <td data-label="${headers[4]}">${
+              item.Tanggal_Input || "N/A"
+            }</td>
                     `;
             break;
           case "Jadwal_Pelajaran":
@@ -3050,13 +3458,13 @@
             idKey = "ID_Jadwal";
             dataFetch = await fetchData("Jadwal_Pelajaran"); // Fetch all, then display
             dataCache.jadwal_pelajaran = dataFetch; // Update cache
-            renderFunction = (item) => `
-                        <td class="py-2 px-4 border-b text-sm text-gray-700">${item.ID_Jadwal}</td>
-                        <td class="py-2 px-4 border-b text-sm text-gray-700">${item.Kelas}</td>
-                        <td class="py-2 px-4 border-b text-sm text-gray-700">${item.Hari}</td>
-                        <td class="py-2 px-4 border-b text-sm text-gray-700">${item.Jam}</td>
-                        <td class="py-2 px-4 border-b text-sm text-gray-700">${item.Mata_Pelajaran}</td>
-                        <td class="py-2 px-4 border-b text-sm text-gray-700">${item.Guru}</td>
+            renderFunction = (item, headers) => `
+                        <td data-label="${headers[0]}">${item.ID_Jadwal}</td>
+                        <td data-label="${headers[1]}">${item.Kelas}</td>
+                        <td data-label="${headers[2]}">${item.Hari}</td>
+                        <td data-label="${headers[3]}">${item.Jam}</td>
+                        <td data-label="${headers[4]}">${item.Mata_Pelajaran}</td>
+                        <td data-label="${headers[5]}">${item.Guru}</td>
                     `;
             break;
           case "Pengumuman":
@@ -3065,19 +3473,17 @@
             // Admin should see all announcements, no class filter here
             dataFetch = await fetchData("Pengumuman");
             dataCache.pengumuman = dataFetch; // Update cache
-            renderFunction = (item) => `
-                        <td class="py-2 px-4 border-b text-sm text-gray-700">${
-                          item.ID_Pengumuman
-                        }</td>
-                        <td class="py-2 px-4 border-b text-sm text-gray-700">${
-                          item.Judul
-                        }</td>
-                        <td class="py-2 px-4 border-b text-sm text-gray-700">${
-                          item.Tanggal_Pengumuman
-                        }</td>
-                        <td class="py-2 px-4 border-b text-sm text-gray-700">${
-                          item.Untuk_Kelas || "Semua Kelas"
-                        }</td>
+            renderFunction = (item, headers) => `
+                        <td data-label="${headers[0]}">${
+              item.ID_Pengumuman
+            }</td>
+                        <td data-label="${headers[1]}">${item.Judul}</td>
+                        <td data-label="${headers[2]}">${
+              item.Tanggal_Pengumuman
+            }</td>
+                        <td data-label="${headers[3]}">${
+              item.Untuk_Kelas || "Semua Kelas"
+            }</td>
                     `;
             break;
           default:
@@ -3092,17 +3498,19 @@
           return;
         }
 
+        const headers = getHeaderLabels(tableBody.id); // Get headers from the specific table
+
         dataFetch.forEach((item) => {
           const row = document.createElement("tr");
           row.innerHTML =
-            renderFunction(item) +
+            renderFunction(item, headers) +
             `
                     <td class="py-2 px-4 border-b text-sm text-gray-700">
                         <button onclick="editEntry('${sheetName}', '${item[idKey]}')" class="bg-yellow-500 hover:bg-yellow-600 text-white py-1 px-2 rounded-md text-xs mr-2">Edit</button>
                         <button onclick="deleteEntry('${sheetName}', '${item[idKey]}')" class="bg-red-500 hover:bg-red-600 text-white py-1 px-2 rounded-md text-xs">Hapus</button>
                     </td>
                 `;
-          tableBody.appendChild(row);
+          tbody.appendChild(row);
         });
       }
 
@@ -3271,6 +3679,8 @@
         let idKey; // To get the correct ID key for the sheet
 
         try {
+          showLoading(); // Show loading before edit form population
+
           // Fetch the latest data for editing, in case it's not in cache or has changed
           const currentData = await fetchData(sheetName);
           if (!currentData) {
@@ -3406,87 +3816,90 @@
         } catch (error) {
           console.error("Edit Entry Error:", error);
           showToast("Terjadi kesalahan saat mencoba mengedit data.", "error");
+        } finally {
+          hideLoading(); // Hide loading after edit form population
         }
       }
 
       // --- Delete Entry Function ---
       async function deleteEntry(sheetName, id) {
-        if (
-          !confirm(
-            `Apakah Anda yakin ingin menghapus data dengan ID ${id} dari ${sheetName}?`
-          )
-        ) {
-          return;
-        }
-
-        let idKey;
-        switch (sheetName) {
-          case "Tugas":
-            idKey = "ID_Tugas";
-            break;
-          case "Nilai":
-            idKey = "ID_Nilai";
-            break;
-          case "Kehadiran":
-            idKey = "ID_Kehadiran";
-            break;
-          case "Catatan_Guru":
-            idKey = "ID_Catatan";
-            break;
-          case "Jadwal_Pelajaran":
-            idKey = "ID_Jadwal";
-            break;
-          case "Pengumuman":
-            idKey = "ID_Pengumuman";
-            break;
-          case "Siswa":
-            idKey = "NIS";
-            break;
-          case "Admin_Users":
-            idKey = "Email";
-            break;
-          default:
-            showToast("Aksi hapus tidak didukung untuk sheet ini.", "error");
-            return;
-        }
-
-        const dataToDelete = {};
-        dataToDelete[idKey] = id; // Send the ID for deletion
-
-        try {
-          showLoading(); // Show loading before deletion
-          const result = await sendData(sheetName, dataToDelete, "delete");
-          if (result.success) {
-            showToast(
-              `${sheetName} dengan ID ${id} berhasil dihapus!`,
-              "success"
-            );
-            await loadAdminTableData(sheetName); // Reload table after deletion
-            // Refresh dropdowns if relevant data is modified
-            if (sheetName === "Siswa" || sheetName === "Tugas") {
-              await loadAdminDropdownData();
+        showConfirmModal(
+          `Apakah Anda yakin ingin menghapus data dengan ID ${id} dari ${sheetName}?`,
+          async () => {
+            // Actual deletion logic moves here
+            let idKey;
+            switch (sheetName) {
+              case "Tugas":
+                idKey = "ID_Tugas";
+                break;
+              case "Nilai":
+                idKey = "ID_Nilai";
+                break;
+              case "Kehadiran":
+                idKey = "ID_Kehadiran";
+                break;
+              case "Catatan_Guru":
+                idKey = "ID_Catatan";
+                break;
+              case "Jadwal_Pelajaran":
+                idKey = "ID_Jadwal";
+                break;
+              case "Pengumuman":
+                idKey = "ID_Pengumuman";
+                break;
+              case "Siswa":
+                idKey = "NIS";
+                break;
+              case "Admin_Users":
+                idKey = "Email";
+                break;
+              default:
+                showToast(
+                  "Aksi hapus tidak didukung untuk sheet ini.",
+                  "error"
+                );
+                return;
             }
-            if (sheetName === "Pengumuman") {
-              if (currentStudentNis && currentStudentClass) {
-                const pengumumanData = await fetchData("Pengumuman", {
-                  class: currentStudentClass,
-                });
-                dataCache.pengumuman = pengumumanData;
-                updateNotificationBadge(); // Update badge after deletion
+
+            const dataToDelete = {};
+            dataToDelete[idKey] = id; // Send the ID for deletion
+
+            try {
+              showLoading(); // Show loading before deletion
+              const result = await sendData(sheetName, dataToDelete, "delete");
+              if (result.success) {
+                showToast(
+                  `${sheetName} dengan ID ${id} berhasil dihapus!`,
+                  "success"
+                );
+                await loadAdminTableData(sheetName); // Reload table after deletion
+                // Refresh dropdowns if relevant data is modified
+                if (sheetName === "Siswa" || sheetName === "Tugas") {
+                  await loadAdminDropdownData();
+                }
+                if (sheetName === "Pengumuman") {
+                  if (currentStudentNis && currentStudentClass) {
+                    const pengumumanData = await fetchData("Pengumuman", {
+                      class: currentStudentClass,
+                    });
+                    dataCache.pengumuman = pengumumanData;
+                    updateNotificationBadge(); // Update badge after deletion
+                  }
+                }
+              } else {
+                showToast(
+                  `Gagal menghapus ${sheetName} dengan ID ${id}: ${result.message}`,
+                  "error"
+                );
               }
+            } catch (error) {
+              console.error("Delete Entry Error:", error);
+              showToast("Terjadi kesalahan saat menghapus data.", "error");
+            } finally {
+              hideLoading(); // Hide loading after deletion attempt
             }
-          } else {
-            showToast(
-              `Gagal menghapus ${sheetName} dengan ID ${id}: ${result.message}`,
-              "error"
-            );
           }
-        } catch (error) {
-          console.error("Delete Entry Error:", error);
-          showToast("Terjadi kesalahan saat menghapus data.", "error");
-        } finally {
-          hideLoading(); // Hide loading after deletion attempt
-        }
+        );
       }
 
       // --- Admin Form Submissions ---
@@ -3730,9 +4143,10 @@
             !announcement.Untuk_Kelas ||
             announcement.Untuk_Kelas === "" ||
             announcement.Untuk_Kelas === "Semua" ||
-            announcement.Untuk_Kelas.split(",")
-              .map((c) => c.trim())
-              .includes(currentStudentClass);
+            (currentStudentClass &&
+              announcement.Untuk_Kelas.split(",")
+                .map((c) => c.trim())
+                .includes(currentStudentClass));
           return (
             relevantToStudent &&
             !readAnnouncements.has(announcement.ID_Pengumuman)
@@ -3782,9 +4196,10 @@
             !announcement.Untuk_Kelas ||
             announcement.Untuk_Kelas === "" ||
             announcement.Untuk_Kelas === "Semua" ||
-            announcement.Untuk_Kelas.split(",")
-              .map((c) => c.trim())
-              .includes(currentStudentClass)
+            (currentStudentClass &&
+              announcement.Untuk_Kelas.split(",")
+                .map((c) => c.trim())
+                .includes(currentStudentClass))
           );
         });
 
@@ -3829,9 +4244,10 @@
             !announcement.Untuk_Kelas ||
             announcement.Untuk_Kelas === "" ||
             announcement.Untuk_Kelas === "Semua" ||
-            announcement.Untuk_Kelas.split(",")
-              .map((c) => c.trim())
-              .includes(currentStudentClass);
+            (currentStudentClass &&
+              announcement.Untuk_Kelas.split(",")
+                .map((c) => c.trim())
+                .includes(currentStudentClass));
           if (relevantToStudent) {
             readAnnouncements.add(announcement.ID_Pengumuman);
           }
