@@ -14,11 +14,24 @@
       body {
         font-family: "Inter", sans-serif;
         background-color: #f3f4f6; /* Gray-100 */
+        /* Updated: Remove centering to make it stick to top, add small top/bottom padding */
+        min-height: 100vh;
+        display: flex;
+        flex-direction: column;
+        padding: 8px 0; /* Small vertical padding, no horizontal padding from body directly */
       }
       /* Ensure main content takes full width on smaller screens, removing max-width */
       .main-content-area {
         width: 100%;
         max-width: 960px; /* Keep max-width for larger screens */
+        /* Updated: Remove white background, shadow, rounded corners for mobile edge-to-edge feel */
+        background-color: transparent; /* Blend with body background */
+        box-shadow: none;
+        border-radius: 0;
+        /* Adjusted padding for larger screens, and overridden for mobile below */
+        padding: 0; /* Initial padding, to be set by inner elements */
+        margin-left: auto;
+        margin-right: auto; /* Keep centered on larger screens */
       }
       .section-hidden {
         display: none;
@@ -310,12 +323,13 @@
       @media (max-width: 768px) {
         /* Applies to screens smaller than md breakpoint */
         body {
-          padding: 8px; /* Reduced padding on body for mobile */
+          padding-left: 0;
+          padding-right: 0; /* Remove horizontal padding from body */
         }
         .main-content-area {
-          padding: 12px; /* Reduced padding on main container for mobile */
-          border-radius: 8px; /* Slightly smaller border-radius */
-          box-shadow: none; /* Remove subtle shadow for a flatter look */
+          padding: 0 8px; /* Small horizontal padding inside main content, no vertical */
+          border-radius: 0; /* No rounded corners */
+          box-shadow: none; /* No subtle shadow */
         }
         .container {
             /* Override general .container max-width for full width on mobile */
@@ -328,7 +342,7 @@
             margin-bottom: 1rem; /* mb-4 */
         }
         h2 {
-            font-size: 1.5rem; /* text-2xl to text-xl on mobile */
+            font-size: 1.25rem; /* Further reduced for 'Dashboard Wali Murid' */
             margin-bottom: 1rem; /* mb-4 */
         }
         h3 {
@@ -368,11 +382,27 @@
         .grid.gap-6 {
           gap: 1rem; /* gap-4 */
         }
-        .bg-gray-50 {
+        /* Specific cards that were bg-white should now be bg-white */
+        .bg-gray-50, .bg-white, .bg-blue-100, .bg-green-50, .bg-yellow-50 {
           padding: 1rem; /* p-4 */
           border-radius: 8px; /* rounded-lg to rounded-md */
           box-shadow: none; /* Remove subtle shadow */
+          margin-left: 8px; /* Match main content padding */
+          margin-right: 8px;
         }
+
+        /* Adjustments for login card and dashboard sections */
+        #unified-login-card,
+        #tab-content-container,
+        #admin-tab-content-container {
+            padding: 1rem; /* p-4 */
+            border-radius: 8px; /* rounded-lg to rounded-md */
+            box-shadow: none; /* Remove shadow */
+            margin-left: 8px; /* Match main content padding */
+            margin-right: 8px;
+            background-color: white; /* Ensure these sections retain white background if they had it */
+        }
+
         .space-y-6 {
           gap: 1rem; /* space-y-4 */
         }
@@ -403,11 +433,7 @@
             padding-right: 0.5rem; /* px-2 */
             font-size: 0.75rem; /* text-sm to text-xs */
         }
-        #tab-content-container, #admin-tab-content-container {
-            padding: 1rem; /* p-4 */
-            border-radius: 8px; /* rounded-lg to rounded-md */
-            box-shadow: none; /* Remove shadow */
-        }
+
 
         /* Unified login card */
         #unified-login-card {
@@ -483,6 +509,8 @@
           border-radius: 0.5rem; /* Rounded corners for cards */
           box-shadow: none; /* No shadow for flat design */
           background-color: #ffffff; /* Explicitly white for cards */
+          margin-left: 8px; /* Match main content padding */
+          margin-right: 8px;
         }
 
         .scrollable-table-container td {
@@ -574,7 +602,8 @@
 
         /* Styling for ALL simplified rows on mobile */
         .tugas-simplified-row td {
-            padding-left: 12px !important; /* Remove data-label indentation */
+            padding-left: 12px !important; /* Keep a minimal padding here */
+            padding-right: 12px !important;
             text-align: left; /* Align text left */
             font-size: 0.875rem; /* text-sm */
             border-bottom: none; /* No border for these simplified rows */
@@ -591,7 +620,7 @@
             align-items: flex-start;
             justify-content: center;
             width: 100%;
-            padding: 0.5rem 0; /* Add some padding */
+            padding: 0.5rem 0; /* Add some vertical padding */
             border-bottom: 1px solid #e5e7eb; /* Subtle separator */
         }
         .tugas-simplified-row:last-child > td > div {
@@ -607,7 +636,7 @@
       }
     </style>
   </head>
-  <body class="min-h-screen flex items-center justify-center p-4">
+  <body class="min-h-screen flex flex-col p-0">
     <!-- Loading Overlay -->
     <div id="loading-overlay">
       <div class="spinner"></div>
@@ -640,11 +669,11 @@
     <!-- Sidebar Overlay (for clicking outside to close) -->
     <div id="sidebar-overlay" onclick="closeSidebar()"></div>
 
-    <div
-      class="main-content-area mx-auto bg-white shadow-xl rounded-lg p-6 md:p-8 w-full relative"
-    >
+    <div class="main-content-area mx-auto w-full relative">
       <!-- Top Right Actions (Notification) - Logout moved to sidebar -->
-      <div class="absolute top-4 right-4 flex items-center space-x-4 z-10">
+      <div
+        class="absolute top-4 right-4 flex items-center space-x-4 z-10 px-4 md:px-0"
+      >
         <!-- Notification Icon and Badge -->
         <div class="relative" id="notification-area">
           <button
@@ -670,7 +699,7 @@
       </div>
 
       <!-- Login Section -->
-      <section id="login-section" class="">
+      <section id="login-section" class="pt-4 px-4 md:px-0">
         <h2 class="text-3xl font-bold text-center text-gray-800 mb-8">
           Sistem Monitoring Siswa
         </h2>
@@ -740,8 +769,8 @@
       </section>
 
       <!-- Parent Dashboard Section -->
-      <section id="parent-dashboard-section" class="section-hidden">
-        <h2 class="text-3xl font-bold text-center text-gray-800 mb-6">
+      <section id="parent-dashboard-section" class="section-hidden pt-4">
+        <h2 class="text-3xl font-bold text-center text-gray-800 mb-6 px-4">
           Dashboard Wali Murid
         </h2>
 
@@ -758,7 +787,7 @@
         <!-- Tabs for various data -->
         <div class="mb-6">
           <div
-            class="flex border-b border-gray-200 overflow-x-auto whitespace-nowrap"
+            class="flex border-b border-gray-200 overflow-x-auto whitespace-nowrap px-4 bg-white"
           >
             <button
               class="tab-button py-2 px-4 text-sm font-medium text-gray-700 hover:text-blue-600 hover:border-b-2 hover:border-blue-600 focus:outline-none"
@@ -1043,15 +1072,15 @@
       </section>
 
       <!-- Admin Dashboard Section -->
-      <section id="admin-dashboard-section" class="section-hidden">
-        <h2 class="text-3xl font-bold text-center text-gray-800 mb-6">
+      <section id="admin-dashboard-section" class="section-hidden pt-4">
+        <h2 class="text-3xl font-bold text-center text-gray-800 mb-6 px-4">
           Dashboard Admin (Guru)
         </h2>
 
         <!-- Tabs for admin actions -->
         <div class="mb-6">
           <div
-            class="flex border-b border-gray-200 overflow-x-auto whitespace-nowrap"
+            class="flex border-b border-gray-200 overflow-x-auto whitespace-nowrap px-4 bg-white"
           >
             <button
               class="admin-tab-button py-2 px-4 text-sm font-medium text-gray-700 hover:text-green-600 hover:border-b-2 hover:border-green-600 focus:outline-none"
