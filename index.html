@@ -13,21 +13,20 @@
     <style>
       body {
         font-family: "Inter", sans-serif;
-        background-color: #f3f4f6; /* Gray-100 */
-        /* Updated: Remove centering to make it stick to top, add small top/bottom padding */
+        background-color: #ffffff; /* Mengubah latar belakang body menjadi putih */
         min-height: 100vh;
         display: flex;
         flex-direction: column;
-        padding: 8px 0; /* Small vertical padding, no horizontal padding from body directly */
+        padding: 8px 0;
       }
       /* Ensure main content takes full width on smaller screens, removing max-width */
       .main-content-area {
         width: 100%;
         max-width: 960px; /* Keep max-width for larger screens */
         /* Updated: Remove white background, shadow, rounded corners for mobile edge-to-edge feel */
-        background-color: transparent; /* Blend with body background */
-        box-shadow: none;
-        border-radius: 0;
+        background-color: #ffffff; /* Mengubah latar belakang area konten menjadi putih */
+        box-shadow: none; /* Menghilangkan bayangan */
+        border-radius: 0; /* Menghilangkan sudut membulat */
         /* Adjusted padding for larger screens, and overridden for mobile below */
         padding: 0; /* Initial padding, to be set by inner elements */
         margin-left: auto;
@@ -198,7 +197,7 @@
       .announcement-item {
         padding: 0.75rem;
         margin-bottom: 0.5rem;
-        background-color: #f9fafb; /* Gray-50 */
+        background-color: #ffffff; /* Mengubah latar belakang item pengumuman menjadi putih */
         border-radius: 0.375rem;
         border: 1px solid #e5e7eb; /* Gray-200 */
       }
@@ -705,10 +704,7 @@
         </h2>
 
         <!-- Unified Login Form Card -->
-        <div
-          id="unified-login-card"
-          class="p-6 bg-blue-50 rounded-lg shadow-inner"
-        >
+        <div id="unified-login-card" class="p-6 bg-white rounded-lg">
           <h3
             id="login-title"
             class="text-2xl font-semibold text-blue-800 mb-4 text-center"
@@ -775,7 +771,7 @@
         </h2>
 
         <!-- Student Identity -->
-        <div class="bg-blue-100 p-6 rounded-lg shadow-md mb-6">
+        <div class="bg-white p-6 rounded-lg mb-6">
           <h3 class="text-2xl font-semibold text-blue-900 mb-4">
             Identitas Siswa
           </h3>
@@ -815,10 +811,7 @@
             </button>
           </div>
 
-          <div
-            id="tab-content-container"
-            class="mt-4 p-4 bg-white rounded-lg shadow-md"
-          >
+          <div id="tab-content-container" class="mt-4 p-4 bg-white rounded-lg">
             <!-- Tugas Status Table (now primary for tasks) -->
             <div id="tugas-status" class="tab-content">
               <h4 class="text-xl font-semibold text-gray-800 mb-3">
@@ -906,9 +899,7 @@
               </div>
 
               <div class="flex flex-col md:flex-row gap-6">
-                <div
-                  class="w-full md:w-1/2 bg-gray-50 p-4 rounded-lg shadow-md"
-                >
+                <div class="w-full md:w-1/2 bg-white p-4 rounded-lg">
                   <h5
                     class="text-lg font-semibold text-gray-700 mb-3 text-center"
                   >
@@ -925,9 +916,7 @@
                   </div>
                 </div>
 
-                <div
-                  class="w-full md:w-1/2 bg-gray-50 p-4 rounded-lg shadow-md"
-                >
+                <div class="w-full md:w-1/2 bg-white p-4 rounded-lg">
                   <h5 class="text-lg font-semibold text-gray-700 mb-3">
                     Detail Kehadiran
                   </h5>
@@ -1001,6 +990,15 @@
                     </tr>
                   </tbody>
                 </table>
+              </div>
+              <!-- New: Summarize notes button -->
+              <div class="mt-4 text-center">
+                <button
+                  id="summarize-notes-button"
+                  class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-md shadow-md transition duration-300 ease-in-out"
+                >
+                  ✨ Buat Ringkasan Catatan
+                </button>
               </div>
             </div>
 
@@ -1122,7 +1120,7 @@
 
           <div
             id="admin-tab-content-container"
-            class="mt-4 p-4 bg-white rounded-lg shadow-md"
+            class="mt-4 p-4 bg-white rounded-lg"
           >
             <!-- Input Tugas Baru Form -->
             <div id="input-tugas" class="admin-tab-content">
@@ -2061,6 +2059,22 @@
       </div>
     </div>
 
+    <!-- Summary Modal -->
+    <div id="summary-modal" class="modal">
+      <div class="modal-content">
+        <button class="modal-close-button" onclick="closeSummaryModal()">
+          &times;
+        </button>
+        <h3 class="text-2xl font-bold text-gray-800 mb-4">
+          Ringkasan Catatan Guru
+        </h3>
+        <div id="summary-content" class="prose max-w-none">
+          <!-- Summary will be loaded here -->
+          <p class="text-center text-gray-500">Membuat ringkasan...</p>
+        </div>
+      </div>
+    </div>
+
     <!-- Toast Container -->
     <div id="toast-container"></div>
 
@@ -2212,6 +2226,13 @@
       const confirmOkBtn = document.getElementById("confirm-ok-btn");
       let onConfirmCallback = null; // Store callback for confirmation
 
+      // Summary Modal Elements
+      const summarizeNotesButton = document.getElementById(
+        "summarize-notes-button"
+      );
+      const summaryModal = document.getElementById("summary-modal");
+      const summaryContent = document.getElementById("summary-content");
+
       // --- Loading Overlay Functions ---
       function showLoading() {
         loadingOverlay.classList.add("visible");
@@ -2299,6 +2320,17 @@
         }
         hideConfirmModal();
       });
+
+      // --- Summary Modal Functions ---
+      function openSummaryModal() {
+        summaryModal.classList.add("open");
+      }
+
+      function closeSummaryModal() {
+        summaryModal.classList.remove("open");
+        summaryContent.innerHTML =
+          '<p class="text-center text-gray-500">Membuat ringkasan...</p>'; // Reset content
+      }
 
       // --- Generate Unique ID (Generic) ---
       function generateUniqueId(prefix) {
@@ -2438,7 +2470,7 @@
           currentLoginMode = "admin";
           loginTitle.textContent = "Login Admin (Guru)";
           unifiedLoginCard.classList.remove("bg-blue-50");
-          unifiedLoginCard.classList.add("bg-green-50");
+          unifiedLoginCard.classList.add("bg-white"); // Changed to white
           loginTitle.classList.remove("text-blue-800");
           loginTitle.classList.add("text-green-800");
           mainLoginButton.classList.remove("bg-blue-600", "hover:bg-blue-700");
@@ -2462,7 +2494,7 @@
           currentLoginMode = "parent";
           loginTitle.textContent = "Login Wali Murid";
           unifiedLoginCard.classList.remove("bg-green-50");
-          unifiedLoginCard.classList.add("bg-blue-50");
+          unifiedLoginCard.classList.add("bg-white"); // Changed to white
           loginTitle.classList.remove("text-green-800");
           loginTitle.classList.add("text-blue-800");
           mainLoginButton.classList.remove(
@@ -2511,7 +2543,7 @@
         currentLoginMode = "parent";
         loginTitle.textContent = "Login Wali Murid";
         unifiedLoginCard.classList.remove("bg-green-50");
-        unifiedLoginCard.classList.add("bg-blue-50");
+        unifiedLoginCard.classList.add("bg-white"); // Changed to white
         loginTitle.classList.remove("text-green-800");
         loginTitle.classList.add("text-blue-800");
         mainLoginButton.classList.remove("bg-green-600", "hover:bg-green-700");
@@ -2940,25 +2972,20 @@
           if (task.status === "Tuntas") {
             statusColorClass = "text-green-600";
             statusText = `Tuntas! Nilai: ${task.nilaiDisplay}`;
-            row.classList.add("bg-green-50"); // Light green background for tuntas
+            row.classList.add("bg-white"); // Changed to white
           } else if (task.status === "Remedial") {
             statusColorClass = "text-red-600";
             statusText = `Remedial. Nilai: ${task.nilaiDisplay}`;
-            row.classList.add("bg-yellow-50"); // Light yellow for remedial
+            row.classList.add("bg-white"); // Changed to white
           } else {
             // Belum Dikerjakan
             statusColorClass = "text-red-600";
             statusText = `Belum Dikerjakan. Batas: ${task.Batas_Waktu}`;
-            row.classList.add("bg-blue-50"); // Light blue for belum dikerjakan
+            row.classList.add("bg-white"); // Changed to white
           }
 
           // Apply the simplified row styling to all tasks
-          row.classList.add(
-            "tugas-simplified-row",
-            "rounded-md",
-            "mb-2",
-            "shadow-sm"
-          );
+          row.classList.add("tugas-simplified-row", "rounded-md", "mb-2"); // Removed shadow-sm
           row.innerHTML = `
               <td colspan="5">
                   <div class="flex flex-col md:flex-row md:justify-between items-start md:items-center py-2 px-2 border-b border-gray-100 last:border-none">
@@ -4287,6 +4314,77 @@
       // Attach event listener to the bell icon
       announcementBellIcon.addEventListener("click", openAnnouncementModal);
 
+      // --- Gemini API Call for Summarization ---
+      async function callGeminiAPI(prompt) {
+        const apiKey = ""; // API key is handled by the environment
+        const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
+
+        const chatHistory = [];
+        chatHistory.push({ role: "user", parts: [{ text: prompt }] });
+
+        const payload = { contents: chatHistory };
+
+        try {
+          const response = await fetch(apiUrl, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload),
+          });
+          const result = await response.json();
+
+          if (
+            result.candidates &&
+            result.candidates.length > 0 &&
+            result.candidates[0].content &&
+            result.candidates[0].content.parts &&
+            result.candidates[0].content.parts.length > 0
+          ) {
+            return result.candidates[0].content.parts[0].text;
+          } else {
+            console.error("Unexpected Gemini API response structure:", result);
+            throw new Error("Failed to get summary from AI.");
+          }
+        } catch (error) {
+          console.error("Error calling Gemini API:", error);
+          throw new Error(`Error: ${error.message}`);
+        }
+      }
+
+      // --- Summarize Notes Function ---
+      summarizeNotesButton.addEventListener("click", async () => {
+        if (!currentStudentNis) {
+          showToast(
+            "Anda harus login sebagai wali murid untuk membuat ringkasan catatan.",
+            "info"
+          );
+          return;
+        }
+
+        if (!dataCache.catatan_guru || dataCache.catatan_guru.length === 0) {
+          showToast("Tidak ada catatan guru untuk diringkas.", "warning");
+          return;
+        }
+
+        openSummaryModal(); // Open modal and show loading text
+        summaryContent.innerHTML =
+          '<div class="text-center py-4 text-gray-500 flex flex-col items-center justify-center"><div class="spinner w-8 h-8"></div><p class="mt-2">Membuat ringkasan catatan...</p></div>';
+
+        try {
+          // Combine all teacher notes into a single string
+          const allNotes = dataCache.catatan_guru
+            .map((note) => `Minggu ${note.Minggu_Ke}: ${note.Catatan}`)
+            .join("\n");
+
+          const prompt = `Buat ringkasan padat dan mudah dipahami dalam Bahasa Indonesia dari catatan guru berikut ini untuk wali murid. Jelaskan poin-poin penting tentang kemajuan atau masalah siswa. Jika tidak ada poin penting yang menonjol, sebutkan bahwa tidak ada masalah khusus. Pisahkan poin-poin dengan bullet point.\n\nCatatan Guru:\n${allNotes}`;
+
+          const summary = await callGeminiAPI(prompt);
+          summaryContent.innerHTML = `<p>${summary.replace(/\n/g, "<br>")}</p>`; // Display summary with line breaks
+        } catch (error) {
+          summaryContent.innerHTML = `<p class="text-red-600">Gagal membuat ringkasan: ${error.message}. Silakan coba lagi.</p>`;
+          showToast("Gagal membuat ringkasan catatan.", "error");
+        }
+      });
+
       // Initialize view: show parent login by default
       showSection("login-section");
       // Ensure initial state is parent login
@@ -4296,7 +4394,7 @@
       loginAdminEmailInput.removeAttribute("required");
       loginTitle.textContent = "Login Wali Murid";
       unifiedLoginCard.classList.remove("bg-green-50");
-      unifiedLoginCard.classList.add("bg-blue-50");
+      unifiedLoginCard.classList.add("bg-white"); // Changed to white
       loginTitle.classList.remove("text-green-800");
       loginTitle.classList.add("text-blue-800");
       mainLoginButton.classList.remove("bg-green-600", "hover:bg-green-700");
