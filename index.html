@@ -17,20 +17,17 @@
         min-height: 100vh;
         display: flex;
         flex-direction: column;
-        padding: 8px 0;
+        padding: 0; /* Menghilangkan padding dari body */
       }
       /* Ensure main content takes full width on smaller screens, removing max-width */
       .main-content-area {
-        width: 100%;
-        max-width: 960px; /* Keep max-width for larger screens */
-        /* Updated: Remove white background, shadow, rounded corners for mobile edge-to-edge feel */
-        background-color: #ffffff; /* Mengubah latar belakang area konten menjadi putih */
-        box-shadow: none; /* Menghilangkan bayangan */
-        border-radius: 0; /* Menghilangkan sudut membulat */
-        /* Adjusted padding for larger screens, and overridden for mobile below */
-        padding: 0; /* Initial padding, to be set by inner elements */
-        margin-left: auto;
-        margin-right: auto; /* Keep centered on larger screens */
+        width: 100%; /* Memastikan lebar penuh */
+        /* max-width: 960px; Removed max-width */
+        /* margin-left: auto; margin-right: auto; Removed auto margins */
+        background-color: #ffffff;
+        box-shadow: none;
+        border-radius: 0;
+        padding: 0; /* No padding on the main content area itself */
       }
       .section-hidden {
         display: none;
@@ -318,6 +315,39 @@
         z-index: 10; /* Ensure header is above content */
       }
 
+      /* --- DESKTOP/GENERAL STYLES (Applies by default) --- */
+      @media (min-width: 769px) { /* Applies to screens larger than md breakpoint */
+        .main-content-area {
+            max-width: 960px; /* Reintroduce max-width for larger screens */
+            margin-left: auto;
+            margin-right: auto; /* Center on larger screens */
+            padding-top: 8px; /* Add some padding at the top for desktop */
+        }
+        /* Padding for sections and cards on desktop */
+        #login-section,
+        #parent-dashboard-section,
+        #admin-dashboard-section {
+            padding: 1rem 1rem; /* Consistent padding for sections on desktop */
+            /* Tailwind p-4 */
+        }
+
+        /* Specific elements inside sections that need padding */
+        #unified-login-card,
+        #tab-content-container,
+        #admin-tab-content-container,
+        #parent-dashboard-section > .bg-white, /* Student Identity */
+        #kehadiran > .bg-white /* Kehadiran chart/table cards */
+        {
+            padding: 1.5rem; /* Tailwind p-6 for these cards/containers */
+            margin-bottom: 1.5rem; /* Tailwind mb-6 */
+        }
+        .bg-white:not(.p-4), .bg-blue-100:not(.p-4), .bg-green-50:not(.p-4), .bg-yellow-50:not(.p-4) {
+            padding: 1.5rem; /* Default padding for these background elements if not already set */
+            margin-bottom: 1.5rem; /* Default margin-bottom for spacing */
+        }
+      }
+
+
       /* --- MOBILE SPECIFIC STYLES (Media Query) --- */
       @media (max-width: 768px) {
         /* Applies to screens smaller than md breakpoint */
@@ -326,13 +356,43 @@
           padding-right: 0; /* Remove horizontal padding from body */
         }
         .main-content-area {
-          padding: 0 8px; /* Small horizontal padding inside main content, no vertical */
+          padding: 0; /* No padding on the main container itself */
           border-radius: 0; /* No rounded corners */
           box-shadow: none; /* No subtle shadow */
         }
         .container {
             /* Override general .container max-width for full width on mobile */
             max-width: 100%;
+        }
+
+        /* Padding for sections and cards on mobile */
+        #login-section,
+        #parent-dashboard-section,
+        #admin-dashboard-section {
+            padding-top: 1rem; /* pt-4 */
+            padding-bottom: 1rem; /* pb-4 */
+            padding-left: 0; /* No padding on the section itself, content inside will handle it */
+            padding-right: 0;
+        }
+
+        /* Specific elements inside sections that need padding on mobile */
+        #unified-login-card,
+        #tab-content-container,
+        #admin-tab-content-container,
+        #parent-dashboard-section > .bg-white, /* Student Identity */
+        #kehadiran > .bg-white /* Kehadiran chart/table cards */
+        {
+            padding: 1rem; /* Tailwind p-4 on mobile */
+            margin-left: 0.5rem; /* px-2 / ml-2 equivalent to make content not touch edges */
+            margin-right: 0.5rem;
+            margin-bottom: 1rem; /* mb-4 */
+            border-radius: 8px; /* rounded-lg to rounded-md */
+            box-shadow: none; /* Remove subtle shadow */
+        }
+        /* Ensure table container has padding if it's the top-level element in a tab */
+        .tab-content > .scrollable-table-container {
+             margin-left: 0.5rem;
+             margin-right: 0.5rem;
         }
 
         /* Smaller text for titles */
@@ -377,30 +437,6 @@
           box-shadow: none; /* Remove shadow */
         }
 
-        /* Data display sections (profile, etc.) */
-        .grid.gap-6 {
-          gap: 1rem; /* gap-4 */
-        }
-        /* Specific cards that were bg-white should now be bg-white */
-        .bg-gray-50, .bg-white, .bg-blue-100, .bg-green-50, .bg-yellow-50 {
-          padding: 1rem; /* p-4 */
-          border-radius: 8px; /* rounded-lg to rounded-md */
-          box-shadow: none; /* Remove subtle shadow */
-          margin-left: 8px; /* Match main content padding */
-          margin-right: 8px;
-        }
-
-        /* Adjustments for login card and dashboard sections */
-        #unified-login-card,
-        #tab-content-container,
-        #admin-tab-content-container {
-            padding: 1rem; /* p-4 */
-            border-radius: 8px; /* rounded-lg to rounded-md */
-            box-shadow: none; /* Remove shadow */
-            margin-left: 8px; /* Match main content padding */
-            margin-right: 8px;
-            background-color: white; /* Ensure these sections retain white background if they had it */
-        }
 
         .space-y-6 {
           gap: 1rem; /* space-y-4 */
@@ -434,52 +470,6 @@
         }
 
 
-        /* Unified login card */
-        #unified-login-card {
-            padding: 1rem; /* p-4 */
-            border-radius: 8px; /* rounded-lg to rounded-md */
-            box-shadow: none; /* Remove shadow */
-        }
-        #login-title {
-            font-size: 1.5rem; /* text-2xl to text-xl */
-            margin-bottom: 1rem; /* mb-4 */
-        }
-        #login-form .space-y-4 > div { /* Individual form groups */
-            margin-bottom: 0.75rem; /* space-y-3 */
-        }
-        #login-form label {
-            font-size: 0.75rem; /* text-xs */
-        }
-        #login-form input {
-            padding: 0.5rem 0.75rem; /* px-3 py-2 to px-2 py-1.5 */
-            font-size: 0.875rem; /* text-sm */
-            border-radius: 6px; /* rounded-md to rounded-sm */
-            box-shadow: none; /* Remove shadow */
-        }
-        #main-login-button {
-            padding: 0.5rem 0.75rem; /* py-2 to py-1.5 */
-            font-size: 0.875rem; /* text-sm */
-            border-radius: 6px; /* rounded-md to rounded-sm */
-            box-shadow: none; /* Remove shadow */
-        }
-        #toggle-login-mode-btn {
-            font-size: 0.75rem; /* text-xs */
-        }
-
-        /* Student identity box */
-        .bg-blue-100 {
-            padding: 1rem; /* p-4 */
-            border-radius: 8px; /* rounded-lg to rounded-md */
-            box-shadow: none; /* Remove shadow */
-        }
-        .bg-blue-100 h3 {
-            font-size: 1.5rem; /* text-2xl to text-xl */
-            margin-bottom: 0.75rem; /* mb-3 */
-        }
-        .bg-blue-100 p {
-            font-size: 0.875rem; /* text-sm */
-        }
-
         /* Table Transformation for Mobile - Retained and adjusted for new padding */
         .scrollable-table-container {
           height: auto; /* Remove fixed height on mobile for card-like view */
@@ -508,8 +498,8 @@
           border-radius: 0.5rem; /* Rounded corners for cards */
           box-shadow: none; /* No shadow for flat design */
           background-color: #ffffff; /* Explicitly white for cards */
-          margin-left: 8px; /* Match main content padding */
-          margin-right: 8px;
+          margin-left: 0.5rem; /* Match main content padding */
+          margin-right: 0.5rem;
         }
 
         .scrollable-table-container td {
@@ -668,7 +658,7 @@
     <!-- Sidebar Overlay (for clicking outside to close) -->
     <div id="sidebar-overlay" onclick="closeSidebar()"></div>
 
-    <div class="main-content-area mx-auto w-full relative">
+    <div class="main-content-area relative">
       <!-- Top Right Actions (Notification) - Logout moved to sidebar -->
       <div
         class="absolute top-4 right-4 flex items-center space-x-4 z-10 px-4 md:px-0"
@@ -1179,7 +1169,7 @@
                     class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-green-500 focus:border-green-500"
                   >
                     <option value="">Pilih Mata Pelajaran...</option>
-                    <!-- Options will be populated by JS -->
+                    <!-- Options will be dynamically generated here -->
                   </select>
                 </div>
                 <div>
@@ -1785,7 +1775,7 @@
                     class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-green-500 focus:border-green-500"
                   >
                     <option value="">Pilih Mata Pelajaran...</option>
-                    <!-- Options will be populated by JS -->
+                    <!-- Options will be dynamically generated here -->
                   </select>
                 </div>
                 <div>
