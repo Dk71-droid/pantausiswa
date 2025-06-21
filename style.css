@@ -1,0 +1,749 @@
+body {
+  font-family: "Inter", sans-serif;
+  background-color: #ffffff; /* Mengubah latar belakang body menjadi putih */
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  padding: 0; /* Menghilangkan padding dari body */
+}
+/* Ensure main content takes full width on smaller screens, removing max-width */
+.main-content-area {
+  width: 100%; /* Memastikan lebar penuh */
+  background-color: #ffffff;
+  box-shadow: none;
+  border-radius: 0;
+  /* Add padding-top to ensure content starts below the fixed header */
+  padding-top: 56px; /* Height of the fixed header */
+  transition: transform 0.3s ease-in-out; /* Smooth transition for sliding */
+}
+.section-hidden {
+  display: none;
+}
+/* Loading Overlay Styling */
+#loading-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(255, 255, 255, 0.9); /* Semi-transparent white */
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  z-index: 4000; /* Higher than everything */
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.3s ease-in-out, visibility 0.3s ease-in-out;
+}
+#loading-overlay.visible {
+  opacity: 1;
+  visibility: visible;
+}
+.spinner {
+  border: 4px solid rgba(0, 0, 0, 0.1);
+  border-left-color: #3b82f6; /* Blue-500 */
+  border-radius: 50%;
+  width: 40px;
+  height: 40px;
+  animation: spin 1s linear infinite;
+}
+@keyframes spin {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
+/* Toast Notification Styling */
+#toast-container {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  z-index: 3000; /* Higher than sidebar and modals */
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.toast {
+  padding: 12px 20px;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  color: white;
+  opacity: 0;
+  transition: opacity 0.3s ease-in-out, transform 0.3s ease-in-out;
+  transform: translateY(-20px);
+}
+.toast.show {
+  opacity: 1;
+  transform: translateY(0);
+}
+.toast.success {
+  background-color: #10b981; /* Green-500 */
+}
+.toast.error {
+  background-color: #ef4444; /* Red-500 */
+}
+.toast.info {
+  background-color: #3b82f6; /* Blue-500 */
+}
+.toast.warning {
+  background-color: #f59e0b; /* Amber-500 */
+}
+
+/* Chart container responsiveness */
+#kehadiran-chart-container {
+  position: relative;
+  width: 100%;
+  padding-bottom: 55%; /* Disesuaikan untuk membuat diagram lebih kecil lagi */
+  margin-bottom: 0.25rem !important; /* Mengurangi jarak ke keterangan dibawahnya */
+}
+#kehadiran-chart {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+}
+#kehadiran-chart-legend {
+  margin-top: 0.25rem !important; /* Mepetkan ke chart */
+}
+/* Disable input styling */
+input:disabled,
+select:disabled,
+textarea:disabled,
+button:disabled {
+  cursor: not-allowed;
+  background-color: #e2e8f0; /* bg-gray-200 */
+  color: #a0aec0; /* text-gray-500 */
+}
+/* Style for all select elements and input fields to ensure consistency */
+#subject-filter-select,
+#kehadiran-filter-period,
+#jadwal-filter-day,
+input[type="text"] {
+  /* General styling for text inputs too */
+  padding: 0.375rem 0.75rem; /* py-1.5 px-3 (6px vertical, 12px horizontal) */
+  font-size: 0.8125rem !important; /* Disetel menjadi 13px dan !important */
+  font-weight: 500; /* font-medium */
+  color: #4b5563; /* text-gray-700 */
+  border-radius: 6px; /* rounded-md */
+  border: 1px solid #d1d5db; /* border-gray-300 */
+  background-color: #f9fafb; /* bg-gray-50 */
+  box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05); /* Tailwind shadow-sm */
+  width: 100%; /* Ensure full width by default */
+}
+#subject-filter-select:focus,
+#kehadiran-filter-period:focus,
+#jadwal-filter-day:focus,
+input[type="text"]:focus {
+  outline: none;
+  border-color: #3b82f6; /* blue-500 */
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.25);
+}
+
+/* Modal Styles */
+.modal {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(0, 0, 0, 0.5);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 2000;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.3s ease-in-out, visibility 0.3s ease-in-out;
+}
+.modal.open {
+  opacity: 1;
+  visibility: visible;
+}
+.modal-content {
+  background-color: white;
+  padding: 1.5rem;
+  border-radius: 0.5rem;
+  box-shadow: 0 10px 20px rgba(0, 0, 0, 0.19), 0 6px 6px rgba(0, 0, 0, 0.23);
+  width: 90%;
+  max-width: 600px;
+  max-height: 80vh; /* Limit height for scrollability */
+  overflow-y: auto;
+  position: relative;
+  transform: translateY(-50px);
+  transition: transform 0.3s ease-in-out;
+}
+.modal.open .modal-content {
+  transform: translateY(0);
+}
+.modal-close-button {
+  position: absolute;
+  top: 0.75rem;
+  right: 0.75rem;
+  background: none;
+  border: none;
+  font-size: 1.5rem;
+  cursor: pointer;
+  color: #6b7280; /* Gray-500 */
+}
+/* Removed .announcement-item related styles */
+
+/* Sidebar Styling */
+#sidebar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 280px; /* Fixed width for sidebar */
+  height: 100%;
+  background-color: #ffffff; /* White background for sidebar */
+  box-shadow: 2px 0 10px rgba(0, 0, 0, 0.2);
+  z-index: 2100; /* Higher than modal, lower than toast */
+  transform: translateX(-100%); /* Hidden by default */
+  transition: transform 0.3s ease-in-out;
+  display: flex;
+  flex-direction: column;
+  padding: 20px;
+}
+#sidebar.open {
+  transform: translateX(0); /* Slide in */
+}
+#sidebar-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(0, 0, 0, 0.4); /* Darker overlay for sidebar */
+  z-index: 2050; /* Between modal and sidebar */
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.3s ease-in-out, visibility 0.3s ease-in-out;
+}
+#sidebar-overlay.visible {
+  opacity: 1;
+  visibility: visible;
+}
+.sidebar-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid #e5e7eb;
+}
+.sidebar-close-button {
+  background: none;
+  border: none;
+  font-size: 2rem;
+  cursor: pointer;
+  color: #6b7280;
+}
+.sidebar-menu-item {
+  padding: 10px 15px;
+  font-size: 1rem;
+  color: #374151; /* Gray-800 */
+  text-decoration: none;
+  display: block;
+  border-radius: 5px;
+  transition: background-color 0.2s ease;
+}
+.sidebar-menu-item:hover {
+  background-color: #f3f4f6; /* Gray-100 */
+}
+
+/* Fixed Application Header for Sidebar Icon, Title, and Refresh Button */
+.fixed-app-header {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%; /* Spans full width of the viewport */
+  background-color: #ffffff;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  z-index: 1000;
+  height: 56px;
+  transition: transform 0.3s ease-in-out;
+}
+
+/* New wrapper inside the fixed header for content alignment */
+.header-content-wrapper {
+  display: flex;
+  justify-content: center; /* Center the title by default */
+  align-items: center;
+  height: 100%; /* Take full height of parent header */
+  position: relative; /* For absolute positioning of children */
+  padding: 0 1rem; /* Add some padding to match desktop alignment */
+}
+
+/* Sidebar icon styling within the new header-content-wrapper */
+.sidebar-icon {
+  position: absolute; /* Position absolutely within the wrapper */
+  left: 0.25rem; /* Further reduced from 0.5rem to 0.25rem for closer to edge */
+  font-size: 1.25rem; /* Smaller icon */
+  cursor: pointer;
+  color: #4b5563; /* Gray-700 for a simple black/gray color */
+  display: none; /* Controlled by JS to show/hide based on section */
+  padding: 6px; /* Padding for easier clicking */
+  border-radius: 50%;
+  transition: background-color 0.2s ease;
+}
+
+/* Refresh data button styling within the new header-content-wrapper */
+#refresh-data-button {
+  position: absolute; /* Position absolutely within the wrapper */
+  right: 1rem; /* Align to the right padding of the wrapper */
+  padding: 6px; /* Match sidebar icon padding for size */
+  border-radius: 50%; /* Make it round */
+  background-color: transparent; /* No background */
+  color: #4b5563; /* Match sidebar icon color */
+  font-size: 1.25rem; /* Match sidebar icon font size */
+  transition: background-color 0.2s ease;
+}
+
+/* App Header Title Styling */
+.app-header-title {
+  font-size: 1.25rem; /* text-xl */
+  font-weight: 600; /* font-semibold */
+  color: #1a202c; /* text-gray-900 (darker for prominence) */
+  /* Remove any margins if previously set to ensure true centering */
+  margin: 0;
+  padding: 0;
+  line-height: 1; /* Ensure text sits nicely in the middle */
+}
+
+/* Fixed height for scrollable tables to prevent layout shift */
+.scrollable-table-container {
+  height: 256px; /* h-64 in Tailwind */
+  overflow-y: auto;
+  /* overflow-x: auto; - Removed for mobile table transformation */
+}
+/* Sticky table header */
+.scrollable-table-container table thead {
+  position: sticky;
+  top: 0;
+  background-color: #f3f4f6; /* bg-gray-100 */
+  z-index: 10; /* Ensure header is above content */
+}
+
+/* --- DESKTOP/GENERAL STYLES (Applies by default) --- */
+@media (min-width: 769px) {
+  /* Applies to screens larger than md breakpoint */
+  body {
+    background-color: #f8f8f8; /* Soft light gray for the entire desktop background */
+  }
+
+  /* Keep main-content-area centered */
+  .main-content-area {
+    max-width: 960px; /* Reintroduce max-width for larger screens */
+    margin-left: auto;
+    margin-right: auto; /* Center on larger screens */
+    padding-top: 56px; /* Keep consistent padding for fixed header */
+    background-color: transparent; /* Make main content area transparent to show body background */
+    box-shadow: none; /* Remove any lingering box-shadow from the main content area */
+  }
+
+  /* Revert header-content-wrapper to full width on desktop while keeping elements inside positioned correctly */
+  .header-content-wrapper {
+    max-width: 100%; /* Make it full width again */
+    margin-left: 0;
+    margin-right: 0;
+    padding: 0 1rem; /* Padding to match general page padding */
+    justify-content: center; /* Center the title within the full width */
+  }
+
+  /* Padding for sections and cards on desktop */
+  #login-section,
+  #parent-dashboard-section,
+  #admin-dashboard-section {
+    padding: 1rem 1rem; /* Consistent padding for sections on desktop */
+    /* Tailwind p-4 */
+  }
+
+  /* Specific elements inside sections that need padding */
+  #unified-login-card,
+  #tab-content-container, /* ADDED BACKGROUND COLOR HERE */
+  #admin-tab-content-container,
+  #kehadiran > .bg-white /* Kehadiran chart/table cards */ {
+    padding: 1rem; /* Reduced from 1.5rem (p-6) to 1rem (16px) for more compactness */
+    margin-bottom: 1rem; /* Reduced from 1.5rem (mb-6) to 1rem for tighter spacing */
+    background-color: #ffffff; /* Reverted to white background for desktop */
+    border: 1px solid #e5e7eb; /* Added light grey border */
+    border-radius: 0.5rem; /* Added rounded corners for the border */
+    box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05); /* Optional: add a subtle shadow */
+  }
+  .bg-white:not(.p-4),
+  .bg-blue-100:not(.p-4),
+  .bg-green-50:not(.p-4),
+  .bg-yellow-50:not(.p-4) {
+    padding: 1rem; /* Default padding for these background elements if not already set */
+    margin-bottom: 1rem; /* Default margin-bottom for spacing */
+  }
+
+  /* Adjustments for student identity card on desktop */
+  .student-identity-card {
+    padding: 0.75rem 1.5rem; /* Increased vertical padding to 0.75rem (12px) for better spacing */
+    margin-top: 0.25rem; /* Reduced margin-top for closer to header */
+    margin-bottom: 0.25rem; /* Reduced margin-bottom for closer to tabs */
+  }
+  .student-identity-card h3 {
+    font-size: 1.1875rem; /* Slightly increased to 19px */
+    margin-bottom: 0.25rem;
+  }
+  .student-identity-card p {
+    font-size: 0.9375rem; /* Slightly increased to 15px */
+    line-height: 1.4; /* Increased line height for better readability */
+    margin-bottom: 0.125rem;
+  }
+  .student-identity-card p:last-child {
+    margin-bottom: 0;
+  }
+
+  /* Center headings on desktop */
+  #parent-dashboard-section h4 {
+    text-align: center;
+  }
+
+  /* Ensure the overall tabs container has no bottom margin on desktop */
+  .mb-2 {
+    /* This class is on the div wrapping the tab buttons in index.html */
+    margin-bottom: 0rem !important; /* Set to 0 for a tighter look on desktop */
+  }
+  /* Adjust padding of the tab content wrapper for desktop */
+  .relative.px-4.py-2.bg-white.rounded-lg.shadow-sm.-mt-2 {
+    padding-top: 0.75rem; /* Reduced from py-2 (8px) to 0.75rem (12px) */
+    padding-bottom: 0.75rem; /* Reduced from py-2 (8px) to 0.75rem (12px) */
+  }
+}
+
+/* --- MOBILE SPECIFIC STYLES (Media Query) --- */
+@media (max-width: 768px) {
+  /* Apply transform to shift main content and fixed header when sidebar is open */
+  .main-content-area.sidebar-open-main,
+  .fixed-app-header.sidebar-open-main {
+    transform: translateX(280px); /* Matches sidebar width */
+  }
+
+  /* Applies to screens smaller than md breakpoint */
+  body {
+    padding-left: 0;
+    padding-right: 0; /* Remove horizontal padding from body */
+  }
+  .main-content-area {
+    padding: 0; /* No padding on the main container itself */
+    border-radius: 0; /* No rounded corners */
+    box-shadow: none; /* No subtle shadow */
+    padding-top: 56px; /* Keep consistent padding for fixed header on mobile too */
+  }
+  .container {
+    /* Override general .container max-width for full width on mobile */
+    max-width: 100%;
+  }
+
+  /* Make sections flush with screen edges on mobile */
+  #login-section,
+  #parent-dashboard-section {
+    padding-left: 0; /* Ensure flush left/right */
+    padding-right: 0; /* Ensure flush left/right */
+    padding-top: 0; /* Eliminate top padding from section to header */
+    padding-bottom: 0; /* Eliminate bottom padding from section to next element */
+  }
+
+  /* Make main content cards/containers flush with screen edges */
+  #unified-login-card,
+  /* The tabs container directly */
+  .flex.border-b.border-gray-200.overflow-x-auto.whitespace-nowrap.px-4.bg-white,
+  /* The tab content wrapper */
+  .relative.px-4.py-2.bg-white.rounded-lg.shadow-sm.-mt-2,
+  /* Kehadiran chart/table cards - they are children of #kehadiran, so they need their own adjustment */
+  #kehadiran > .bg-white /* This targets the chart and table cards inside kehadiran tab */ {
+    margin-left: 0; /* Remove horizontal margin */
+    margin-right: 0; /* Remove horizontal margin */
+    padding-left: 0; /* Remove horizontal padding at this level */
+    padding-right: 0; /* Remove horizontal padding at this level */
+    border-radius: 0; /* Make them square corners to truly flush with screen */
+    box-shadow: none; /* Remove shadow for a flatter look */
+    background-color: #ffffff; /* Ensure white background on mobile */
+    border: none; /* No border on mobile */
+  }
+
+  /* Adjust internal padding for content inside these newly flush containers */
+  /* This re-introduces the 1rem (16px) padding for the content *inside* the flush cards/sections */
+  #unified-login-card,
+  #tab-content-container,
+  #kehadiran > .bg-white /* Target specific content wrappers for padding */ {
+    padding: 0.75rem; /* Reduced from 1rem (16px) to 0.75rem (12px) for more compactness */
+  }
+
+  /* Adjustments for student identity card on mobile */
+  .student-identity-card {
+    /* Memberikan sedikit margin untuk jarak dengan header dan tab */
+    margin-top: 0.5rem !important; /* Contoh: 8px dari header */
+    margin-bottom: 0.5rem !important; /* Contoh: 8px dari tab */
+    padding: 0.25rem 0.75rem; /* Vertikal 4px, Horizontal 12px */
+  }
+  .student-identity-card h3 {
+    font-size: 0.9375rem !important; /* 15px */
+    margin-bottom: 0.125rem !important; /* 2px */
+    line-height: 1.3 !important; /* Sesuaikan line height */
+    padding: 0; /* Hapus padding yang mengganggu */
+  }
+  .student-identity-card p {
+    font-size: 0.8125rem !important; /* 13px */
+    line-height: 1.3 !important; /* Lebih rapat */
+    margin-bottom: 0.125rem !important; /* 2px */
+    padding: 0; /* Hapus padding yang mengganggu */
+  }
+  .student-identity-card p:last-child {
+    margin-bottom: 0 !important;
+  }
+
+  /* Ensure table container takes full width of its parent (tab-content-container) */
+  .scrollable-table-container {
+    margin-left: 0; /* REMOVED margin to align with parent padding */
+    margin-right: 0; /* REMOVED margin to align with parent padding */
+    width: 100%; /* Ensure it fills parent */
+    padding-left: 0; /* Remove internal padding, let child rows handle it */
+    padding-right: 0; /* Remove internal padding, let child rows handle it */
+  }
+
+  /* Smaller text for titles */
+  h1 {
+    font-size: 1.5rem; /* text-2xl to text-xl on mobile */
+    margin-bottom: 0.75rem; /* mb-3 */
+  }
+  h2 {
+    font-size: 1.125rem; /* Further reduced for 'Sistem Monitoring Siswa' on login (18px) */
+    margin-bottom: 0.75rem; /* mb-3 */
+  }
+  h3 {
+    font-size: 1rem; /* text-xl to text-base on mobile (16px) */
+    margin-bottom: 0.5rem; /* mb-2 */
+    padding-bottom: 0.125rem; /* pb-0.5 */
+  }
+  h4 {
+    font-size: 0.875rem; /* text-xl to text-sm on mobile (14px) */
+    margin-bottom: 0.5rem; /* mb-2 */
+    text-align: center; /* Center align for mobile */
+  }
+
+  /* Input form adjustments */
+  #input-section {
+    margin-bottom: 1rem; /* mb-4 */
+  }
+  #input-section .mb-4 {
+    /* Label and input group */
+    margin-bottom: 0.5rem; /* mb-2 */
+  }
+  #input-section label {
+    margin-bottom: 0.125rem; /* mb-0.5 */
+    font-size: 0.75rem; /* text-xs */
+  }
+  #input-section input {
+    padding-top: 0.375rem; /* py-1.5 to py-0.5 */
+    padding-bottom: 0.375rem; /* py-1.5 to py-0.5 */
+    border-radius: 4px; /* rounded-md */
+    box-shadow: none; /* Remove shadow */
+    font-size: 0.875rem; /* text-sm */
+  }
+  #search-button {
+    padding-top: 0.5rem; /* py-2 to py-1.5 */
+    padding-bottom: 0.5rem; /* py-2 to py-1.5 */
+    border-radius: 6px; /* rounded-lg to rounded-md */
+    box-shadow: none; /* Remove shadow */
+  }
+
+  .space-y-6 {
+    gap: 0.75rem; /* space-y-3 */
+  }
+  .space-y-3 {
+    gap: 0.5rem; /* space-y-1.5 */
+  }
+  label.block.text-sm {
+    font-size: 0.75rem; /* text-xs */
+  }
+  input.mt-1 {
+    margin-top: 0.125rem; /* mt-0.5 to mt-0.25 */
+    padding: 0.25rem 0.5rem; /* p-1 */
+    border-radius: 3px; /* Smaller radius */
+    box-shadow: none; /* Remove shadow */
+    font-size: 0.8125rem; /* Slightly smaller than 0.875rem (13px) */
+  }
+  textarea.mt-1 {
+    margin-top: 0.125rem; /* mt-0.5 to mt-0.25 */
+    padding: 0.25rem 0.5rem; /* p-1 */
+    border-radius: 3px; /* Smaller radius */
+    box-shadow: none; /* Remove shadow */
+    font-size: 0.8125rem; /* Slightly smaller than 0.875rem (13px) */
+  }
+
+  /* Tabs and admin tabs - now their container will be px-0, so they need internal padding */
+  .tab-button,
+  .admin-tab-button {
+    padding-left: 0.75rem; /* px-3 */
+    padding-right: 0.75rem; /* px-3 */
+    font-size: 0.8125rem; /* Slightly smaller than 0.875rem (13px) */
+    padding-top: 0.375rem; /* Reduced from py-2 (8px) to 6px */
+    padding-bottom: 0.375rem; /* Reduced from py-2 (8px) to 6px */
+  }
+  /* Smaller font for sidebar menu items on mobile */
+  #sidebar .sidebar-menu-item {
+    font-size: 0.8125rem; /* Reduced to 13px */
+    padding: 6px 10px; /* Slightly reduced padding */
+  }
+
+  /* Ensure the overall tabs container has no bottom margin on mobile */
+  .mb-2 {
+    /* This class is on the div wrapping the tab buttons in index.html */
+    margin-bottom: 0rem !important; /* Override any mb-2 from Tailwind to make it flush */
+  }
+  /* Adjust padding of the tab content wrapper for mobile */
+  .relative.px-4.py-2.bg-white.rounded-lg.shadow-sm.-mt-2 {
+    padding-top: 0.125rem !important; /* Reduced from 0.25rem (4px) to 0.125rem (2px) and !important */
+    padding-bottom: 0.125rem !important; /* Reduced from 0.25rem (4px) to 0.125rem (2px) and !important */
+    margin-top: -0.125rem !important; /* Adjust negative margin to pull up closer, from -0.25rem to -0.125rem and !important */
+  }
+
+  /* Table Transformation for Mobile - Retained and adjusted for new padding */
+  .scrollable-table-container {
+    height: auto; /* Remove fixed height on mobile for card-like view */
+    overflow-y: visible; /* Allow content to push container height */
+    overflow-x: hidden; /* Prevent horizontal scrolling */
+  }
+
+  .scrollable-table-container table,
+  .scrollable-table-container thead,
+  .scrollable-table-container tbody,
+  .scrollable-table-container th,
+  .scrollable-table-container td,
+  .scrollable-table-container tr {
+    display: block; /* Make all table elements behave as blocks */
+  }
+
+  .scrollable-table-container thead tr {
+    position: absolute; /* Hide table headers */
+    top: -9999px;
+    left: -9999px;
+  }
+
+  .scrollable-table-container tr {
+    border: 1px solid #e5e7eb; /* Add border to each 'card' (row) */
+    margin-bottom: 0.5rem; /* space between cards, reduced */
+    border-radius: 0.5rem; /* Rounded corners for cards */
+    box-shadow: none; /* No shadow for flat design */
+    background-color: #ffffff; /* Explicitly white for cards */
+    margin-left: 0; /* Ensure no extra margin */
+    margin-right: 0;
+    padding: 0; /* Remove internal padding if td handles it */
+  }
+
+  .scrollable-table-container td {
+    border: none; /* Remove individual cell borders */
+    border-bottom: 1px solid #eee; /* Add separator between fields within a card */
+    position: relative;
+    padding-left: 0.75rem !important; /* Align content to the 0.75rem padding of the parent container */
+    padding-right: 0.75rem !important; /* Consistent padding */
+    text-align: left; /* Align text left */
+    font-size: 0.8125rem; /* text-sm (13px) */
+    min-height: 30px; /* Ensure minimum height for tap target, reduced */
+    display: flex; /* Use flexbox for label and value alignment */
+    flex-direction: column; /* Stack label above value */
+    align-items: flex-start; /* Align stacked items to the left */
+    justify-content: center;
+    padding-top: 0.375rem; /* Vertical padding for content within cell (6px) */
+    padding-bottom: 0.375rem; /* Vertical padding for content within cell (6px) */
+  }
+
+  .scrollable-table-container td:last-child {
+    border-bottom: 0; /* No border on the last field in a card */
+  }
+
+  .scrollable-table-container td::before {
+    content: attr(data-label); /* Display the label from data-label attribute */
+    position: static; /* Change from absolute to static */
+    width: auto; /* Allow label to take natural width */
+    white-space: nowrap; /* Prevent label from wrapping */
+    text-align: left;
+    font-weight: 600; /* font-semibold */
+    color: #4b5563; /* text-gray-700 */
+    flex-shrink: 0;
+    margin-bottom: 0.125rem; /* Space between label and value (2px) */
+    font-size: 0.6875rem; /* Smaller font for label (11px) */
+  }
+
+  /* Adjust action button styling for mobile */
+  .scrollable-table-container td button {
+    width: auto; /* Allow buttons to size naturally */
+    padding: 0.25rem 0.5rem; /* py-1 px-2 */
+    font-size: 0.6875rem; /* text-xs (11px) */
+    margin-left: 0.5rem; /* space between buttons */
+    box-shadow: none; /* Remove button shadows */
+    border-radius: 3px; /* Slightly smaller button radius */
+  }
+  .scrollable-table-container td button:first-child {
+    margin-left: auto; /* Push first button to the right for flex layout */
+  }
+  .scrollable-table-container td:has(button) {
+    /* Style the cell containing buttons */
+    display: flex;
+    flex-wrap: wrap; /* Allow buttons to wrap */
+    justify-content: flex-end; /* Align buttons to the right */
+    padding-left: 0.75rem !important; /* Adjust padding for button row */
+    padding-right: 0.75rem !important; /* Adjust padding for button row */
+  }
+  .scrollable-table-container td:has(button)::before {
+    content: ""; /* Hide data-label for action column */
+    display: none;
+  }
+
+  /* Styling for ALL simplified rows on mobile */
+  .tugas-simplified-row {
+    margin-left: 0; /* Ensure no extra margin */
+    margin-right: 0;
+    padding: 0; /* Remove any padding on the row itself */
+    border-radius: 0; /* No rounded corners for flush */
+  }
+
+  .tugas-simplified-row td {
+    padding-left: 0.75rem !important; /* Consistent padding with other cards */
+    padding-right: 0.75rem !important;
+    text-align: left; /* Align text left */
+    font-size: 0.8125rem; /* text-sm (13px) */
+    border-bottom: none; /* No border for these simplified rows */
+    display: block; /* Ensure it behaves as a block */
+  }
+  .tugas-simplified-row td::before {
+    content: ""; /* Hide data-label */
+    display: none;
+  }
+  .tugas-simplified-row > td > div {
+    /* Flex container inside the single TD for simplified view */
+    display: flex;
+    flex-direction: column; /* Stack on mobile */
+    align-items: flex-start;
+    justify-content: center;
+    width: 100%;
+    padding: 0.375rem 0; /* Add some vertical padding (6px) */
+    border-bottom: 1px solid #e5e7eb; /* Subtle separator */
+  }
+  .tugas-simplified-row:last-child > td > div {
+    border-bottom: none; /* No border on the very last item */
+  }
+
+  /* Ensure table header is hidden for parent dashboard tugas status on mobile */
+  #tugas-status table thead tr {
+    position: absolute;
+    top: -9999px;
+    left: -9999px;
+  }
+
+  /* Dropdown and table under it */
+  .mb-4 label,
+  .mb-4 select,
+  .mb-4 table {
+    margin-left: 0;
+    margin-right: 0;
+  }
+}
