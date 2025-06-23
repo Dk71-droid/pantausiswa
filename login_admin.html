@@ -3,57 +3,85 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Login Admin - Pantau Siswa</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <link
-      href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap"
-      rel="stylesheet"
-    />
+    <title>Login Admin - PantauSiswa</title>
+    <link rel="stylesheet" href="style.css" />
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        background: #f3f4f6;
+        margin: 0;
+        padding: 0;
+      }
+      .section-hidden {
+        display: none;
+      }
+      .container {
+        max-width: 500px;
+        margin: 0 auto;
+        padding: 2rem;
+      }
+      .field {
+        margin-bottom: 1rem;
+      }
+      .toast-message {
+        margin-top: 0.5rem;
+      }
+    </style>
   </head>
-  <body class="bg-gray-100 min-h-screen flex items-center justify-center">
-    <div class="bg-white p-8 rounded-lg shadow-lg max-w-md w-full text-center">
-      <h1 class="text-2xl font-bold mb-4">Login Admin</h1>
-      <p class="mb-6">
-        Klik tombol di bawah untuk login menggunakan akun Google Anda.
-      </p>
-      <button
-        onclick="loginWithGoogle()"
-        class="bg-blue-600 text-white px-6 py-2 rounded-md hover:bg-blue-700"
-      >
-        Login dengan Google
-      </button>
+  <body>
+    <div class="container">
+      <h2>PantauSiswa - Admin</h2>
+
+      <section id="login-section">
+        <form id="login-form">
+          <div class="field">
+            <label for="login-email-admin">Email Admin:</label>
+            <input type="email" id="login-email-admin" required />
+          </div>
+          <button type="submit">Login</button>
+        </form>
+      </section>
+
+      <section id="admin-config-section" class="section-hidden">
+        <h3>Konfigurasi Admin</h3>
+        <form id="admin-config-form">
+          <div class="field">
+            <label for="admin-kelas-mengampu">Kelas yang Diampu:</label>
+            <input
+              type="text"
+              id="admin-kelas-mengampu"
+              placeholder="Contoh: 5A"
+              required
+            />
+          </div>
+
+          <div class="field">
+            <label>Pilih Mata Pelajaran:</label>
+            <div id="admin-mapel-selection-container"></div>
+          </div>
+
+          <div class="field">
+            <input
+              type="text"
+              id="new-mapel-input"
+              placeholder="Mapel lain..."
+            />
+            <button type="button" id="add-new-mapel-btn">Tambah Mapel</button>
+          </div>
+
+          <button type="submit">Simpan Konfigurasi</button>
+        </form>
+      </section>
+
+      <section id="admin-dashboard-section" class="section-hidden">
+        <h3>Dashboard Admin</h3>
+        <p>Selamat datang, <strong id="dashboard-admin-email"></strong></p>
+        <button id="logout-admin-btn">Logout</button>
+      </section>
+
+      <div id="toast-container"></div>
     </div>
 
-    <script>
-      function loginWithGoogle() {
-        // URL Web App Google Apps Script kamu:
-        window.location.href =
-          "https://script.google.com/macros/s/AKfycbwZEByXGKCa-s4sSPHBtM5GQuZHTjNWkgDWzUgpGXkaO66_mvWiakXnufxX_jd5lYwqdw/exec";
-      }
-
-      window.addEventListener("DOMContentLoaded", () => {
-        const params = new URLSearchParams(window.location.search);
-        const login = params.get("login");
-        const email = params.get("email");
-        const kelas = params.get("kelas");
-        const mapel = params.get("mapel");
-
-        if (login === "success") {
-          alert(
-            "Login berhasil sebagai: " +
-              email +
-              "\nKelas: " +
-              kelas +
-              "\nMapel: " +
-              mapel
-          );
-          // Di sini kamu bisa redirect ke halaman dashboard misalnya
-        } else if (login === "fail") {
-          alert(
-            "Login gagal. Email " + email + " tidak terdaftar sebagai admin."
-          );
-        }
-      });
-    </script>
+    <script src="script_admin.js"></script>
   </body>
 </html>
