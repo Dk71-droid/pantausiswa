@@ -1,6 +1,4 @@
 // Ganti URL ini dengan URL Web App Google Apps Script Anda setelah di-deploy
-// Catatan: URL ini mungkin tidak lagi digunakan secara langsung untuk FETCH
-// karena kita akan menggunakan google.script.run
 const GOOGLE_APPS_SCRIPT_WEB_APP_URL =
   "https://script.google.com/macros/s/AKfycbyA74lf_vJL6Z6Xq6WmuD6kBJlcFiGvY-ei6I283YGESmLuOA0iP3hVol40JGEzbpAO3g/exec";
 const PASS_MARK = 75; // Nilai minimum untuk status "Tuntas" - (used in value configuration)
@@ -40,36 +38,29 @@ const dataCache = {
   catatan_guru: null,
   jadwal_pelajaran: null,
   pengumuman: null,
-  admin_users: null, // This is now less critical as auth is server-side via Google
+  admin_users: null,
 };
 
 // DOM Elements specific to admin view
 const loadingOverlay = document.getElementById("loading-overlay");
-const loginSection = document.getElementById("login-section"); // For admin login form (now status message)
-const adminWelcomeDashboardSection = document.getElementById(
-  "admin-welcome-dashboard-section"
-); // NEW Welcome Dashboard
-const adminDataManagementDashboardSection = document.getElementById(
-  "admin-data-management-dashboard-section"
-); // OLD Dashboard, renamed for clarity
+const loginSection = document.getElementById("login-section"); // For admin login form
+const adminDashboardSection = document.getElementById(
+  "admin-dashboard-section"
+);
 const toastContainer = document.getElementById("toast-container");
 const unifiedLoginCard = document.getElementById("unified-login-card");
-const loginTitle = document.getElementById("login-title"); // Now used for status messages
-const loginStatusMessage = document.getElementById("login-status-message"); // NEW element for messages
-const accessDeniedMessage = document.getElementById("access-denied-message"); // NEW element for access denied
-
-const sidebarMenuIcon = document.getElementById("sidebar-menu-icon"); // NEW for admin sidebar
-const sidebar = document.getElementById("sidebar"); // NEW for admin sidebar
-const sidebarOverlay = document.getElementById("sidebar-overlay"); // NEW for admin sidebar
-const logoutButtonSidebar = document.getElementById("logout-button-sidebar"); // NEW for admin sidebar
-
-const adminLoggedInEmailSpan = document.getElementById("admin-logged-in-email"); // To display logged in email
+const loginTitle = document.getElementById("login-title");
+const loginForm = document.getElementById("login-form");
+const loginAdminEmailInput = document.getElementById("login-email-admin");
+const mainLoginButton = document.getElementById("main-login-button");
 
 // Admin form dropdowns
 const nilaiNisSelect = document.getElementById("nilai-nis");
 const nilaiTugasIdSelect = document.getElementById("nilai-tugas-id");
 const kehadiranNisSelect = document.getElementById("kehadiran-nis");
+const kehadiranTanggalInput = document.getElementById("kehadiran-tanggal"); // Added
 const catatanNisSelect = document.getElementById("catatan-nis");
+const catatanMingguInput = document.getElementById("catatan-minggu"); // Added
 const tugasMapelSelect = document.getElementById("tugas-mapel");
 const jadwalMapelSelect = document.getElementById("jadwal-mapel");
 
@@ -120,54 +111,10 @@ function hideLoading() {
 
 // Fungsi untuk menampilkan atau menyembunyikan bagian aplikasi
 function showSection(sectionId) {
-  // Sembunyikan semua bagian utama terlebih dahulu
   loginSection.classList.add("section-hidden");
-  adminWelcomeDashboardSection.classList.add("section-hidden");
-  adminDataManagementDashboardSection.classList.add("section-hidden");
-
-  // Tampilkan bagian target
-  const targetElement = document.getElementById(sectionId);
-  if (targetElement) {
-    targetElement.classList.remove("section-hidden");
-  }
-
-  // Kelola visibilitas ikon sidebar
-  if (
-    sectionId === "admin-welcome-dashboard-section" ||
-    sectionId === "admin-data-management-dashboard-section"
-  ) {
-    sidebarMenuIcon.style.display = "block";
-  } else {
-    sidebarMenuIcon.style.display = "none";
-  }
+  adminDashboardSection.classList.add("section-hidden");
+  document.getElementById(sectionId).classList.remove("section-hidden");
 }
-
-// --- Sidebar Functions ---
-function openSidebar() {
-  sidebar.classList.add("open");
-  sidebarOverlay.classList.add("visible");
-  document
-    .querySelector(".main-content-area")
-    .classList.add("sidebar-open-main");
-  document
-    .querySelector(".fixed-app-header")
-    .classList.add("sidebar-open-main");
-}
-
-function closeSidebar() {
-  sidebar.classList.remove("open");
-  sidebarOverlay.classList.remove("visible");
-  document
-    .querySelector(".main-content-area")
-    .classList.remove("sidebar-open-main");
-  document
-    .querySelector(".fixed-app-header")
-    .classList.remove("sidebar-open-main");
-}
-// Pasang event listener klik ke overlay untuk menutup sidebar
-sidebarOverlay.addEventListener("click", closeSidebar);
-// Pasang fungsi logout ke tombol logout sidebar baru
-logoutButtonSidebar.addEventListener("click", logout);
 
 // --- Toast Notification Function ---
 function showToast(message, type = "info", duration = 3000) {
@@ -176,7 +123,7 @@ function showToast(message, type = "info", duration = 3000) {
   toast.textContent = message;
   toastContainer.appendChild(toast);
 
-  void toast.offsetWidth; // Memaksa reflow
+  void toast.offsetWidth;
   toast.classList.add("show");
 
   setTimeout(() => {
@@ -225,104 +172,137 @@ function generateTugasId(subjectAbbr, taskNumber, month) {
   return `${subjectAbbr}${formattedTaskNumber}${formattedMonth}`;
 }
 
+// --- Generate Kehadiran ID based on NIS and Date ---
+function updateKehadiranIdField() {
+  const nis = kehadiranNisSelect.value;
+  const tanggal = kehadiranTanggalInput.value;
+  const kehadiranIdInput = document.getElementById("kehadiran-id");
+
+  if (nis && tanggal) {
+    try {
+      const date = new Date(tanggal);
+      if (isNaN(date.getTime())) {
+        kehadiranIdInput.value = "Format tanggal salah";
+        kehadiranIdInput.classList.remove("bg-white");
+        kehadiranIdInput.classList.add("bg-gray-100", "cursor-not-allowed");
+        return;
+      }
+      const month = String(date.getMonth() + 1).padStart(2, "0");
+      const day = String(date.getDate()).padStart(2, "0");
+      const year = date.getFullYear();
+      const formattedDate = `${day}${month}${year}`; // Changed format to DDMMYYYY
+      kehadiranIdInput.value = `${nis}_${formattedDate}`;
+      kehadiranIdInput.classList.remove("bg-gray-100", "cursor-not-allowed");
+      kehadiranIdInput.classList.add("bg-white");
+    } catch (error) {
+      console.error("Error formatting date for Kehadiran ID:", error);
+      kehadiranIdInput.value = "Gagal membuat ID";
+      kehadiranIdInput.classList.remove("bg-white");
+      kehadiranIdInput.classList.add("bg-gray-100", "cursor-not-allowed");
+    }
+  } else {
+    kehadiranIdInput.value = "Dihasilkan Otomatis";
+    kehadiranIdInput.classList.remove("bg-white");
+    kehadiranIdInput.classList.add("bg-gray-100", "cursor-not-allowed");
+  }
+}
+
+// --- Generate Catatan Guru ID based on NIS and Minggu_Ke ---
+function updateCatatanIdField() {
+  const nis = catatanNisSelect.value;
+  const mingguKe = catatanMingguInput.value;
+  const catatanIdInput = document.getElementById("catatan-id");
+
+  if (nis && mingguKe) {
+    // Simple check for valid week number (can be expanded)
+    if (isNaN(parseInt(mingguKe))) {
+      catatanIdInput.value = "Minggu ke salah";
+      catatanIdInput.classList.remove("bg-white");
+      catatanIdInput.classList.add("bg-gray-100", "cursor-not-allowed");
+      return;
+    }
+    catatanIdInput.value = `${nis}_${mingguKe}`;
+    catatanIdInput.classList.remove("bg-gray-100", "cursor-not-allowed");
+    catatanIdInput.classList.add("bg-white");
+  } else {
+    catatanIdInput.value = "Dihasilkan Otomatis";
+    catatanIdInput.classList.remove("bg-white");
+    catatanIdInput.classList.add("bg-gray-100", "cursor-not-allowed");
+  }
+}
+
 // Universal tab switching function
-// Fungsi ini sekarang menangani peralihan antara bagian admin utama (selamat datang vs manajemen data)
-// dan juga tab internal di dalam manajemen data
-function switchTab(targetTabId, buttons) {
-  // Jika beralih ke bagian utama
-  if (targetTabId.startsWith("admin-")) {
-    showSection(targetTabId); // Tampilkan bagian utama
-    // Nonaktifkan semua tombol sidebar
-    document.querySelectorAll(".sidebar-menu-item").forEach((btn) => {
-      btn.classList.remove("text-green-600", "border-green-600", "font-bold");
-      btn.classList.add("text-gray-800");
-    });
-    // Aktifkan tombol sidebar tertentu jika ditemukan
-    const sidebarButton = Array.from(
-      document.querySelectorAll(".sidebar-menu-item")
-    ).find((btn) => btn.dataset.tab === targetTabId);
-    if (sidebarButton) {
-      sidebarButton.classList.remove("text-gray-800");
-      sidebarButton.classList.add("text-green-600", "font-bold");
-    }
-    closeSidebar(); // Tutup sidebar setelah pemilihan
-  } else {
-    // Ini untuk tab internal di dalam adminDataManagementDashboardSection
-    document.querySelectorAll(".admin-tab-content").forEach((content) => {
-      content.classList.add("section-hidden");
-    });
+function switchTab(targetTabId, buttons, prefix = "") {
+  document.querySelectorAll(`.${prefix}tab-content`).forEach((content) => {
+    content.classList.add("section-hidden");
+  });
 
-    buttons.forEach((btn) => {
-      btn.classList.remove("text-green-600", "border-green-600", "border-b-2");
-      btn.classList.add("text-gray-700");
-    });
+  buttons.forEach((btn) => {
+    btn.classList.remove("text-green-600", "border-green-600", "border-b-2");
+    btn.classList.add("text-gray-700");
+  });
 
-    document.getElementById(targetTabId).classList.remove("section-hidden");
+  document.getElementById(targetTabId).classList.remove("section-hidden");
 
-    const clickedButton = Array.from(buttons).find(
-      (btn) => btn.dataset.tab === targetTabId
+  const clickedButton = Array.from(buttons).find(
+    (btn) => btn.dataset.tab === targetTabId
+  );
+  if (clickedButton) {
+    clickedButton.classList.remove("text-gray-700");
+    clickedButton.classList.add(
+      "text-green-600",
+      "border-b-2",
+      "border-green-600"
     );
-    if (clickedButton) {
-      clickedButton.classList.remove("text-gray-700");
-      clickedButton.classList.add(
-        "text-green-600",
-        "border-b-2",
-        "border-green-600"
-      );
-    }
   }
 }
 
-// --- Panggilan Balik Apps Script untuk Google Login ---
-function onAdminStatusReceived(response) {
-  hideLoading();
-  if (response.isAdmin) {
-    adminLoggedInEmailSpan.textContent = response.email;
-    showSection("admin-welcome-dashboard-section");
-    // Aktifkan tombol sidebar 'Dashboard Admin' di awal
-    switchTab(
-      "admin-welcome-dashboard-section",
-      document.querySelectorAll(".sidebar-menu-item")
+// --- Admin Login Form Submission ---
+loginForm.addEventListener("submit", async (e) => {
+  e.preventDefault();
+  showLoading();
+
+  try {
+    const adminEmail = loginAdminEmailInput.value.trim();
+    if (!adminEmail) {
+      showToast("Email admin tidak boleh kosong.", "error");
+      hideLoading();
+      return;
+    }
+
+    // Fetch authorized emails from Google Apps Script
+    // Force refresh admin users as it's a critical initial fetch
+    const authorizedEmails = await fetchData("Admin_Users", null, true);
+    dataCache.admin_users = authorizedEmails; // Cache admin users
+
+    // Check if the entered email exists in the list of authorized emails (case-insensitive)
+    const emailExists = authorizedEmails.some(
+      (user) =>
+        user.Email && user.Email.toLowerCase() === adminEmail.toLowerCase()
     );
-  } else {
-    // Tampilkan bagian login dengan pesan akses ditolak
-    showSection("login-section");
-    accessDeniedMessage.classList.remove("section-hidden");
-    loginStatusMessage.innerHTML = `
-            <p class="text-red-600 font-bold text-xl mb-2">AKSES DITOLAK</p>
-            <p class="text-gray-700">Email Anda: <span class="font-semibold">${
-              response.email || "Tidak Terdeteksi"
-            }</span> tidak terdaftar sebagai admin.</p>
-            <p class="text-gray-700 mt-2">Silakan hubungi administrator sistem jika Anda yakin ini adalah kesalahan.</p>
-            <p class="text-gray-700 mt-4">Pastikan Anda login dengan akun Google yang benar.</p>
-        `;
-    // Sembunyikan judul login normal jika akses ditolak
-    loginTitle.classList.add("section-hidden");
+
+    if (emailExists) {
+      showToast("Login admin berhasil!", "success");
+      await loadAdminDropdownData(); // Load dropdowns for forms
+      await loadAdminTableData("Tugas"); // Load initial table for admin dashboard
+      updateTugasIdField(); // Initial generation for Tugas ID
+      updateKehadiranIdField(); // Initial generation for Kehadiran ID
+      updateCatatanIdField(); // Initial generation for Catatan Guru ID - Added
+      showSection("admin-dashboard-section"); // Show admin dashboard
+      switchTab("input-tugas", document.querySelectorAll(".admin-tab-button")); // Activate default tab
+    } else {
+      showToast("Email admin tidak terdaftar. Akses ditolak.", "error");
+    }
+  } catch (error) {
+    console.error("Login Error:", error);
+    showToast(
+      "Terjadi kesalahan saat login. Periksa konsol untuk detail.",
+      "error"
+    );
+  } finally {
+    hideLoading();
   }
-}
-
-function onAdminStatusError(error) {
-  hideLoading();
-  console.error("Error fetching admin status:", error);
-  showSection("login-section");
-  accessDeniedMessage.classList.remove("section-hidden");
-  loginStatusMessage.innerHTML = `
-        <p class="text-red-600 font-bold text-xl mb-2">TERJADI KESALAHAN</p>
-        <p class="text-gray-700">Gagal memverifikasi status admin. Pesan: ${error.message}</p>
-        <p class="text-gray-700 mt-2">Silakan coba lagi atau hubungi administrator sistem.</p>
-    `;
-  loginTitle.classList.add("section-hidden");
-  showToast("Gagal memverifikasi status admin.", "error");
-}
-
-// --- Fungsi Logout ---
-function logout() {
-  // Ini akan memuat ulang halaman, yang akan memaksa Aplikasi Web Apps Script untuk mengevaluasi ulang status login Google mereka.
-  showToast("Logging out...", "info");
-  setTimeout(() => {
-    window.location.reload(); // Muat ulang halaman untuk memicu pemeriksaan Google Auth
-  }, 500);
-}
+});
 
 // Helper function to reset admin forms to create mode
 function resetAdminForm(
@@ -344,6 +324,11 @@ function resetAdminForm(
       nilaiStatusSelect.disabled = false;
       if (nilaiNisSelect) nilaiNisSelect.disabled = false;
       if (nilaiTugasIdSelect) nilaiTugasIdSelect.disabled = false;
+    } else if (idKey === "ID_Kehadiran") {
+      updateKehadiranIdField(); // Call to regenerate based on current dropdowns (which will be reset to empty)
+    } else if (idKey === "ID_Catatan") {
+      // Added
+      updateCatatanIdField(); // Call to regenerate based on current dropdowns (which will be reset to empty)
     } else {
       idInputElement.value = "Dihasilkan Otomatis";
     }
@@ -354,31 +339,105 @@ function resetAdminForm(
   submitButton.disabled = false;
 }
 
-// --- Fungsi Pengambilan Data (GET) dengan Cache ---
-// Dimodifikasi untuk menggunakan google.script.run untuk permintaan GET setelah otentikasi awal
-async function fetchData(sheetName, param = null) {
-  return new Promise((resolve, reject) => {
-    google.script.run
-      .withSuccessHandler((response) => {
-        if (response.error) {
-          reject(new Error(response.error));
-        } else {
-          resolve(response);
-        }
-      })
-      .withFailureHandler(reject)
-      .getData(sheetName, param); // Panggil fungsi Apps Script getData
-  });
+// --- Data Fetching Function (GET) with Caching ---
+async function fetchData(sheetName, param = null, forceRefresh = false) {
+  let cacheKey = sheetName;
+  if (param) {
+    // Convert param object to a consistent string for cache key, or use param directly if string
+    const paramString =
+      typeof param === "object" ? JSON.stringify(param) : String(param);
+    cacheKey += `_${paramString}`;
+  }
+
+  // Check cache first if not forced to refresh
+  if (!forceRefresh && dataCache[cacheKey]) {
+    console.log(`Mengambil data dari cache: ${cacheKey}`);
+    return dataCache[cacheKey];
+  }
+
+  let url = `${GOOGLE_APPS_SCRIPT_WEB_APP_URL}?sheet=${sheetName}`;
+  if (param) {
+    if (
+      sheetName === "Siswa" ||
+      sheetName === "Kehadiran" ||
+      sheetName === "Catatan_Guru"
+    ) {
+      if (typeof param === "object") {
+        url += `&nis=${param.nis || ""}`;
+      } else {
+        url += `&nis=${param}`;
+      }
+    } else if (sheetName === "Nilai") {
+      if (typeof param === "object" && param.nis && param.id_tugas) {
+        url += `&nis=${param.nis}&id_tugas=${param.id_tugas}`;
+      } else if (typeof param === "string") {
+        url += `&nis=${param}`;
+      }
+    } else if (sheetName === "Jadwal_Pelajaran" && param.class) {
+      url += `&class=${param.class}`;
+    } else if (sheetName === "Pengumuman" && param.class) {
+      url += `&class=${param.class}`;
+    }
+  }
+  try {
+    console.log(`Mengambil data dari server: ${url}`);
+    const response = await fetch(url);
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+    const data = await response.json();
+    console.log(`Data diterima dari ${sheetName}:`, data);
+    dataCache[cacheKey] = data; // Store in cache
+    return data;
+  } catch (error) {
+    console.error(`Error fetching data from ${sheetName}:`, error);
+    showToast(
+      `Gagal mengambil data dari ${sheetName}. Error: ${error.message}`,
+      "error"
+    );
+    return null;
+  }
 }
 
-// --- Fungsi Pengiriman/Pembaruan/Penghapusan Data (POST) ---
+// --- Data Posting/Updating/Deleting Function (POST) ---
 async function sendData(sheetName, data, action) {
-  return new Promise((resolve, reject) => {
-    google.script.run
-      .withSuccessHandler(resolve)
-      .withFailureHandler(reject)
-      .doPostBackend({ sheet: sheetName, action: action, data: data }); // Panggil fungsi Apps Script yang baru untuk POST
-  });
+  const url = `${GOOGLE_APPS_SCRIPT_WEB_APP_URL}`;
+  try {
+    const response = await fetch(url, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded",
+      },
+      body: new URLSearchParams({
+        sheet: sheetName,
+        action: action,
+        data: JSON.stringify(data),
+      }),
+    });
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+    const result = await response.json();
+    console.log(`Response from ${sheetName} (${action}):`, result);
+
+    // Invalidate relevant cache entries after a successful CRUD operation
+    // For simplicity, invalidate all data for the affected sheet.
+    // More granular invalidation could be implemented if needed.
+    for (const key in dataCache) {
+      if (key.startsWith(sheetName)) {
+        dataCache[key] = null; // Mark as stale
+      }
+    }
+
+    return result;
+  } catch (error) {
+    console.error(`Error sending data to ${sheetName} (${action}):`, error);
+    showToast(
+      `Gagal ${action} data ke ${sheetName}. Error: ${error.message}`,
+      "error"
+    );
+    return { success: false, message: `Error: ${error.message}` };
+  }
 }
 
 // Helper function to get header labels for data-label attribute
@@ -386,7 +445,7 @@ function getHeaderLabels(tableBodyId) {
   let headers = [];
   const table = document.getElementById(tableBodyId).closest("table");
   if (table && table.querySelector("thead tr")) {
-    // Hanya pilih header yang terlihat untuk data-label
+    // Only pick visible headers for data-label
     table.querySelectorAll("thead th").forEach((th) => {
       headers.push(th.textContent.trim());
     });
@@ -415,79 +474,76 @@ function populateDropdown(
   }
 }
 
-// --- Muat Data untuk Dropdown dan Tabel Admin ---
+// --- Load Data for Admin Dropdowns and Tables ---
 async function loadAdminDropdownData() {
   populateDropdown(nilaiNisSelect, null, "", "", "Memuat siswa...");
   populateDropdown(kehadiranNisSelect, null, "", "", "Memuat siswa...");
   populateDropdown(catatanNisSelect, null, "", "", "Memuat siswa...");
 
-  try {
-    const siswaData = await fetchData("Siswa"); // Tidak perlu parameter forceRefresh di sini karena fetchData tidak menggunakan cache
-    if (siswaData) {
-      dataCache.siswa = siswaData; // Perbarui cache secara eksplisit
+  // Force refresh for dropdown data to ensure latest options
+  const siswaData = await fetchData("Siswa", null, true);
+  if (siswaData) {
+    dataCache.siswa = siswaData; // Update cache explicitly
+    populateDropdown(
+      nilaiNisSelect,
+      siswaData,
+      "NIS",
+      "Nama",
+      "Pilih Siswa..."
+    );
+    populateDropdown(
+      kehadiranNisSelect,
+      siswaData,
+      "NIS",
+      "Nama",
+      "Pilih Siswa..."
+    );
+    populateDropdown(
+      catatanNisSelect,
+      siswaData,
+      "NIS",
+      "Nama",
+      "Pilih Siswa..."
+    );
+  } else {
+    showToast("Gagal memuat daftar siswa untuk dropdown.", "error");
+  }
+
+  const subjectOptions = HARDCODED_SUBJECTS.map((s) => ({
+    value: s,
+    text: s,
+  }));
+  populateDropdown(
+    tugasMapelSelect,
+    subjectOptions,
+    "value",
+    "text",
+    "Pilih Mata Pelajaran..."
+  );
+  populateDropdown(
+    jadwalMapelSelect,
+    subjectOptions,
+    "value",
+    "text",
+    "Pilih Mata Pelajaran..."
+  );
+
+  if (nilaiTugasIdSelect) {
+    populateDropdown(nilaiTugasIdSelect, null, "", "", "Memuat tugas...");
+    // Force refresh for task data
+    const tugasData = await fetchData("Tugas", null, true);
+    if (tugasData) {
+      dataCache.tugas = tugasData; // Update cache explicitly
       populateDropdown(
-        nilaiNisSelect,
-        siswaData,
-        "NIS",
-        "Nama",
-        "Pilih Siswa..."
-      );
-      populateDropdown(
-        kehadiranNisSelect,
-        siswaData,
-        "NIS",
-        "Nama",
-        "Pilih Siswa..."
-      );
-      populateDropdown(
-        catatanNisSelect,
-        siswaData,
-        "NIS",
-        "Nama",
-        "Pilih Siswa..."
+        nilaiTugasIdSelect,
+        tugasData,
+        "ID_Tugas",
+        "Nama_Tugas",
+        "Pilih Tugas..."
       );
     } else {
-      showToast("Gagal memuat daftar siswa untuk dropdown.", "error");
+      showToast("Gagal memuat daftar tugas untuk dropdown.", "error");
     }
-
-    const subjectOptions = HARDCODED_SUBJECTS.map((s) => ({
-      value: s,
-      text: s,
-    }));
-    populateDropdown(
-      tugasMapelSelect,
-      subjectOptions,
-      "value",
-      "text",
-      "Pilih Mata Pelajaran..."
-    );
-    populateDropdown(
-      jadwalMapelSelect,
-      subjectOptions,
-      "value",
-      "text",
-      "Pilih Mata Pelajaran..."
-    );
-
-    if (nilaiTugasIdSelect) {
-      populateDropdown(nilaiTugasIdSelect, null, "", "", "Memuat tugas...");
-      const tugasData = await fetchData("Tugas");
-      if (tugasData) {
-        dataCache.tugas = tugasData; // Perbarui cache secara eksplisit
-        populateDropdown(
-          nilaiTugasIdSelect,
-          tugasData,
-          "ID_Tugas",
-          "Nama_Tugas",
-          "Pilih Tugas..."
-        );
-      } else {
-        showToast("Gagal memuat daftar tugas untuk dropdown.", "error");
-      }
-    }
-  } catch (error) {
-    console.error("Error loading admin dropdown data:", error);
-    showToast("Gagal memuat data dropdown admin.", "error");
   }
 }
 
@@ -497,7 +553,7 @@ async function loadAdminTableData(sheetName) {
   let dataFetch;
   let renderFunction;
 
-  // Tetapkan tableBodyElement terlebih dahulu
+  // Assign tableBodyElement first
   switch (sheetName) {
     case "Tugas":
       tableBodyElement = document.getElementById("tugas-list-table-body");
@@ -531,24 +587,18 @@ async function loadAdminTableData(sheetName) {
     return;
   }
 
-  tableBodyElement.innerHTML = `<tr><td colspan="99" class="text-center py-4 text-gray-500">Memuat data...</td></tr>`; // Tampilkan loading di tabel
+  tableBodyElement.innerHTML = `<tr><td colspan="99" class="text-center py-4 text-gray-500">Memuat data...</td></tr>`; // Show loading in table
 
-  try {
-    dataFetch = await fetchData(sheetName); // Tidak perlu parameter forceRefresh di sini karena fetchData tidak menggunakan cache
-    dataCache[sheetName.toLowerCase().replace("_", "")] = dataFetch; // Perbarui cache secara eksplisit
-  } catch (error) {
-    console.error(`Error fetching table data for ${sheetName}:`, error);
-    showToast(`Gagal memuat data tabel ${sheetName}.`, "error");
-    tableBodyElement.innerHTML = `<tr><td colspan="99" class="text-center py-4 text-red-500">Gagal memuat data.</td></tr>`;
-    return;
-  }
+  // Force refresh for all table data to ensure latest state
+  dataFetch = await fetchData(sheetName, null, true);
+  dataCache[sheetName.toLowerCase().replace("_", "")] = dataFetch; // Update cache explicitly
 
   if (!dataFetch || dataFetch.length === 0) {
     tableBodyElement.innerHTML = `<tr><td colspan="99" class="text-center py-4 text-gray-500">Tidak ada data ${sheetName}.</td></tr>`;
     return;
   }
 
-  // Definisikan renderFunction setelah dataFetch dan caching ditangani
+  // Define renderFunction after dataFetch and caching is handled
   switch (sheetName) {
     case "Tugas":
       idKey = "ID_Tugas";
@@ -615,14 +665,14 @@ async function loadAdminTableData(sheetName) {
               `;
       break;
     default:
-      // Kasus ini seharusnya tidak tercapai karena switch awal
+      // This case should ideally not be reached due to the initial switch
       console.error("renderFunction not defined for sheet:", sheetName);
       return;
   }
 
-  tableBodyElement.innerHTML = ""; // Bersihkan pesan loading
+  tableBodyElement.innerHTML = ""; // Clear loading message
 
-  const headers = getHeaderLabels(tableBodyElement.id); // Dapatkan header dari tabel tertentu
+  const headers = getHeaderLabels(tableBodyElement.id); // Get headers from the specific table
 
   dataFetch.forEach((item) => {
     const row = document.createElement("tr");
@@ -638,11 +688,11 @@ async function loadAdminTableData(sheetName) {
       )})" class="bg-red-500 hover:bg-red-600 text-white py-1 px-2 rounded-md text-xs">Hapus</button>
                   </td>
               `;
-    tbody.appendChild(row);
+    tableBodyElement.appendChild(row);
   });
 }
 
-// --- Konfigurasi Formulir Nilai berdasarkan pemilihan NIS dan ID Tugas ---
+// --- Configure Nilai Form based on NIS and ID Tugas selection ---
 async function configureNilaiFormBasedOnSelection() {
   const nis = nilaiNisSelect.value;
   const tugasId = nilaiTugasIdSelect.value;
@@ -662,11 +712,15 @@ async function configureNilaiFormBasedOnSelection() {
     nilaiIdInput.classList.remove("bg-gray-100", "cursor-not-allowed");
     nilaiIdInput.classList.add("bg-white");
 
-    // Ambil Nilai yang sudah ada untuk kombinasi siswa dan tugas ini
-    const existingNilai = await fetchData("Nilai", {
-      nis: nis,
-      id_tugas: tugasId,
-    });
+    // Fetch existing Nilai for this student and task combination (force refresh)
+    const existingNilai = await fetchData(
+      "Nilai",
+      {
+        nis: nis,
+        id_tugas: tugasId,
+      },
+      true
+    );
 
     if (existingNilai && existingNilai.length > 0) {
       const foundNilai = existingNilai[0];
@@ -708,7 +762,23 @@ if (nilaiTugasIdSelect)
     configureNilaiFormBasedOnSelection
   );
 
-// --- Perbarui bidang ID Tugas berdasarkan pemilihan Mata Pelajaran ---
+// --- Event Listeners for Kehadiran ID Generation ---
+if (kehadiranNisSelect) {
+  kehadiranNisSelect.addEventListener("change", updateKehadiranIdField);
+}
+if (kehadiranTanggalInput) {
+  kehadiranTanggalInput.addEventListener("change", updateKehadiranIdField);
+}
+
+// --- Event Listeners for Catatan Guru ID Generation --- Added
+if (catatanNisSelect) {
+  catatanNisSelect.addEventListener("change", updateCatatanIdField);
+}
+if (catatanMingguInput) {
+  catatanMingguInput.addEventListener("input", updateCatatanIdField); // Use 'input' for instant feedback
+}
+
+// --- Update Tugas ID field based on Mata Pelajaran selection ---
 async function updateTugasIdField() {
   const selectedSubject = tugasMapelSelect.value;
   const tugasIdInput = document.getElementById("tugas-id");
@@ -717,8 +787,8 @@ async function updateTugasIdField() {
     const subjectAbbr = SUBJECT_ABBREVIATIONS[selectedSubject] || "OTH";
     const currentMonth = new Date().getMonth() + 1;
 
-    // Ambil semua tugas yang sudah ada untuk menentukan nomor urut berikutnya
-    const allTugas = (await fetchData("Tugas")) || [];
+    // Fetch all existing tasks to determine the next sequential number (force refresh)
+    const allTugas = (await fetchData("Tugas", null, true)) || [];
     dataCache.tugas = allTugas;
 
     const tasksForSubjectInMonth = allTugas.filter((task) => {
@@ -755,11 +825,11 @@ async function updateTugasIdField() {
 
 tugasMapelSelect.addEventListener("change", updateTugasIdField);
 
-// --- Perbarui bidang ID Pengumuman ---
+// --- Update Pengumuman ID field ---
 async function updatePengumumanIdField() {
   const pengumumanIdInput = document.getElementById("pengumuman-id");
-  // Ambil semua pengumuman
-  const allPengumuman = (await fetchData("Pengumuman")) || [];
+  // Force refresh for all announcements
+  const allPengumuman = (await fetchData("Pengumuman", null, true)) || [];
   dataCache.pengumuman = allPengumuman;
 
   const nextPengumumanNumber = allPengumuman.length + 1;
@@ -773,7 +843,7 @@ async function updatePengumumanIdField() {
   pengumumanIdInput.classList.add("bg-white");
 }
 
-// --- Fungsi Edit Entri ---
+// --- Edit Entry Function ---
 async function editEntry(sheetName, id) {
   let formElement;
   let idInput;
@@ -785,13 +855,13 @@ async function editEntry(sheetName, id) {
   try {
     showLoading();
 
-    // Ambil data terbaru untuk pengeditan
-    const currentData = await fetchData(sheetName);
+    // Fetch the latest data for editing, always force refresh for edit operations
+    const currentData = await fetchData(sheetName, null, true);
     if (!currentData) {
       showToast("Gagal memuat data untuk edit.", "error");
       return;
     }
-    // Perbarui entri cache tertentu untuk sheet ini
+    // Update the specific cache entry for this sheet
     dataCache[sheetName.toLowerCase().replace("_", "")] = currentData;
 
     switch (sheetName) {
@@ -903,11 +973,6 @@ async function editEntry(sheetName, id) {
       submitButton.disabled = false;
 
       showToast(`Mode Edit: ${sheetName} ID ${id}`, "info");
-      // Beralih ke tab yang benar untuk pengeditan
-      switchTab(
-        `input-${sheetName.toLowerCase().replace("_", "")}`,
-        document.querySelectorAll(".admin-data-tab-button")
-      );
     } else {
       showToast(
         `Data dengan ID ${id} tidak ditemukan di ${sheetName}.`,
@@ -922,7 +987,7 @@ async function editEntry(sheetName, id) {
   }
 }
 
-// --- Fungsi Hapus Entri ---
+// --- Delete Entry Function ---
 async function deleteEntry(sheetName, id) {
   showConfirmModal(
     `Apakah Anda yakin ingin menghapus data dengan ID ${id} dari ${sheetName}?`,
@@ -950,7 +1015,9 @@ async function deleteEntry(sheetName, id) {
         case "Siswa":
           idKey = "NIS";
           break;
-        // case "Admin_Users": idKey = "Email"; break; // Admin_Users tidak dapat diedit melalui CRUD frontend
+        case "Admin_Users":
+          idKey = "Email";
+          break;
         default:
           showToast("Aksi hapus tidak didukung untuk sheet ini.", "error");
           return;
@@ -961,15 +1028,15 @@ async function deleteEntry(sheetName, id) {
 
       try {
         showLoading();
-        const result = await sendData(sheetName, dataToDelete, "delete"); // sendData sekarang menangani pembatalan cache
+        const result = await sendData(sheetName, dataToDelete, "delete"); // sendData now handles cache invalidation
         if (result.success) {
           showToast(
             `${sheetName} dengan ID ${id} berhasil dihapus!`,
             "success"
           );
-          await loadAdminTableData(sheetName); // Muat ulang tabel setelah penghapusan
+          await loadAdminTableData(sheetName); // Reload table after deletion
           if (sheetName === "Siswa" || sheetName === "Tugas") {
-            await loadAdminDropdownData(); // Muat ulang dropdown jika data yang relevan dimodifikasi
+            await loadAdminDropdownData(); // Refresh dropdowns if relevant data is modified
           }
         } else {
           showToast(
@@ -987,7 +1054,7 @@ async function deleteEntry(sheetName, id) {
   );
 }
 
-// --- Pengiriman Formulir Admin ---
+// --- Admin Form Submissions ---
 async function handleAdminFormSubmit(
   e,
   sheetName,
@@ -1029,6 +1096,29 @@ async function handleAdminFormSubmit(
         hideLoading();
         return;
       } else if (
+        idKeyName === "ID_Kehadiran" &&
+        (idInputElement.value === "Dihasilkan Otomatis" ||
+          idInputElement.value.trim() === "")
+      ) {
+        showToast(
+          "Silakan pilih NIS dan Tanggal untuk menghasilkan ID Kehadiran.",
+          "error"
+        );
+        hideLoading();
+        return;
+      } else if (
+        // Added validation for Catatan Guru
+        idKeyName === "ID_Catatan" &&
+        (idInputElement.value === "Dihasilkan Otomatis" ||
+          idInputElement.value.trim() === "")
+      ) {
+        showToast(
+          "Silakan pilih NIS dan Minggu ke- untuk menghasilkan ID Catatan.",
+          "error"
+        );
+        hideLoading();
+        return;
+      } else if (
         idKeyName === "ID_Pengumuman" &&
         idInputElement.value === "Dihasilkan Otomatis"
       ) {
@@ -1041,6 +1131,8 @@ async function handleAdminFormSubmit(
         idKeyName !== "ID_Nilai" &&
         idKeyName !== "ID_Tugas" &&
         idKeyName !== "ID_Pengumuman" &&
+        idKeyName !== "ID_Kehadiran" &&
+        idKeyName !== "ID_Catatan" && // Added condition for Catatan Guru
         idInputElement &&
         (idInputElement.value === "Dihasilkan Otomatis" ||
           idInputElement.value.trim() === "")
@@ -1076,12 +1168,17 @@ async function handleAdminFormSubmit(
         idInputElement
       );
 
-      await loadAdminTableData(sheetName); // Muat ulang tabel setelah pengiriman
-      await loadAdminDropdownData(); // Muat ulang dropdown jika ada (misalnya, tugas baru ditambahkan atau mata pelajaran)
+      await loadAdminTableData(sheetName); // Reload table after submission
+      await loadAdminDropdownData(); // Reload dropdowns just in case (e.g., new tasks added or subjects)
       if (idKeyName === "ID_Nilai") {
-        configureNilaiFormBasedOnSelection(); // Memicu konfigurasi awal untuk formulir Nilai
+        configureNilaiFormBasedOnSelection(); // Re-trigger for Nilai to reset its field state
       } else if (idKeyName === "ID_Tugas") {
-        updateTugasIdField(); // Memicu pembuatan ID awal untuk formulir Tugas
+        updateTugasIdField(); // Re-trigger for Tugas to reset its field state
+      } else if (idKeyName === "ID_Kehadiran") {
+        updateKehadiranIdField(); // Re-trigger for Kehadiran to reset its field state
+      } else if (idKeyName === "ID_Catatan") {
+        // Added
+        updateCatatanIdField(); // Re-trigger for Catatan to reset its field state
       } else if (idKeyName === "ID_Pengumuman") {
         updatePengumumanIdField();
       }
@@ -1168,47 +1265,18 @@ document
     );
   });
 
-// --- Logika Pergantian Tab untuk Dashboard Admin ---
-// Event listener untuk item menu sidebar (bagian utama)
-document.querySelectorAll(".sidebar-menu-item").forEach((button) => {
+// --- Tab Switching Logic for Admin Dashboard ---
+document.querySelectorAll(".admin-tab-button").forEach((button) => {
   button.addEventListener("click", async () => {
     const targetTab = button.dataset.tab;
-    switchTab(targetTab, document.querySelectorAll(".sidebar-menu-item")); // Tangani peralihan bagian utama
-
-    if (targetTab === "admin-data-management-dashboard-section") {
-      showLoading();
-      try {
-        // Aktifkan tab manajemen data pertama secara default
-        const firstDataTabButton = document.querySelector(
-          ".admin-data-tab-button"
-        );
-        if (firstDataTabButton) {
-          switchTab(
-            firstDataTabButton.dataset.tab,
-            document.querySelectorAll(".admin-data-tab-button")
-          );
-          await loadAdminDropdownData();
-          await loadAdminTableData("Tugas"); // Muat tabel awal untuk manajemen data
-        }
-      } catch (error) {
-        console.error("Error loading data management dashboard:", error);
-        showToast("Gagal memuat dashboard manajemen data.", "error");
-      } finally {
-        hideLoading();
-      }
-    }
-    // Tidak ada tindakan yang diperlukan untuk admin-welcome-dashboard-section karena bersifat statis
-  });
-});
-
-// Event listener untuk tab manajemen data internal
-document.querySelectorAll(".admin-data-tab-button").forEach((button) => {
-  button.addEventListener("click", async () => {
-    const targetTab = button.dataset.tab;
-    switchTab(targetTab, document.querySelectorAll(".admin-data-tab-button"));
+    switchTab(
+      targetTab,
+      document.querySelectorAll(".admin-tab-button"),
+      "admin-"
+    );
     showLoading();
     try {
-      // Reset formulir ke mode 'create' saat beralih tab dan hapus data lama
+      // Reset forms to 'create' mode when switching tabs and clear old data
       resetAdminForm(
         document.getElementById("form-input-tugas"),
         tugasFormMode,
@@ -1258,7 +1326,7 @@ document.querySelectorAll(".admin-data-tab-button").forEach((button) => {
         document.getElementById("pengumuman-id")
       );
 
-      // Muat ulang dropdown dan tabel jika menavigasi ke formulir yang menggunakannya
+      // Reload dropdowns and tables if navigating to a form that uses them
       if (
         [
           "input-nilai",
@@ -1269,11 +1337,16 @@ document.querySelectorAll(".admin-data-tab-button").forEach((button) => {
           "input-pengumuman",
         ].includes(targetTab)
       ) {
-        await loadAdminDropdownData(); // Pastikan dropdown diisi dengan data terbaru
+        await loadAdminDropdownData(); // Ensure dropdowns are populated with latest data
         if (targetTab === "input-nilai") {
-          configureNilaiFormBasedOnSelection(); // Memicu konfigurasi awal untuk formulir Nilai
+          configureNilaiFormBasedOnSelection(); // Trigger initial configuration for Nilai form
         } else if (targetTab === "input-tugas") {
-          updateTugasIdField(); // Memicu pembuatan ID awal untuk formulir Tugas
+          updateTugasIdField(); // Trigger initial ID generation for Tugas form
+        } else if (targetTab === "input-kehadiran") {
+          updateKehadiranIdField(); // Trigger initial ID generation for Kehadiran form
+        } else if (targetTab === "input-catatan") {
+          // Added
+          updateCatatanIdField(); // Trigger initial ID generation for Catatan form
         } else if (targetTab === "input-pengumuman") {
           updatePengumumanIdField();
         }
@@ -1303,7 +1376,7 @@ document.querySelectorAll(".admin-data-tab-button").forEach((button) => {
           sheetNameForTable = "";
       }
       if (sheetNameForTable) {
-        await loadAdminTableData(sheetNameForTable); // Muat data tabel untuk tab saat ini
+        await loadAdminTableData(sheetNameForTable); // Load table data for the current tab
       }
     } catch (error) {
       console.error("Error loading admin tab data:", error);
@@ -1314,49 +1387,63 @@ document.querySelectorAll(".admin-data-tab-button").forEach((button) => {
   });
 });
 
-// Status 'Dihasilkan Otomatis' awal dan status hanya-baca untuk bidang ID
+// Initialize admin view: show login by default, hide dashboard
+showSection("login-section");
+
+// Apply initial 'Dihasilkan Otomatis' and readonly state to admin ID fields
+// This part is modified slightly to rely on updateKehadiranIdField for initial state
+document.getElementById("tugas-id").readOnly = true;
+document.getElementById("tugas-id").value = "Dihasilkan Otomatis";
+document
+  .getElementById("tugas-id")
+  .classList.add("bg-gray-100", "cursor-not-allowed");
+
+document.getElementById("nilai-id").readOnly = true;
+document.getElementById("nilai-id").value = "";
+document.getElementById("nilai-id").placeholder = "Akan Dihasilkan Otomatis";
+document
+  .getElementById("nilai-id")
+  .classList.add("bg-gray-100", "cursor-not-allowed");
+
+document.getElementById("kehadiran-id").readOnly = true;
+// Initial call for kehadiran-id, will show "Dihasilkan Otomatis" if NIS/Tanggal are empty
+// This is now handled by resetAdminForm when tab is switched or login is complete
+// document.getElementById("kehadiran-id").value = "Dihasilkan Otomatis"; // Removed, handled by updateKehadiranIdField
+document
+  .getElementById("kehadiran-id")
+  .classList.add("bg-gray-100", "cursor-not-allowed");
+
+document.getElementById("catatan-id").readOnly = true;
+// document.getElementById("catatan-id").value = "Dihasilkan Otomatis"; // Removed, handled by updateCatatanIdField
+document
+  .getElementById("catatan-id")
+  .classList.add("bg-gray-100", "cursor-not-allowed");
+
+document.getElementById("jadwal-id").readOnly = true;
+document.getElementById("jadwal-id").value = "Dihasilkan Otomatis";
+document
+  .getElementById("jadwal-id")
+  .classList.add("bg-gray-100", "cursor-not-allowed");
+
+document.getElementById("pengumuman-id").readOnly = true;
+document.getElementById("pengumuman-id").value = "Dihasilkan Otomatis";
+document
+  .getElementById("pengumuman-id")
+  .classList.add("bg-gray-100", "cursor-not-allowed");
+
+// Initial call to update Kehadiran ID on page load, if elements are ready
 document.addEventListener("DOMContentLoaded", () => {
-  document.getElementById("tugas-id").readOnly = true;
-  document.getElementById("tugas-id").value = "Dihasilkan Otomatis";
-  document
-    .getElementById("tugas-id")
-    .classList.add("bg-gray-100", "cursor-not-allowed");
-
-  document.getElementById("nilai-id").readOnly = true;
-  document.getElementById("nilai-id").value = "";
-  document.getElementById("nilai-id").placeholder = "Akan Dihasilkan Otomatis";
-  document
-    .getElementById("nilai-id")
-    .classList.add("bg-gray-100", "cursor-not-allowed");
-
-  document.getElementById("kehadiran-id").readOnly = true;
-  document.getElementById("kehadiran-id").value = "Dihasilkan Otomatis";
-  document
-    .getElementById("kehadiran-id")
-    .classList.add("bg-gray-100", "cursor-not-allowed");
-
-  document.getElementById("catatan-id").readOnly = true;
-  document.getElementById("catatan-id").value = "Dihasilkan Otomatis";
-  document
-    .getElementById("catatan-id")
-    .classList.add("bg-gray-100", "cursor-not-allowed");
-
-  document.getElementById("jadwal-id").readOnly = true;
-  document.getElementById("jadwal-id").value = "Dihasilkan Otomatis";
-  document
-    .getElementById("jadwal-id")
-    .classList.add("bg-gray-100", "cursor-not-allowed");
-
-  document.getElementById("pengumuman-id").readOnly = true;
-  document.getElementById("pengumuman-id").value = "Dihasilkan Otomatis";
-  document
-    .getElementById("pengumuman-id")
-    .classList.add("bg-gray-100", "cursor-not-allowed");
-
-  // Panggil Apps Script untuk memeriksa status admin saat halaman dimuat
-  showLoading();
-  google.script.run
-    .withSuccessHandler(onAdminStatusReceived)
-    .withFailureHandler(onAdminStatusError)
-    .getAdminStatus();
+  // These calls are mainly for when the admin section is directly loaded.
+  // If navigated via login, the login process will handle initial ID generation.
+  // The presence of if (kehadiranNisSelect) / if (kehadiranTanggalInput) protects against errors
+  // if the dashboard is not yet visible or elements aren't populated.
+  if (
+    document
+      .getElementById("admin-dashboard-section")
+      .classList.contains("section-hidden")
+  ) {
+    // Only run if not already on dashboard, to avoid double updates on login redirect.
+    updateKehadiranIdField(); // Ensure initial state reflects empty dropdowns.
+    updateCatatanIdField(); // Ensure initial state reflects empty dropdowns for Catatan
+  }
 });

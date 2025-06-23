@@ -20,64 +20,15 @@
       <p class="mt-4 text-gray-700 text-lg font-semibold">Memuat data...</p>
     </div>
 
-    <!-- Sidebar Menu (hidden by default) -->
-    <div id="sidebar">
-      <div class="sidebar-header">
-        <h4 class="text-xl font-bold text-gray-800">Menu Admin</h4>
-        <button class="sidebar-close-button" onclick="closeSidebar()">
-          &times;
-        </button>
-      </div>
-      <nav>
-        <button
-          class="sidebar-menu-item w-full text-left admin-tab-button"
-          data-tab="admin-welcome-dashboard-section"
-        >
-          Dashboard Admin
-        </button>
-        <button
-          class="sidebar-menu-item w-full text-left admin-tab-button"
-          data-tab="admin-data-management-dashboard-section"
-        >
-          Manajemen Data
-        </button>
-        <hr class="my-3 border-gray-200" />
-        <button
-          onclick="logout()"
-          class="sidebar-menu-item w-full text-left bg-gray-100 hover:bg-gray-200 text-gray-800 font-bold"
-          id="logout-button-sidebar"
-        >
-          Logout
-        </button>
-      </nav>
-    </div>
-    <!-- Sidebar Overlay (for clicking outside to close) -->
-    <div id="sidebar-overlay" onclick="closeSidebar()"></div>
-
-    <!-- Fixed Header for Sidebar Icon, Title, and Refresh Button -->
-    <header class="fixed-app-header">
-      <div class="header-content-wrapper">
-        <div
-          id="sidebar-menu-icon"
-          class="sidebar-icon"
-          onclick="openSidebar()"
-          style="display: none"
-        >
-          &#9776;
-        </div>
-        <div class="app-header-title">Admin Pantausiswa</div>
-      </div>
-    </header>
-
     <div class="main-content-area relative">
-      <!-- Login Section (for Admin - now repurposed for status message) -->
+      <!-- Login Section (for Admin) -->
       <section id="login-section" class="pt-4 px-4 md:px-0">
         <h2 class="text-3xl font-bold text-center text-gray-800 mb-8">
           Sistem Monitoring Siswa
         </h2>
 
-        <!-- Admin Login Status Card -->
-        <div id="unified-login-card" class="p-6 bg-white rounded-lg shadow-md">
+        <!-- Admin Login Form Card -->
+        <div id="unified-login-card" class="p-6 bg-white rounded-lg">
           <h3
             id="login-title"
             class="text-2xl font-semibold text-green-800 mb-4 text-center"
@@ -85,17 +36,31 @@
             Login Admin (Guru)
           </h3>
 
-          <div id="login-status-message" class="text-center text-lg mb-4">
-            <p class="text-gray-700">
-              Memverifikasi status login Anda dengan Google...
-            </p>
-            <p
-              class="text-red-600 font-bold mt-4 section-hidden"
-              id="access-denied-message"
+          <form id="login-form" class="space-y-4">
+            <!-- Email for Admin Login -->
+            <div>
+              <label
+                for="login-email-admin"
+                class="block text-sm font-medium text-gray-700"
+                >Email Admin:</label
+              >
+              <input
+                type="email"
+                id="login-email-admin"
+                name="email"
+                required
+                class="mt-1 block w-full px-4 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-green-500 focus:border-green-500 sm:text-sm"
+              />
+            </div>
+
+            <button
+              type="submit"
+              id="main-login-button"
+              class="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-md shadow-md transition duration-300 ease-in-out"
             >
-              AKSES DITOLAK
-            </p>
-          </div>
+              Login sebagai Admin
+            </button>
+          </form>
 
           <!-- Link to Parent Login Page -->
           <a
@@ -107,74 +72,10 @@
         </div>
       </section>
 
-      <!-- NEW: Admin Welcome Dashboard Section -->
-      <section
-        id="admin-welcome-dashboard-section"
-        class="section-hidden pt-4 px-4 md:px-0"
-      >
-        <h2 class="text-3xl font-bold text-center text-gray-800 mb-6">
-          Selamat Datang, Admin!
-        </h2>
-        <div class="p-6 bg-white rounded-lg shadow-md">
-          <p class="mb-4 text-gray-700">
-            Terima kasih telah masuk. Ini adalah dashboard utama admin. Anda
-            dapat menggunakan menu di samping untuk mulai mengelola data siswa.
-          </p>
-          <h3 class="text-xl font-semibold text-gray-800 mb-3">
-            Panduan Penggunaan:
-          </h3>
-          <ul class="list-disc list-inside space-y-2 text-gray-700">
-            <li>
-              Gunakan menu navigasi di sisi kiri untuk mengakses berbagai fitur
-              administrasi.
-            </li>
-            <li>
-              <strong>Manajemen Tugas:</strong> Tambahkan, edit, atau hapus data
-              tugas.
-            </li>
-            <li>
-              <strong>Manajemen Nilai:</strong> Input dan perbarui nilai siswa
-              untuk tugas tertentu.
-            </li>
-            <li>
-              <strong>Manajemen Kehadiran:</strong> Catat dan kelola kehadiran
-              siswa.
-            </li>
-            <li>
-              <strong>Manajemen Catatan Siswa:</strong> Tambahkan dan lihat
-              catatan penting tentang siswa.
-            </li>
-            <li>
-              <strong>Manajemen Jadwal Pelajaran:</strong> Atur jadwal
-              pelajaran.
-            </li>
-            <li>
-              <strong>Manajemen Pengumuman:</strong> Buat dan kelola pengumuman
-              untuk siswa/wali murid.
-            </li>
-            <li>Pastikan untuk selalu menyimpan perubahan Anda.</li>
-            <li>Jika ada masalah, hubungi administrator sistem.</li>
-          </ul>
-          <div class="mt-6 text-center">
-            <p class="text-sm text-gray-600">
-              Email Anda:
-              <span
-                id="admin-logged-in-email"
-                class="font-semibold text-green-700"
-                >Memverifikasi...</span
-              >
-            </p>
-          </div>
-        </div>
-      </section>
-
-      <!-- OLD: Admin Data Management Dashboard Section (now child of admin-dashboard-section) -->
-      <section
-        id="admin-data-management-dashboard-section"
-        class="section-hidden pt-4"
-      >
+      <!-- Admin Dashboard Section (This will be the main content for admin after login) -->
+      <section id="admin-dashboard-section" class="section-hidden pt-4">
         <h2 class="text-3xl font-bold text-center text-gray-800 mb-6 px-4">
-          Manajemen Data Admin
+          Dashboard Admin (Guru)
         </h2>
 
         <!-- Tabs for admin actions -->
@@ -183,37 +84,37 @@
             class="flex border-b border-gray-200 overflow-x-auto whitespace-nowrap px-4 bg-white"
           >
             <button
-              class="admin-data-tab-button py-2 px-4 text-sm font-medium text-gray-700 hover:text-green-600 hover:border-b-2 hover:border-green-600 focus:outline-none"
+              class="admin-tab-button py-2 px-4 text-sm font-medium text-gray-700 hover:text-green-600 hover:border-b-2 hover:border-green-600 focus:outline-none"
               data-tab="input-tugas"
             >
               Input Tugas Baru
             </button>
             <button
-              class="admin-data-tab-button py-2 px-4 text-sm font-medium text-gray-700 hover:text-green-600 hover:border-b-2 hover:border-green-600 focus:outline-none"
+              class="admin-tab-button py-2 px-4 text-sm font-medium text-gray-700 hover:text-green-600 hover:border-b-2 hover:border-green-600 focus:outline-none"
               data-tab="input-nilai"
             >
               Input Nilai Siswa
             </button>
             <button
-              class="admin-data-tab-button py-2 px-4 text-sm font-medium text-gray-700 hover:text-green-600 hover:border-b-2 hover:border-green-600 focus:outline-none"
+              class="admin-tab-button py-2 px-4 text-sm font-medium text-gray-700 hover:text-green-600 hover:border-b-2 hover:border-green-600 focus:outline-none"
               data-tab="input-kehadiran"
             >
               Input Kehadiran
             </button>
             <button
-              class="admin-data-tab-button py-2 px-4 text-sm font-medium text-gray-700 hover:text-green-600 hover:border-b-2 hover:border-green-600 focus:outline-none"
+              class="admin-tab-button py-2 px-4 text-sm font-medium text-gray-700 hover:text-green-600 hover:border-b-2 hover:border-green-600 focus:outline-none"
               data-tab="input-catatan"
             >
               Input Catatan Siswa
             </button>
             <button
-              class="admin-data-tab-button py-2 px-4 text-sm font-medium text-gray-700 hover:text-green-600 hover:border-b-2 hover:border-green-600 focus:outline-none"
+              class="admin-tab-button py-2 px-4 text-sm font-medium text-gray-700 hover:text-green-600 hover:border-b-2 hover:border-green-600 focus:outline-none"
               data-tab="input-jadwal"
             >
               Input Jadwal Pelajaran
             </button>
             <button
-              class="admin-data-tab-button py-2 px-4 text-sm font-medium text-gray-700 hover:text-green-600 hover:border-b-2 hover:border-green-600 focus:outline-none"
+              class="admin-tab-button py-2 px-4 text-sm font-medium text-gray-700 hover:text-green-600 hover:border-b-2 hover:border-green-600 focus:outline-none"
               data-tab="input-pengumuman"
             >
               Input Pengumuman

@@ -22,13 +22,14 @@ let kehadiranChartInstance = null; // To store the Chart.js instance
 
 // Client-side cache for fetched data to reduce API calls
 const dataCache = {
-  siswa: [],
-  tugas: [],
-  nilai: [],
-  kehadiran: [],
-  catatan_guru: [],
-  jadwal_pelajaran: [],
-  pengumuman: [],
+  siswa: [], // Still fetched from original Siswa sheet
+  tugas: [], // Now derived from ExportWeb -> statustugas
+  nilai: [], // Now derived from ExportWeb -> statustugas (embedded with tugas)
+  kehadiran: [], // Now derived from ExportWeb -> kehadiran
+  catatan_guru: [], // Now derived from ExportWeb -> catatanguru
+  jadwal_pelajaran: [], // Now derived from ExportWeb -> jadwalpelajaran
+  pengumuman: [], // Now derived from ExportWeb -> pengumuman
+  ExportWeb_raw_data: null, // To store the raw fetched ExportWeb data
 };
 
 // DOM Elements specific to parent view
@@ -42,8 +43,6 @@ const logoutButtonSidebar = document.getElementById("logout-button-sidebar");
 const sidebarMenuIcon = document.getElementById("sidebar-menu-icon");
 const sidebar = document.getElementById("sidebar");
 const sidebarOverlay = document.getElementById("sidebar-overlay");
-// const announcementBellIcon = document.getElementById("announcement-bell-icon"); // Dihilangkan sesuai permintaan
-// const notificationBadge = document.getElementById("notification-badge"); // Dihilangkan sesuai permintaan
 
 const unifiedLoginCard = document.getElementById("unified-login-card");
 const loginTitle = document.getElementById("login-title");
@@ -53,6 +52,10 @@ const loginNisInput = document.getElementById("login-nis");
 const mainLoginButton = document.getElementById("main-login-button");
 
 // Parent dashboard specific elements
+const studentNameSpan = document.getElementById("student-name");
+const studentNisSpan = document.getElementById("student-nis");
+const studentClassSpan = document.getElementById("student-class");
+
 const subjectFilterSelect = document.getElementById("subject-filter-select");
 const kehadiranFilterPeriodSelect = document.getElementById(
   "kehadiran-filter-period"
@@ -77,7 +80,7 @@ const summarizeNotesButton = document.getElementById("summarize-notes-button");
 const summaryModal = document.getElementById("summary-modal");
 const summaryContent = document.getElementById("summary-content");
 
-// Refresh Data button (assuming it's now directly in HTML)
+// Refresh Data button
 const refreshDataButton = document.getElementById("refresh-data-button");
 
 // --- Loading Overlay Functions ---
@@ -99,13 +102,11 @@ function showSection(sectionId) {
   if (sectionId === "parent-dashboard-section") {
     sidebarMenuIcon.style.display = "block";
     if (refreshDataButton) {
-      // Periksa keberadaan tombol sebelum menampilkan
       refreshDataButton.style.display = "block"; // Tampilkan tombol refresh
     }
   } else {
     sidebarMenuIcon.style.display = "none";
     if (refreshDataButton) {
-      // Periksa keberadaan tombol sebelum menyembunyikan
       refreshDataButton.style.display = "none"; // Sembunyikan tombol refresh
     }
   }
@@ -200,7 +201,7 @@ function switchTab(targetTabId, buttons, prefix = "") {
   }
 }
 
-// --- Helper Functions for Session Storage (Caching tanpa waktu kedaluwarsa otomatis) ---
+// --- Helper Functions for Session Storage (Caching) ---
 function saveDataToSessionStorage() {
   try {
     sessionStorage.setItem("loggedInNIS", currentStudentNis);
@@ -218,7 +219,10 @@ function loadDataFromSessionStorage() {
 
     if (cachedNIS && cachedDataString) {
       currentStudentNis = cachedNIS;
-      Object.assign(dataCache, JSON.parse(cachedDataString));
+      // Use a temporary object to parse and then assign properties individually
+      // to avoid overwriting methods if dataCache had any, though it doesn't currently.
+      const parsedCache = JSON.parse(cachedDataString);
+      Object.assign(dataCache, parsedCache);
       console.log("Data loaded from session storage.");
       return true; // Data berhasil dimuat
     }
@@ -229,6 +233,329 @@ function loadDataFromSessionStorage() {
     showToast("Sesi data rusak. Silakan login kembali.", "error");
   }
   return false; // Tidak ada data ditemukan atau ada error
+}
+
+/**
+ * Parses a single string entry from ExportWeb (e.g., from statustugas, kehadiran).
+ * Handles quoted commas within fields.
+ * @param {string} entryString - The string representing one record (e.g., "714,\"Bab 1 | Formatif 1\",...").
+ * @returns {Array<string>} An array of parsed field values.
+ */
+function parseExportWebEntry(entryString) {
+  const result = [];
+  let inQuote = false;
+  let currentField = "";
+  for (let i = 0; i < entryString.length; i++) {
+    const char = entryString[i];
+    if (char === '"') {
+      if (i + 1 < entryString.length && entryString[i + 1] === '"') {
+        // Escaped quote: "" -> "
+        currentField += '"';
+        i++; // Skip next quote
+      } else {
+        inQuote = !inQuote;
+      }
+    } else if (char === "," && !inQuote) {
+      result.push(currentField);
+      currentField = "";
+    } else {
+      currentField += char;
+    }
+  }
+  result.push(currentField); // Add the last field
+  return result;
+}
+
+/**
+ * Processes the raw ExportWeb data for a specific student/class based on the requested sheet.
+ * This function iterates through all rows of rawExportWebData and extracts relevant records.
+ *
+ * @param {Array<Object>} rawExportWebData - The raw data array from ExportWeb sheet (each object is a row).
+ * @param {string} requestedSheetName - The specific 'sheet' (e.g., 'Tugas', 'Kehadiran') being requested.
+ * @param {string} nisFilter - The NIS of the student to filter data for.
+ * @param {string} classFilter - The class of the student to filter data for.
+ * @returns {Array<Object>} Parsed and filtered data for the requested sheet.
+ */
+function processAndFilterExportWebData(
+  rawExportWebData,
+  requestedSheetName,
+  nisFilter,
+  classFilter
+) {
+  if (!rawExportWebData || rawExportWebData.length === 0) {
+    return [];
+  }
+
+  const results = [];
+
+  try {
+    for (const row of rawExportWebData) {
+      switch (requestedSheetName) {
+        case "Tugas":
+        case "Nilai": // Nilai is embedded in Tugas for parent view
+          if (row.statustugas && row.statustugas.trim() !== "") {
+            const parts = parseExportWebEntry(row.statustugas); // Each cell is one record
+            if (parts.length === 6) {
+              // NIM,Nama Tugas,Mata Pelajaran,hari tanggal bulan tahun,Nilai,Status
+              if (String(parts[0]) === nisFilter) {
+                // Filter by NIM
+                results.push({
+                  NIS: parts[0],
+                  Nama_Tugas: parts[1],
+                  Mata_Pelajaran: parts[2],
+                  Batas_Waktu: parts[3],
+                  Nilai:
+                    parts[4] === "" || parts[4] === "null"
+                      ? null
+                      : parseInt(parts[4]),
+                  Status_Pengerjaan: parts[5],
+                });
+              }
+            } else {
+              console.warn(
+                "Invalid statustugas entry format:",
+                row.statustugas
+              );
+            }
+          }
+          break;
+
+        case "Kehadiran":
+          if (row.kehadiran && row.kehadiran.trim() !== "") {
+            const parts = parseExportWebEntry(row.kehadiran); // Each cell is one record
+            if (parts.length === 6) {
+              // NIM,hadir jumlah,izin jumlah,sakit jumlah,alpha jumlah,mmddyyyy
+              if (String(parts[0]) === nisFilter) {
+                // Filter by NIM
+                results.push({
+                  NIS: parts[0],
+                  Hadir: parseInt(parts[1] || 0),
+                  Izin: parseInt(parts[2] || 0),
+                  Sakit: parseInt(parts[3] || 0),
+                  Alpha: parseInt(parts[4] || 0),
+                  TanggalTerakhir: parts[5],
+                });
+              }
+            } else {
+              console.warn("Invalid kehadiran entry format:", row.kehadiran);
+            }
+          }
+          break;
+
+        case "Catatan_Guru":
+          if (row.catatanguru && row.catatanguru.trim() !== "") {
+            const parts = parseExportWebEntry(row.catatanguru); // Each cell is one record
+            // FIX: Changed expected parts length from 2 to 3, and adjusted parsing
+            if (parts.length === 3) {
+              // Expected: NIM,Minggu_Ke,Catatan
+              const nisFromData = parts[0];
+              const mingguKe = parts[1];
+              const catatanText = parts[2];
+              if (String(nisFromData) === nisFilter) {
+                // Filter by NIM
+                results.push({
+                  ID_Catatan: `${nisFromData}_${mingguKe}`, // Reconstruct ID if needed
+                  NIS: nisFromData,
+                  Minggu_Ke: mingguKe,
+                  Catatan: catatanText,
+                  Tanggal_Input: "N/A", // Not available in ExportWeb format
+                });
+              }
+            } else {
+              console.warn(
+                "Invalid catatanguru entry format:",
+                row.catatanguru
+              );
+            }
+          }
+          break;
+
+        case "Jadwal_Pelajaran":
+          if (row.jadwalpelajaran && row.jadwalpelajaran.trim() !== "") {
+            const parts = parseExportWebEntry(row.jadwalpelajaran); // Each cell is one record
+            if (parts.length === 5) {
+              // ID_Jadwal,Kelas,Hari,Jam,Mata_Pelajaran
+              const kelasInJadwal = String(parts[1]).toLowerCase();
+              if (kelasInJadwal === classFilter.toLowerCase()) {
+                // Filter by Class
+                results.push({
+                  ID_Jadwal: parts[0],
+                  Kelas: parts[1],
+                  Hari: parts[2],
+                  Jam: parts[3],
+                  Mata_Pelajaran: parts[4],
+                  Guru: "N/A", // Not available in ExportWeb format
+                });
+              }
+            } else {
+              console.warn(
+                "Invalid jadwalpelajaran entry format:",
+                row.jadwalpelajaran
+              );
+            }
+          }
+          break;
+
+        case "Pengumuman":
+          if (row.pengumuman && row.pengumuman.trim() !== "") {
+            const parts = parseExportWebEntry(row.pengumuman); // Each cell is one record
+            // FIX: Adjusted parts length for Pengumuman to 4
+            if (parts.length === 4) {
+              // Untuk_Kelas,Tanggal_Pengumuman,Judul,Isi_Pengumuman
+              const untukKelas = String(parts[0]).toLowerCase();
+              if (
+                untukKelas === "semua" ||
+                untukKelas.includes(classFilter.toLowerCase())
+              ) {
+                // Filter by Class or 'Semua'
+                results.push({
+                  Untuk_Kelas: parts[0],
+                  Tanggal_Pengumuman: parts[1],
+                  Judul: parts[2],
+                  Isi_Pengumuman: parts[3],
+                });
+              }
+            } else {
+              console.warn("Invalid pengumuman entry format:", row.pengumuman);
+            }
+          }
+          break;
+        default:
+          // This case should ideally not be reached if fetchData correctly uses "ExportWeb_fetch_raw"
+          console.warn(
+            `Requested sheet name '${requestedSheetName}' not handled by ExportWeb processing directly.`
+          );
+          break;
+      }
+    }
+  } catch (e) {
+    console.error(
+      `Error processing ExportWeb data for ${requestedSheetName}:`,
+      e
+    );
+    return [];
+  }
+  return results;
+}
+
+/**
+ * Fetches data from the Google Apps Script Web App.
+ * This function has two primary modes:
+ * 1. `sheetName = "ExportWeb_fetch_raw"`: Fetches the entire raw ExportWeb sheet data.
+ * 2. `sheetName = "Siswa"` or other original sheets: Fetches directly from the original sheet (for admin CRUD or initial student lookup).
+ *
+ * @param {string} sheetName - The name of the sheet to retrieve data from, or "ExportWeb_fetch_raw".
+ * @param {string | object} param - Optional NIS (string) or object with filters ({class: "Kelas", id_tugas: "ID"}).
+ * @param {boolean} forceRefresh - True to bypass cache and force a new fetch.
+ * @returns {Promise<Array<Object> | null>} An array of data objects, or null if an error occurred.
+ */
+async function fetchData(sheetName, param = null, forceRefresh = false) {
+  // Mode 1: Fetch raw ExportWeb data
+  if (sheetName === "ExportWeb_fetch_raw") {
+    const exportWebCacheKey = "ExportWeb_raw_data";
+
+    if (!forceRefresh && dataCache[exportWebCacheKey]) {
+      console.log(`Mengambil raw ExportWeb data dari cache.`);
+      return dataCache[exportWebCacheKey];
+    }
+
+    // If not in cache or forceRefresh, fetch raw ExportWeb data
+    let url = `${GOOGLE_APPS_SCRIPT_WEB_APP_URL}?sheet=ExportWeb`; // Requesting the actual 'ExportWeb' sheet
+    try {
+      console.log(`Mengambil raw ExportWeb data dari server: ${url}`);
+      const response = await fetch(url);
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      const rawExportWebData = await response.json();
+      console.log(`Raw ExportWeb data diterima:`, rawExportWebData);
+
+      dataCache[exportWebCacheKey] = rawExportWebData; // Cache the raw data
+      return rawExportWebData;
+    } catch (error) {
+      console.error(`Error fetching raw ExportWeb data:`, error);
+      showToast(
+        `Gagal mengambil data konsolidasi. Error: ${error.message}`,
+        "error"
+      );
+      return null;
+    }
+  } else {
+    // Mode 2: Fetch data from original sheets (Siswa, Admin_Users, or for admin CRUD ops)
+    let cacheKey = sheetName;
+    if (param) {
+      const paramString =
+        typeof param === "object" ? JSON.stringify(param) : String(param);
+      cacheKey += `_${paramString}`;
+    }
+
+    // Check cache for original sheet data (only if dataCache[sheetName.toLowerCase().replace("_", "")] is explicitly defined and not empty)
+    // Note: For 'siswa', it's better to always re-fetch on login to ensure latest student info from original sheet.
+    // So, the `if` condition below would largely apply to admin-side caching, or if we decide to cache 'Siswa' for later use within the same session.
+    if (!forceRefresh && dataCache[sheetName.toLowerCase().replace("_", "")]) {
+      // Additional check for array length for data that might be an empty array
+      const cachedData = dataCache[sheetName.toLowerCase().replace("_", "")];
+      if (Array.isArray(cachedData) && cachedData.length > 0) {
+        console.log(`Mengambil data dari cache (original sheet): ${cacheKey}`);
+        return cachedData;
+      }
+    }
+
+    let url = `${GOOGLE_APPS_SCRIPT_WEB_APP_URL}?sheet=${sheetName}`;
+    if (param) {
+      if (
+        sheetName === "Siswa" ||
+        sheetName === "Kehadiran" ||
+        sheetName === "Catatan_Guru"
+      ) {
+        // For NIS-based lookups
+        if (typeof param === "object") {
+          url += `&nis=${param.nis || ""}`;
+        } else {
+          url += `&nis=${param}`;
+        }
+      } else if (sheetName === "Nilai") {
+        // Specific Nilai lookup for admin
+        if (typeof param === "object" && param.nis && param.id_tugas) {
+          url += `&nis=${param.nis}&id_tugas=${param.id_tugas}`;
+        } else if (typeof param === "string") {
+          url += `&nis=${param}`;
+        }
+      } else if (
+        sheetName === "Tugas" ||
+        sheetName === "Jadwal_Pelajaran" ||
+        sheetName === "Pengumuman" ||
+        sheetName === "Admin_Users"
+      ) {
+        // For class-based or general lookups
+        if (param.class) {
+          url += `&class=${param.class}`;
+        }
+      }
+    }
+
+    try {
+      console.log(`Mengambil data dari server (original sheet): ${url}`);
+      const response = await fetch(url);
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      const data = await response.json();
+      console.log(`Data diterima dari ${sheetName} (original sheet):`, data);
+      dataCache[sheetName.toLowerCase().replace("_", "")] = data; // Cache original sheet data
+      return data;
+    } catch (error) {
+      console.error(
+        `Error fetching data from ${sheetName} (original sheet):`,
+        error
+      );
+      showToast(
+        `Gagal mengambil data dari ${sheetName}. Error: ${error.message}`,
+        "error"
+      );
+      return null;
+    }
+  }
 }
 
 // --- Login Form Submission (Parent Only) ---
@@ -244,25 +571,78 @@ loginForm.addEventListener("submit", async (e) => {
       return;
     }
 
-    const studentData = await fetchData("Siswa", nis);
+    // 1. Fetch basic student data from the original "Siswa" sheet for name and class
+    // This part still uses direct sheet access as ExportWeb might not have full student profiles.
+    const studentData = await fetchData("Siswa", nis, true); // Force refresh for Siswa data on login
 
     if (studentData && studentData.length > 0) {
       const student = studentData[0];
-      currentStudentNis = student.NIS;
-      currentStudentClass = student.Kelas;
+      currentStudentNis = String(student.NIS);
+      currentStudentClass = String(student.Kelas);
 
-      document.getElementById("student-name").textContent = student.Nama;
-      document.getElementById("student-nis").textContent = student.NIS;
-      document.getElementById("student-class").textContent = student.Kelas;
+      // Populate student identity
+      studentNameSpan.textContent = student.Nama;
+      studentNisSpan.textContent = student.NIS;
+      studentClassSpan.textContent = student.Kelas;
 
-      await loadParentDashboardData(currentStudentNis); // Ambil data dari server
-      saveDataToSessionStorage(); // Simpan data yang baru diambil ke sessionStorage
+      // 2. Fetch all raw consolidated data from ExportWeb
+      // Use "ExportWeb_fetch_raw" to tell fetchData to just get the raw data from ExportWeb sheet
+      const rawExportWebData = await fetchData(
+        "ExportWeb_fetch_raw",
+        null,
+        true
+      );
 
-      showSection("parent-dashboard-section");
-      switchTab("tugas-status", document.querySelectorAll(".tab-button"));
+      if (rawExportWebData && rawExportWebData.length > 0) {
+        // 3. Process and filter the raw ExportWeb data for the current student/class
+        dataCache.siswa = studentData; // Keep original student data for display
+        dataCache.tugas = processAndFilterExportWebData(
+          rawExportWebData,
+          "Tugas",
+          currentStudentNis,
+          currentStudentClass
+        );
+        dataCache.nilai = dataCache.tugas; // Nilai is embedded in tugas for parent view
+        dataCache.kehadiran = processAndFilterExportWebData(
+          rawExportWebData,
+          "Kehadiran",
+          currentStudentNis,
+          currentStudentClass
+        );
+        dataCache.catatan_guru = processAndFilterExportWebData(
+          rawExportWebData,
+          "Catatan_Guru",
+          currentStudentNis,
+          currentStudentClass
+        );
+        dataCache.jadwal_pelajaran = processAndFilterExportWebData(
+          rawExportWebData,
+          "Jadwal_Pelajaran",
+          currentStudentNis,
+          currentStudentClass
+        ); // Pass both NIS and Class for filtering
+        dataCache.pengumuman = processAndFilterExportWebData(
+          rawExportWebData,
+          "Pengumuman",
+          currentStudentNis,
+          currentStudentClass
+        ); // Pass both NIS and Class for filtering
+
+        await loadParentDashboardData();
+        saveDataToSessionStorage(); // Simpan data yang baru diambil ke sessionStorage
+
+        showSection("parent-dashboard-section");
+        switchTab("tugas-status", document.querySelectorAll(".tab-button"));
+      } else {
+        showToast(
+          "Gagal memuat data dari ExportWeb. Data kosong atau tidak valid.",
+          "error"
+        );
+        logout(); // Fallback to logout if ExportWeb data is critical and missing
+      }
     } else {
       showToast(
-        "NIS tidak ditemukan. Mohon periksa kembali NIS Anda.",
+        "NIS tidak ditemukan atau tidak ada data untuk siswa ini. Mohon periksa kembali NIS Anda.",
         "error"
       );
     }
@@ -280,14 +660,11 @@ function logout() {
   currentStudentClass = null;
   sessionStorage.removeItem("loggedInNIS"); // Clear persistent login
   sessionStorage.removeItem("dataCache"); // Clear cached data
-  localStorage.clear(); // Clear all local storage for a clean logout
   // Clear all data cache in memory on logout
-  for (const key in dataCache) {
-    if (dataCache.hasOwnProperty(key)) {
-      dataCache[key] = [];
-    }
-  }
-  closeSidebar();
+  Object.keys(dataCache).forEach((key) => {
+    dataCache[key] = []; // Clear all data caches, including siswa, to ensure fresh state
+  });
+  dataCache.ExportWeb_raw_data = null; // Ensure this specific cache is cleared
 
   loginNisInput.value = "";
   showSection("login-section");
@@ -304,21 +681,7 @@ document.querySelectorAll(".tab-button").forEach((button) => {
     switchTab(targetTab, document.querySelectorAll(".tab-button"));
     showLoading();
     try {
-      // Data sudah ada di dataCache, jadi langsung render
-      if (targetTab === "kehadiran" && dataCache.kehadiran.length > 0) {
-        const currentFilter = kehadiranFilterPeriodSelect.value;
-        renderKehadiranChartAndTable(dataCache.kehadiran, currentFilter);
-      } else if (
-        targetTab === "jadwal-pelajaran" &&
-        dataCache.jadwal_pelajaran.length > 0
-      ) {
-        const currentFilterDay = jadwalFilterDaySelect.value;
-        renderJadwalPelajaran(
-          dataCache.jadwal_pelajaran,
-          currentStudentClass,
-          currentFilterDay
-        );
-      }
+      await loadParentDashboardData(targetTab);
     } catch (error) {
       console.error("Error loading tab data:", error);
       showToast("Gagal memuat data untuk tab ini.", "error");
@@ -328,80 +691,58 @@ document.querySelectorAll(".tab-button").forEach((button) => {
   });
 });
 
-// --- Data Fetching Function (GET) ---
-async function fetchData(sheetName, param = null) {
-  let url = `${GOOGLE_APPS_SCRIPT_WEB_APP_URL}?sheet=${sheetName}`;
-  if (param) {
-    if (
-      sheetName === "Siswa" ||
-      sheetName === "Kehadiran" ||
-      sheetName === "Catatan_Guru"
-    ) {
-      if (typeof param === "object") {
-        url += `&nis=${param.nis || ""}`;
-      } else {
-        url += `&nis=${param}`;
-      }
-    } else if (sheetName === "Nilai") {
-      if (typeof param === "object" && param.nis && param.id_tugas) {
-        url += `&nis=${param.nis}&id_tugas=${param.id_tugas}`;
-      } else if (typeof param === "string") {
-        url += `&nis=${param}`;
-      }
-    } else if (sheetName === "Jadwal_Pelajaran" && param.class) {
-      url += `&class=${param.class}`;
-    } else if (sheetName === "Pengumuman" && param.class) {
-      url += `&class=${param.class}`;
-    }
-  }
-  try {
-    const response = await fetch(url);
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
-    }
-    const data = await response.json();
-    console.log(`Fetched data from ${sheetName}:`, data);
-    return data;
-  } catch (error) {
-    console.error(`Error fetching data from ${sheetName}:`, error);
-    showToast(
-      `Gagal mengambil data dari ${sheetName}. Error: ${error.message}`,
-      "error"
-    );
-    return null;
-  }
-}
-
-// --- Parent Dashboard Data Loading and Rendering ---
-// Fungsi ini akan selalu mengambil data terbaru dari server
-async function loadParentDashboardData(nis) {
-  const nilaiData = await fetchData("Nilai", nis);
-  const tugasData = await fetchData("Tugas");
-  const kehadiranData = await fetchData("Kehadiran", nis);
-  const catatanGuruData = await fetchData("Catatan_Guru", nis);
-  const studentInfo = await fetchData("Siswa", nis);
-
-  dataCache.nilai = nilaiData;
-  dataCache.tugas = tugasData;
-  dataCache.kehadiran = kehadiranData;
-  dataCache.catatan_guru = catatanGuruData;
-  dataCache.siswa = studentInfo;
-
+// --- Load and Render Parent Dashboard Data ---
+async function loadParentDashboardData(activeTab = "tugas-status") {
+  // Populate subject filter dropdown once
   populateSubjectFilterSelect();
-  renderTugasStatus(dataCache.tugas, dataCache.nilai, nis, "Semua");
 
-  kehadiranFilterPeriodSelect.value = "all";
-  renderKehadiranChartAndTable(dataCache.kehadiran, "all");
+  // Data is now assumed to be directly in dataCache after login or refresh
+  const tasksForStudent = dataCache.tugas;
+  const gradesForStudent = dataCache.nilai; // Already combined in dataCache.tugas for parent view
+  const attendanceForStudent = dataCache.kehadiran;
+  const notesForStudent = dataCache.catatan_guru;
+  const schedulesForClass = dataCache.jadwal_pelajaran;
+  const announcementsForClass = dataCache.pengumuman;
 
-  renderCatatanGuru(dataCache.catatan_guru);
-  if (studentInfo && studentInfo.length > 0) {
-    const studentClass = studentInfo[0].Kelas;
-    const jadwalData = await fetchData("Jadwal_Pelajaran", {
-      class: studentClass,
-    });
-    dataCache.jadwal_pelajaran = jadwalData;
-    jadwalFilterDaySelect.value = "all";
-    renderJadwalPelajaran(dataCache.jadwal_pelajaran, studentClass, "all");
+  if (activeTab === "tugas-status") {
+    renderTugasStatus(
+      tasksForStudent,
+      gradesForStudent,
+      subjectFilterSelect.value
+    );
+  } else if (activeTab === "kehadiran") {
+    renderKehadiranChartAndTable(
+      attendanceForStudent,
+      kehadiranFilterPeriodSelect.value
+    );
+  } else if (activeTab === "catatan-guru") {
+    renderCatatanGuru(notesForStudent);
+  } else if (activeTab === "jadwal-pelajaran") {
+    renderJadwalPelajaran(
+      schedulesForClass,
+      currentStudentClass,
+      jadwalFilterDaySelect.value
+    );
+  } else if (activeTab === "pengumuman") {
+    renderAnnouncementsInModal(announcementsForClass); // This will only render in the modal, not a tab
+  } else {
+    // Initial load, render all tabs
+    renderTugasStatus(
+      tasksForStudent,
+      gradesForStudent,
+      subjectFilterSelect.value
+    );
+    renderKehadiranChartAndTable(
+      attendanceForStudent,
+      kehadiranFilterPeriodSelect.value
+    );
+    renderCatatanGuru(notesForStudent);
+    renderJadwalPelajaran(
+      schedulesForClass,
+      currentStudentClass,
+      jadwalFilterDaySelect.value
+    );
+    renderAnnouncementsInModal(announcementsForClass);
   }
 }
 
@@ -417,102 +758,166 @@ function getHeaderLabels(tableBodyId) {
   return headers;
 }
 
-function renderTugasStatus(
-  allTugasData,
-  nilaiData,
-  currentNis,
-  filterSubject = "Semua"
-) {
+function renderTugasStatus(tugasData, nilaiData, filterSubject = "Semua") {
   const tbody = document.getElementById("tugas-status-table-body");
   tbody.innerHTML = "";
 
-  let filteredTugasData = allTugasData;
+  if (!tugasData || tugasData.length === 0) {
+    tbody.innerHTML =
+      '<tr><td colspan="5" class="text-center py-4 text-gray-500">Tidak ada data tugas untuk siswa ini.</td></tr>';
+    return;
+  }
+
+  let filteredTugas = tugasData;
   if (filterSubject !== "Semua") {
-    filteredTugasData = allTugasData.filter(
+    filteredTugas = tugasData.filter(
       (tugas) => tugas.Mata_Pelajaran === filterSubject
     );
   }
 
-  if (!filteredTugasData || filteredTugasData.length === 0) {
+  if (filteredTugas.length === 0) {
     tbody.innerHTML =
-      '<tr><td colspan="5" class="text-center py-4 text-gray-500">Tidak ada tugas yang terdaftar.</td></tr>';
+      '<tr><td colspan="5" class="text-center py-4 text-gray-500">Tidak ada tugas yang terdaftar untuk mata pelajaran ini.</td></tr>';
     return;
   }
 
-  const belumDikerjakan = [];
-  const remedial = [];
-  const tuntas = [];
+  const tugasStatusMap = new Map();
 
-  filteredTugasData.forEach((tugas) => {
-    const studentNilai = nilaiData.find(
-      (n) =>
-        n.ID_Tugas === tugas.ID_Tugas && String(n.NIS) === String(currentNis)
-    );
+  filteredTugas.forEach((tugas) => {
+    // In this new setup, `tugasData` already contains the combined info from ExportWeb
+    // So, `nilaiData` is effectively `tugasData` itself, and we just use `task.Nilai` directly
+    // Let's remove the `nilaiData.find` logic here as it's redundant.
 
-    if (!studentNilai) {
-      belumDikerjakan.push({
-        ...tugas,
-        status: "Belum Dikerjakan",
-        nilaiDisplay: "N/A",
-      });
-    } else if (studentNilai.Status_Pengerjaan === "Remedial") {
-      remedial.push({
-        ...tugas,
-        status: "Remedial",
-        nilaiDisplay: studentNilai.Nilai,
-      });
-    } else if (studentNilai.Status_Pengerjaan === "Tuntas") {
-      tuntas.push({
-        ...tugas,
-        status: "Tuntas",
-        nilaiDisplay: studentNilai.Nilai,
-      });
+    let status = "Belum Dikerjakan";
+    let nilaiDisplay = "N/A";
+    let statusColorClass = "text-red-600";
+
+    // The 'Nilai' field from ExportWeb now represents the actual grade
+    if (
+      tugas.Nilai !== null &&
+      tugas.Nilai !== undefined &&
+      tugas.Nilai !== ""
+    ) {
+      nilaiDisplay = tugas.Nilai;
+      if (tugas.Nilai >= PASS_MARK) {
+        status = "Tuntas";
+        statusColorClass = "text-green-600";
+      } else {
+        status = "Remedial";
+        statusColorClass = "text-red-600";
+      }
     } else {
-      belumDikerjakan.push({
-        ...tugas,
-        status: "Belum Dikerjakan",
-        nilaiDisplay: "N/A",
-      });
+      // If Nilai is null/empty, check Status_Pengerjaan from ExportWeb
+      if (tugas.Status_Pengerjaan === "Sudah Dikerjakan") {
+        // Assuming this status if no grade yet but submitted
+        status = "Menunggu Penilaian";
+        statusColorClass = "text-yellow-600";
+      } else if (tugas.Status_Pengerjaan) {
+        // Fallback if other specific statuses are used
+        status = tugas.Status_Pengerjaan;
+        // Determine color based on status if needed
+        if (status === "Tuntas") statusColorClass = "text-green-600";
+        else if (status === "Remedial") statusColorClass = "text-red-600";
+        else if (status === "Belum Dikerjakan")
+          statusColorClass = "text-red-600";
+        else statusColorClass = "text-gray-600";
+      }
     }
+
+    tugasStatusMap.set(
+      tugas.NIS + "_" + tugas.Nama_Tugas + "_" + tugas.Mata_Pelajaran,
+      {
+        // Using a composite key
+        ...tugas,
+        nilai: nilaiDisplay,
+        status: status,
+        statusColorClass: statusColorClass,
+      }
+    );
   });
 
-  const sortByBatasWaktu = (a, b) =>
-    new Date(a.Batas_Waktu) - new Date(b.Batas_Waktu);
+  const tugasArray = Array.from(tugasStatusMap.values());
+
+  const belumDikerjakan = tugasArray.filter(
+    (tugas) => tugas.status === "Belum Dikerjakan"
+  );
+  const remedial = tugasArray.filter((tugas) => tugas.status === "Remedial");
+  const tuntas = tugasArray.filter((tugas) => tugas.status === "Tuntas");
+  const menungguPenilaian = tugasArray.filter(
+    (tugas) => tugas.status === "Menunggu Penilaian"
+  );
+
+  // Sort by Batas_Waktu
+  const sortByBatasWaktu = (a, b) => {
+    // The date format is "hari, tanggal bulan tahun" e.g., "Kamis, 19 Juni 2025"
+    // We need to parse this. A robust solution might involve a library,
+    // but for simple sorting, converting to a comparable string or Date object is best.
+    // Let's create a temporary Date object for comparison.
+    try {
+      // Remove the "hari, " part for Date parsing
+      const dateStringA = a.Batas_Waktu.split(", ")[1];
+      const dateStringB = b.Batas_Waktu.split(", ")[1];
+      // Replace month names for consistent parsing if necessary
+      const monthMap = {
+        Januari: "January",
+        February: "February",
+        Maret: "March",
+        April: "April",
+        Mei: "May",
+        Juni: "June",
+        Juli: "July",
+        Agustus: "August",
+        September: "September",
+        Oktober: "October",
+        November: "November",
+        Desember: "December",
+      };
+      const parseDateString = (str) => {
+        let parts = str.split(" ");
+        let day = parts[0];
+        let month = monthMap[parts[1]];
+        let year = parts[2];
+        return new Date(`${month} ${day}, ${year}`);
+      };
+      return parseDateString(dateStringA) - parseDateString(dateStringB);
+    } catch (e) {
+      console.error("Error parsing Batas_Waktu for sorting:", e);
+      return 0; // Fallback, don't sort
+    }
+  };
 
   belumDikerjakan.sort(sortByBatasWaktu);
   remedial.sort(sortByBatasWaktu);
   tuntas.sort(sortByBatasWaktu);
+  menungguPenilaian.sort(sortByBatasWaktu);
 
-  const orderedTasks = [...belumDikerjakan, ...remedial, ...tuntas];
+  const orderedTasks = [
+    ...belumDikerjakan,
+    ...remedial,
+    ...menungguPenilaian,
+    ...tuntas,
+  ];
 
+  // FIX: Revert to previous HTML structure for 2-line condensed display
   orderedTasks.forEach((task) => {
     const row = document.createElement("tr");
-    let statusColorClass;
-    let statusText;
-
-    if (task.status === "Tuntas") {
-      statusColorClass = "text-green-600";
-      statusText = `Tuntas! Nilai: ${task.nilaiDisplay}`;
-      row.classList.add("bg-white");
-    } else if (task.status === "Remedial") {
-      statusColorClass = "text-red-600";
-      statusText = `Remedial. Nilai: ${task.nilaiDisplay}`;
-      row.classList.add("bg-white");
-    } else {
-      statusColorClass = "text-red-600";
-      statusText = `Belum Dikerjakan. Batas: ${task.Batas_Waktu}`;
-      row.classList.add("bg-white");
-    }
-
-    row.classList.add("tugas-simplified-row", "rounded-md", "mb-2");
+    row.classList.add("tugas-simplified-row", "rounded-md", "mb-2"); // Add simplified class
     row.innerHTML = `
         <td colspan="5">
             <div class="flex flex-col md:flex-row md:justify-between items-start md:items-center py-2 px-2 border-b border-gray-100 last:border-none">
                 <div class="flex-grow">
-                    <span class="font-semibold text-gray-800">${task.Nama_Tugas} (${task.Mata_Pelajaran})</span>
+                    <span class="font-semibold text-gray-800">${
+                      task.Nama_Tugas
+                    } (${task.Mata_Pelajaran})</span>
                 </div>
-                <div class="text-right ${statusColorClass} mt-1 md:mt-0 font-medium">
-                    ${statusText}
+                <div class="text-right ${
+                  task.statusColorClass
+                } mt-1 md:mt-0 font-medium">
+                    ${
+                      task.status === "Belum Dikerjakan"
+                        ? `Belum Dikerjakan. Batas: ${task.Batas_Waktu}`
+                        : `${task.status}! Nilai: ${task.nilai}`
+                    }
                 </div>
             </div>
         </td>
@@ -524,7 +929,6 @@ function renderTugasStatus(
 function populateSubjectFilterSelect() {
   subjectFilterSelect.innerHTML =
     '<option value="Semua">Semua Mata Pelajaran</option>';
-
   HARDCODED_SUBJECTS.forEach((subject) => {
     const option = document.createElement("option");
     option.value = subject;
@@ -535,59 +939,67 @@ function populateSubjectFilterSelect() {
 
 subjectFilterSelect.addEventListener("change", (event) => {
   const selectedSubject = event.target.value;
-  renderTugasStatus(
-    dataCache.tugas,
-    dataCache.nilai,
-    currentStudentNis,
-    selectedSubject
-  );
+  renderTugasStatus(dataCache.tugas, dataCache.nilai, selectedSubject);
 });
 
 // --- Filter Attendance Data ---
 function filterAttendanceData(allData, period) {
-  const now = new Date();
-  let startDate = null;
-
+  // `allData` is now the array of attendance summary objects for the current student
+  // [{NIS, Hadir, Izin, Sakit, Alpha, TanggalTerakhir}]
   if (!allData || allData.length === 0) return [];
 
-  const sortedData = [...allData].sort(
-    (a, b) => new Date(b.Tanggal) - new Date(a.Tanggal)
-  );
-  const latestRecordDate =
-    sortedData.length > 0 ? new Date(sortedData[0].Tanggal) : now;
-
-  switch (period) {
-    case "week":
-      startDate = new Date(latestRecordDate);
-      startDate.setDate(latestRecordDate.getDate() - 7);
-      break;
-    case "month":
-      startDate = new Date(
-        latestRecordDate.getFullYear(),
-        latestRecordDate.getMonth(),
-        1
-      );
-      break;
-    case "3months":
-      startDate = new Date(latestRecordDate);
-      startDate.setMonth(latestRecordDate.getMonth() - 3);
-      break;
-    case "all":
-    default:
-      return allData;
-  }
-
-  return allData.filter((item) => {
-    const itemDate = new Date(item.Tanggal);
-    return itemDate >= startDate && itemDate <= latestRecordDate;
-  });
+  // If there's only one summary object per student, time period filtering doesn't apply to individual records
+  // It only applies to whether this summary is relevant to the selected period.
+  // For the current implementation, we just return the summary as is.
+  return allData;
 }
 
 // --- Render Kehadiran Chart and Table ---
-function renderKehadiranChartAndTable(allKehadiranData, filterPeriod) {
-  const filteredData = filterAttendanceData(allKehadiranData, filterPeriod);
-  renderAttendanceChart(filteredData);
-  renderKehadiranTable(filteredData);
+function renderKehadiranChartAndTable(kehadiranData, filterPeriod) {
+  // `kehadiranData` here is now the summary object from `processAndFilterExportWebData`
+  // [{NIS, Hadir, Izin, Sakit, Alpha, TanggalTerakhir}]
+  const filteredData = filterAttendanceData(kehadiranData, filterPeriod);
+
+  if (!filteredData || filteredData.length === 0) {
+    // Pass empty data to render functions to show "no data" message
+    renderAttendanceChart({}); // Pass empty object for chart
+    renderKehadiranTable([]);
+    return;
+  }
+
+  // Assuming filteredData has only ONE entry for the current student's summary
+  const studentSummary = filteredData[0];
+
+  // Prepare data for Chart.js
+  const chartData = {
+    Hadir: studentSummary.Hadir || 0,
+    Izin: studentSummary.Izin || 0,
+    Sakit: studentSummary.Sakit || 0,
+    Alpha: studentSummary.Alpha || 0,
+  };
+
+  renderAttendanceChart(chartData); // Pass the summary counts
+
+  // Prepare data for the table. Since ExportWeb provides summary,
+  // we'll display the summary in the table as a single row with the latest date.
+  const tableData = studentSummary.TanggalTerakhir
+    ? [
+        {
+          Tanggal: formatMMDDYYYYToReadableDate(studentSummary.TanggalTerakhir), // Convert mmddyyyy to readable
+          Status: `Hadir: ${studentSummary.Hadir}, Izin: ${studentSummary.Izin}, Sakit: ${studentSummary.Sakit}, Alpha: ${studentSummary.Alpha}`,
+        },
+      ]
+    : [];
+  renderKehadiranTable(tableData);
+}
+
+// Helper to convert mmddyyyy to readable date
+function formatMMDDYYYYToReadableDate(mmddyyyy) {
+  if (!mmddyyyy || mmddyyyy.length !== 8) return mmddyyyy;
+  const month = mmddyyyy.substring(0, 2);
+  const day = mmddyyyy.substring(2, 4);
+  const year = mmddyyyy.substring(4, 8);
+  return `${day}/${month}/${year}`;
 }
 
 // --- Render Kehadiran Table ---
@@ -602,8 +1014,7 @@ function renderKehadiranTable(kehadiranData) {
   }
   const headers = getHeaderLabels("kehadiran-table-body");
 
-  kehadiranData.sort((a, b) => new Date(b.Tanggal) - new Date(a.Tanggal));
-
+  // `kehadiranData` is already formatted for table in `renderKehadiranChartAndTable`
   kehadiranData.forEach((data) => {
     const row = document.createElement("tr");
     row.innerHTML = `
@@ -615,7 +1026,8 @@ function renderKehadiranTable(kehadiranData) {
 }
 
 // --- Render Pie Chart for Kehadiran ---
-function renderAttendanceChart(kehadiranData) {
+function renderAttendanceChart(summaryCounts) {
+  // Now accepts summary counts directly
   const canvas = document.getElementById("kehadiran-chart");
   const legendContainer = document.getElementById("kehadiran-chart-legend");
   if (!canvas) {
@@ -640,22 +1052,13 @@ function renderAttendanceChart(kehadiranData) {
 
   ctx.scale(devicePixelRatio, devicePixelRatio);
 
-  const statusCounts = {
-    Hadir: 0,
-    Izin: 0,
-    Sakit: 0,
-    Alpha: 0,
-  };
-
-  kehadiranData.forEach((item) => {
-    const status = item.Status;
-    if (statusCounts.hasOwnProperty(status)) {
-      statusCounts[status]++;
-    }
-  });
-
-  const labels = Object.keys(statusCounts);
-  const data = Object.values(statusCounts);
+  const labels = ["Hadir", "Izin", "Sakit", "Alpha"];
+  const data = [
+    summaryCounts.Hadir || 0,
+    summaryCounts.Izin || 0,
+    summaryCounts.Sakit || 0,
+    summaryCounts.Alpha || 0,
+  ];
   const colors = ["#4CAF50", "#FFC107", "#2196F3", "#F44336"];
   const legendLabels = {
     Hadir: "Hadir",
@@ -717,7 +1120,7 @@ function renderAttendanceChart(kehadiranData) {
   legendContainer.innerHTML = "";
   labels.forEach((label, index) => {
     const color = colors[index];
-    const count = statusCounts[label];
+    const count = summaryCounts[label] || 0; // Use summaryCounts directly
     const legendItem = document.createElement("div");
     legendItem.classList.add("flex", "items-center", "space-x-1");
     legendItem.innerHTML = `
@@ -742,43 +1145,51 @@ kehadiranFilterPeriodSelect.addEventListener("change", (event) => {
   renderKehadiranChartAndTable(dataCache.kehadiran, selectedPeriod);
 });
 
-function renderCatatanGuru(catatanData) {
+function renderCatatanGuru(catatanGuruData) {
   const tbody = document.getElementById("catatan-guru-table-body");
   tbody.innerHTML = "";
 
-  if (!catatanData || catatanData.length === 0) {
+  if (!catatanGuruData || catatanGuruData.length === 0) {
     tbody.innerHTML =
       '<tr><td colspan="3" class="text-center py-4 text-gray-500">Tidak ada catatan guru.</td></tr>';
     return;
   }
   const headers = getHeaderLabels("catatan-guru-table-body");
 
-  catatanData.forEach((data) => {
+  catatanGuruData.forEach((catatan) => {
     const row = document.createElement("tr");
     row.innerHTML = `
-                  <td data-label="${headers[0]}">${data.Minggu_Ke}</td>
-                  <td data-label="${headers[1]}">${data.Catatan}</td>
+                  <td data-label="${headers[0]}">${catatan.Minggu_Ke}</td>
+                  <td data-label="${headers[1]}">${catatan.Catatan}</td>
                   <td data-label="${headers[2]}">${
-      data.Tanggal_Input || "N/A"
+      catatan.Tanggal_Input || "N/A"
     }</td>
               `;
     tbody.appendChild(row);
   });
 }
 
-function renderJadwalPelajaran(allJadwalData, studentClass, filterDay = "all") {
+function renderJadwalPelajaran(
+  jadwalPelajaranData,
+  studentClass,
+  filterDay = "all"
+) {
   const tbody = document.getElementById("jadwal-pelajaran-table-body");
   tbody.innerHTML = "";
 
-  if (!allJadwalData || allJadwalData.length === 0) {
+  if (!jadwalPelajaranData || jadwalPelajaranData.length === 0) {
     tbody.innerHTML = `<tr><td colspan="4" class="text-center py-4 text-gray-500">Tidak ada jadwal pelajaran untuk kelas ${studentClass}.</td></tr>`;
     return;
   }
   const headers = getHeaderLabels("jadwal-pelajaran-table-body");
 
-  let filteredJadwal = allJadwalData;
+  let filteredJadwal = jadwalPelajaranData.filter(
+    (jadwal) =>
+      String(jadwal.Kelas).toLowerCase() === studentClass.toLowerCase()
+  );
+
   if (filterDay !== "all") {
-    filteredJadwal = allJadwalData.filter(
+    filteredJadwal = filteredJadwal.filter(
       (jadwal) => jadwal.Hari === filterDay
     );
   }
@@ -820,13 +1231,11 @@ function renderJadwalPelajaran(allJadwalData, studentClass, filterDay = "all") {
 
 jadwalFilterDaySelect.addEventListener("change", (event) => {
   const selectedDay = event.target.value;
-  if (currentStudentClass) {
-    renderJadwalPelajaran(
-      dataCache.jadwal_pelajaran,
-      currentStudentClass,
-      selectedDay
-    );
-  }
+  renderJadwalPelajaran(
+    dataCache.jadwal_pelajaran,
+    currentStudentClass,
+    selectedDay
+  );
 });
 
 // --- Notification Logic (Fungsionalitas dihilangkan) ---
@@ -863,7 +1272,7 @@ function renderAnnouncementsInModal(announcements) {
 
 // --- Gemini API Call for Summarization ---
 async function callGeminiAPI(prompt) {
-  const apiKey = "";
+  const apiKey = ""; // API key will be provided by the environment
   const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
 
   const chatHistory = [];
@@ -918,7 +1327,7 @@ summarizeNotesButton.addEventListener("click", async () => {
 
   try {
     const allNotes = dataCache.catatan_guru
-      .map((note) => `Minggu ${note.Minggu_Ke}: ${note.Catatan}`)
+      .map((catatan) => `Minggu ${catatan.Minggu_Ke}: ${catatan.Catatan}`)
       .join("\n");
 
     const prompt = `Buat ringkasan padat dan mudah dipahami dalam Bahasa Indonesia dari catatan guru berikut ini untuk wali murid. Jelaskan poin-poin penting tentang kemajuan atau masalah siswa. Jika tidak ada poin penting yang menonjol, sebutkan bahwa tidak ada masalah khusus. Pisahkan poin-poin dengan bullet point.\n\nCatatan Guru:\n${allNotes}`;
@@ -933,15 +1342,88 @@ summarizeNotesButton.addEventListener("click", async () => {
 
 // --- Handle Refresh Data Button Click ---
 if (refreshDataButton) {
-  // Pastikan tombol ada sebelum menambahkan event listener
   refreshDataButton.addEventListener("click", async () => {
     if (currentStudentNis) {
       showLoading();
       try {
-        // Force re-fetch all data and update cache
-        await loadParentDashboardData(currentStudentNis);
-        saveDataToSessionStorage(); // Simpan data terbaru ke cache
-        showToast("Data berhasil diperbarui dari server.", "success");
+        // Clear all relevant caches to force re-fetch
+        sessionStorage.removeItem("dataCache");
+        dataCache.ExportWeb_raw_data = null; // Clear raw ExportWeb cache
+        Object.keys(dataCache).forEach((key) => {
+          if (key !== "siswa") {
+            // Keep original student data if still needed
+            dataCache[key] = [];
+          }
+        });
+
+        // 1. Fetch basic student data again to ensure `currentStudentClass` is up-to-date if it was reset.
+        const studentData = await fetchData("Siswa", currentStudentNis, true);
+        if (!studentData || studentData.length === 0) {
+          showToast(
+            "Gagal me-refresh data. Informasi siswa tidak ditemukan.",
+            "error"
+          );
+          logout();
+          return;
+        }
+        currentStudentClass = String(studentData[0].Kelas); // Update current student class
+        studentNameSpan.textContent = studentData[0].Nama;
+        studentNisSpan.textContent = studentData[0].NIS;
+        studentClassSpan.textContent = studentData[0].Kelas;
+
+        // 2. Re-fetch all raw consolidated data from ExportWeb
+        const rawExportWebData = await fetchData(
+          "ExportWeb_fetch_raw",
+          null,
+          true
+        );
+
+        if (rawExportWebData && rawExportWebData.length > 0) {
+          // 3. Re-process and filter for the current student/class
+          dataCache.tugas = processAndFilterExportWebData(
+            rawExportWebData,
+            "Tugas",
+            currentStudentNis,
+            currentStudentClass
+          );
+          dataCache.nilai = dataCache.tugas; // Nilai is embedded in tugas for parent view
+          dataCache.kehadiran = processAndFilterExportWebData(
+            rawExportWebData,
+            "Kehadiran",
+            currentStudentNis,
+            currentStudentClass
+          );
+          dataCache.catatan_guru = processAndFilterExportWebData(
+            rawExportWebData,
+            "Catatan_Guru",
+            currentStudentNis,
+            currentStudentClass
+          );
+          dataCache.jadwal_pelajaran = processAndFilterExportWebData(
+            rawExportWebData,
+            "Jadwal_Pelajaran",
+            currentStudentNis,
+            currentStudentClass
+          ); // Pass both NIS and Class for filtering
+          dataCache.pengumuman = processAndFilterExportWebData(
+            rawExportWebData,
+            "Pengumuman",
+            currentStudentNis,
+            currentStudentClass
+          ); // Pass both NIS and Class for filtering
+
+          await loadParentDashboardData(
+            document.querySelector(".tab-button.text-blue-600")?.dataset.tab ||
+              "tugas-status"
+          );
+          saveDataToSessionStorage(); // Simpan data terbaru ke cache
+          showToast("Data berhasil diperbarui dari server.", "success");
+        } else {
+          showToast(
+            "Gagal me-refresh data dari ExportWeb. Data kosong atau tidak valid.",
+            "error"
+          );
+        }
       } catch (error) {
         console.error("Error refreshing data:", error);
         showToast("Gagal memperbarui data dari server.", "error");
@@ -956,65 +1438,109 @@ if (refreshDataButton) {
 
 // --- Initialization Logic ---
 document.addEventListener("DOMContentLoaded", async () => {
-  const isDataRestored = loadDataFromSessionStorage(); // Hanya memeriksa keberadaan data di cache
+  const isDataRestored = loadDataFromSessionStorage();
 
-  if (isDataRestored && currentStudentNis) {
-    showLoading();
-    try {
-      // Re-populate student identity from dataCache.siswa
-      const student = dataCache.siswa[0];
-      if (student) {
-        currentStudentClass = student.Kelas; // Ensure currentStudentClass is set
-        document.getElementById("student-name").textContent = student.Nama;
-        document.getElementById("student-nis").textContent = student.NIS;
-        document.getElementById("student-class").textContent = student.Kelas;
+  // FIX: Ensure currentStudentNis is explicitly null if session is not valid or complete
+  if (
+    !isDataRestored ||
+    !currentStudentNis ||
+    !dataCache.siswa ||
+    dataCache.siswa.length === 0
+  ) {
+    // If no valid session or student data, show login
+    showSection("login-section");
+    // Also explicitly clear cache if it was partially loaded but invalid
+    sessionStorage.removeItem("loggedInNIS");
+    sessionStorage.removeItem("dataCache");
+    Object.keys(dataCache).forEach((key) => {
+      dataCache[key] = [];
+    });
+    dataCache.ExportWeb_raw_data = null;
+    return; // Exit here to prevent further execution for invalid session
+  }
 
-        // Render sections directly from restored dataCache
-        populateSubjectFilterSelect();
-        renderTugasStatus(
-          dataCache.tugas,
-          dataCache.nilai,
-          currentStudentNis,
-          "Semua"
-        );
-        kehadiranFilterPeriodSelect.value = "all";
-        renderKehadiranChartAndTable(dataCache.kehadiran, "all");
-        renderCatatanGuru(dataCache.catatan_guru);
-        jadwalFilterDaySelect.value = "all";
-        renderJadwalPelajaran(
-          dataCache.jadwal_pelajaran,
-          currentStudentClass,
-          "all"
-        );
-        // updateNotificationBadge(); // Dihilangkan
+  // Proceed only if session is valid and student data exists
+  showLoading();
+  try {
+    // Re-populate student identity from dataCache.siswa
+    studentNameSpan.textContent = dataCache.siswa[0].Nama;
+    studentNisSpan.textContent = dataCache.siswa[0].NIS;
+    currentStudentClass = dataCache.siswa[0].Kelas; // Ensure currentStudentClass is set from cached student data
+    studentClassSpan.textContent = dataCache.siswa[0].Kelas;
 
-        showSection("parent-dashboard-section");
-        switchTab("tugas-status", document.querySelectorAll(".tab-button"));
-      } else {
-        // Fallback if cached student data is somehow missing or invalid
-        sessionStorage.removeItem("loggedInNIS");
-        sessionStorage.removeItem("dataCache");
-        showSection("login-section");
-        showToast(
-          "Sesi login tidak valid atau data cache tidak lengkap. Silakan login kembali.",
-          "error"
-        );
-      }
-    } catch (error) {
-      console.error("Error restoring session from cache:", error);
+    // When restoring from cache, ExportWeb_raw_data needs to be refreshed to populate other dataCache categories correctly.
+    // FIX: Force fresh fetch for ExportWeb_raw_data to ensure latest data on page load after session restore.
+    const rawExportWebData = await fetchData("ExportWeb_fetch_raw", null, true); // Force fresh fetch
+
+    if (rawExportWebData && rawExportWebData.length > 0) {
+      // Re-process and filter for the current student/class
+      dataCache.tugas = processAndFilterExportWebData(
+        rawExportWebData,
+        "Tugas",
+        currentStudentNis,
+        currentStudentClass
+      );
+      dataCache.nilai = dataCache.tugas;
+      dataCache.kehadiran = processAndFilterExportWebData(
+        rawExportWebData,
+        "Kehadiran",
+        currentStudentNis,
+        currentStudentClass
+      );
+      dataCache.catatan_guru = processAndFilterExportWebData(
+        rawExportWebData,
+        "Catatan_Guru",
+        currentStudentNis,
+        currentStudentClass
+      );
+      dataCache.jadwal_pelajaran = processAndFilterExportWebData(
+        rawExportWebData,
+        "Jadwal_Pelajaran",
+        currentStudentNis,
+        currentStudentClass
+      ); // Pass both NIS and Class for filtering
+      dataCache.pengumuman = processAndFilterExportWebData(
+        rawExportWebData,
+        "Pengumuman",
+        currentStudentNis,
+        currentStudentClass
+      ); // Pass both NIS and Class for filtering
+
+      await loadParentDashboardData();
+      kehadiranFilterPeriodSelect.value = "all";
+      renderKehadiranChartAndTable(dataCache.kehadiran, "all");
+      renderCatatanGuru(dataCache.catatan_guru);
+      jadwalFilterDaySelect.value = "all";
+      renderJadwalPelajaran(
+        dataCache.jadwal_pelajaran,
+        currentStudentClass,
+        "all"
+      );
+
+      showSection("parent-dashboard-section");
+      switchTab("tugas-status", document.querySelectorAll(".tab-button"));
+    } else {
+      console.error(
+        "Error: ExportWeb data missing after session restore or initial fetch."
+      );
       sessionStorage.removeItem("loggedInNIS");
       sessionStorage.removeItem("dataCache");
       showSection("login-section");
       showToast(
-        "Terjadi kesalahan saat memulihkan sesi dari cache. Silakan login kembali.",
+        "Terjadi kesalahan saat memulihkan sesi. Silakan login kembali.",
         "error"
       );
-    } finally {
-      hideLoading();
     }
-  } else {
-    // Jika tidak ada NIS yang tersimpan di sessionStorage, tampilkan halaman login
-    // atau jika dataCache kosong (sesi pertama kali atau cache direset manual)
+  } catch (error) {
+    console.error("Error restoring session from cache:", error);
+    sessionStorage.removeItem("loggedInNIS");
+    sessionStorage.removeItem("dataCache");
     showSection("login-section");
+    showToast(
+      "Terjadi kesalahan saat memulihkan sesi dari cache. Silakan login kembali.",
+      "error"
+    );
+  } finally {
+    hideLoading();
   }
 });
