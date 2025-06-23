@@ -1,9 +1,9 @@
 // Ganti URL ini dengan URL Web App Google Apps Script Anda setelah di-deploy
 const GOOGLE_APPS_SCRIPT_WEB_APP_URL =
-  "https://script.google.com/macros/s/AKfycbz8Ie82-LMXU2AbQ_vCriXwpJ57_lWTC387ixIpErlk03T1n6jiGWHsLFtNIuCuTYTEEg/exec";
+  "https://script.google.com/macros/s/AKfycbyA74lf_vJL6Z6Xq6WmuD6kBJlcFiGvY-ei6I283YGESmLuOA0iP3hVol40JGEzbpAO3g/exec";
 const PASS_MARK = 75; // Nilai minimum untuk status "Tuntas" - (used in value configuration)
 
-// Daftar mata pelajaran (digunakan untuk filter dan pembuatan ID Tugas)
+// Hardcoded list of subjects
 const HARDCODED_SUBJECTS = [
   "PAI",
   "Pancasila",
@@ -16,7 +16,7 @@ const HARDCODED_SUBJECTS = [
   "Dawet Ayu",
 ];
 
-// Pemetaan singkatan mata pelajaran untuk ID Tugas
+// Mapping for subject abbreviations for ID Tugas
 const SUBJECT_ABBREVIATIONS = {
   PAI: "PAI",
   Pancasila: "PANC",
@@ -29,1922 +29,1421 @@ const SUBJECT_ABBREVIATIONS = {
   "Dawet Ayu": "DWA",
 };
 
-// Cache sisi klien untuk data yang diambil guna mengurangi panggilan API
+// Client-side cache for fetched data to reduce API calls
 const dataCache = {
-  siswa: null, // Inisialisasi dengan null untuk menunjukkan belum diambil
+  siswa: null, // Initialize with null to indicate not fetched yet
   tugas: null,
   nilai: null,
   kehadiran: null,
   catatan_guru: null,
   jadwal_pelajaran: null,
   pengumuman: null,
-  admin_users: null, // Ditambahkan untuk daftar admin
+  admin_users: null,
 };
 
-// Variabel untuk menyimpan instance Chart.js
-let nilaiChartInstance = null;
-let kehadiranChartInstance = null;
+// DOM Elements specific to admin view
+const loadingOverlay = document.getElementById("loading-overlay");
+const loginSection = document.getElementById("login-section"); // For admin login form
+const adminDashboardSection = document.getElementById(
+  "admin-dashboard-section"
+);
+const toastContainer = document.getElementById("toast-container");
+const unifiedLoginCard = document.getElementById("unified-login-card");
+const loginTitle = document.getElementById("login-title");
+const loginForm = document.getElementById("login-form");
+const loginAdminEmailInput = document.getElementById("login-email-admin");
+const mainLoginButton = document.getElementById("main-login-button");
 
-// ===========================================
-// FUNGSI UTILITY (Serbaguna)
-// ===========================================
+// Admin form dropdowns
+const nilaiNisSelect = document.getElementById("nilai-nis");
+const nilaiTugasIdSelect = document.getElementById("nilai-tugas-id");
+const kehadiranNisSelect = document.getElementById("kehadiran-nis");
+const kehadiranTanggalInput = document.getElementById("kehadiran-tanggal"); // Added
+const catatanNisSelect = document.getElementById("catatan-nis");
+const catatanMingguInput = document.getElementById("catatan-minggu"); // Added
+const tugasMapelSelect = document.getElementById("tugas-mapel");
+const jadwalMapelSelect = document.getElementById("jadwal-mapel");
 
-/**
- * Menampilkan overlay loading.
- */
-function showLoadingOverlay() {
-  const overlay = document.getElementById("loading-overlay");
-  if (overlay) {
-    overlay.style.opacity = "1";
-    overlay.style.visibility = "visible";
-  }
+// Admin form specific inputs for Nilai
+const nilaiInput = document.getElementById("nilai-input");
+const nilaiStatusSelect = document.getElementById("nilai-status");
+
+// Admin form mode inputs
+const tugasFormMode = document.getElementById("tugas-form-mode");
+const nilaiFormMode = document.getElementById("nilai-form-mode");
+const kehadiranFormMode = document.getElementById("kehadiran-form-mode");
+const catatanFormMode = document.getElementById("catatan-form-mode");
+const jadwalFormMode = document.getElementById("jadwal-form-mode");
+const pengumumanFormMode = document.getElementById("pengumuman-form-mode");
+
+// Admin form edit ID inputs
+const tugasEditId = document.getElementById("tugas-edit-id");
+const nilaiEditId = document.getElementById("nilai-edit-id");
+const kehadiranEditId = document.getElementById("kehadiran-edit-id");
+const catatanEditId = document.getElementById("catatan-edit-id");
+const jadwalEditId = document.getElementById("jadwal-edit-id");
+const pengumumanEditId = document.getElementById("pengumuman-edit-id");
+
+// Admin form submit buttons
+const submitTugasBtn = document.getElementById("submit-tugas");
+const submitNilaiBtn = document.getElementById("submit-nilai");
+const submitKehadiranBtn = document.getElementById("submit-kehadiran");
+const submitCatatanBtn = document.getElementById("submit-catatan");
+const submitJadwalBtn = document.getElementById("submit-jadwal");
+const submitPengumumanBtn = document.getElementById("submit-pengumuman");
+
+// Confirmation Modal Elements (copied from main script for shared functionality)
+const confirmModal = document.getElementById("confirm-modal");
+const confirmModalTitle = document.getElementById("confirm-modal-title");
+const confirmModalMessage = document.getElementById("confirm-modal-message");
+const confirmCancelBtn = document.getElementById("confirm-cancel-btn");
+const confirmOkBtn = document.getElementById("confirm-ok-btn");
+let onConfirmCallback = null;
+
+// --- Loading Overlay Functions ---
+function showLoading() {
+  loadingOverlay.classList.add("visible");
 }
 
-/**
- * Menyembunyikan overlay loading.
- */
-function hideLoadingOverlay() {
-  const overlay = document.getElementById("loading-overlay");
-  if (overlay) {
-    overlay.style.opacity = "0";
-    overlay.style.visibility = "hidden";
-  }
+function hideLoading() {
+  loadingOverlay.classList.remove("visible");
 }
 
-/**
- * Menampilkan pesan toast (notifikasi singkat).
- * @param {string} message - Pesan yang akan ditampilkan.
- * @param {string} type - Tipe pesan (misalnya, 'success', 'error', 'info', 'warning').
- */
-function showToast(message, type = "info") {
-  const toastContainer = document.getElementById("toast-container");
-  if (!toastContainer) {
-    console.error("Toast container not found!");
-    return;
-  }
+// Fungsi untuk menampilkan atau menyembunyikan bagian aplikasi
+function showSection(sectionId) {
+  loginSection.classList.add("section-hidden");
+  adminDashboardSection.classList.add("section-hidden");
+  document.getElementById(sectionId).classList.remove("section-hidden");
+}
 
+// --- Toast Notification Function ---
+function showToast(message, type = "info", duration = 3000) {
   const toast = document.createElement("div");
-  toast.className = `toast-message ${type}`;
+  toast.classList.add("toast", type);
   toast.textContent = message;
-
   toastContainer.appendChild(toast);
 
-  // Animasi masuk
-  setTimeout(() => {
-    toast.classList.add("show");
-  }, 10);
+  void toast.offsetWidth;
+  toast.classList.add("show");
 
-  // Animasi keluar dan hapus setelah beberapa detik
   setTimeout(() => {
     toast.classList.remove("show");
-    toast.classList.add("hide");
-    toast.addEventListener(
-      "transitionend",
-      () => {
-        toast.remove();
-      },
-      { once: true }
-    );
-  }, 4000); // Tampilkan selama 4 detik
+    toast.addEventListener("transitionend", () => {
+      toast.remove();
+    });
+  }, duration);
 }
 
-/**
- * Mengirim permintaan ke Google Apps Script Web App.
- * @param {object} payload - Data yang akan dikirim dalam permintaan.
- * @returns {Promise<object>} - Resolves dengan respons dari Apps Script.
- */
-async function sendRequestToGAS(payload) {
-  showLoadingOverlay();
-  try {
-    const response = await fetch(GOOGLE_APPS_SCRIPT_WEB_APP_URL, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(payload),
-    });
+// --- Custom Confirmation Modal Functions ---
+function showConfirmModal(message, onConfirm, title = "Konfirmasi") {
+  confirmModalTitle.textContent = title;
+  confirmModalMessage.textContent = message;
+  onConfirmCallback = onConfirm;
+  confirmModal.classList.add("open");
+}
 
+function hideConfirmModal() {
+  confirmModal.classList.remove("open");
+  onConfirmCallback = null;
+}
+
+confirmCancelBtn.addEventListener("click", hideConfirmModal);
+confirmOkBtn.addEventListener("click", () => {
+  if (onConfirmCallback) {
+    onConfirmCallback();
+  }
+  hideConfirmModal();
+});
+
+// --- Generate Unique ID (Generic) ---
+function generateUniqueId(prefix) {
+  return (
+    prefix +
+    "_" +
+    Date.now().toString(36) +
+    Math.random().toString(36).substring(2, 5).toUpperCase()
+  );
+}
+
+// --- Generate Task ID based on subject, task number, and month ---
+function generateTugasId(subjectAbbr, taskNumber, month) {
+  const formattedTaskNumber = String(taskNumber).padStart(2, "0");
+  const formattedMonth = String(month).padStart(2, "0");
+  return `${subjectAbbr}${formattedTaskNumber}${formattedMonth}`;
+}
+
+// --- Generate Kehadiran ID based on NIS and Date ---
+function updateKehadiranIdField() {
+  const nis = kehadiranNisSelect.value;
+  const tanggal = kehadiranTanggalInput.value;
+  const kehadiranIdInput = document.getElementById("kehadiran-id");
+
+  if (nis && tanggal) {
+    try {
+      const date = new Date(tanggal);
+      if (isNaN(date.getTime())) {
+        kehadiranIdInput.value = "Format tanggal salah";
+        kehadiranIdInput.classList.remove("bg-white");
+        kehadiranIdInput.classList.add("bg-gray-100", "cursor-not-allowed");
+        return;
+      }
+      const month = String(date.getMonth() + 1).padStart(2, "0");
+      const day = String(date.getDate()).padStart(2, "0");
+      const year = date.getFullYear();
+      const formattedDate = `${day}${month}${year}`; // Changed format to DDMMYYYY
+      kehadiranIdInput.value = `${nis}_${formattedDate}`;
+      kehadiranIdInput.classList.remove("bg-gray-100", "cursor-not-allowed");
+      kehadiranIdInput.classList.add("bg-white");
+    } catch (error) {
+      console.error("Error formatting date for Kehadiran ID:", error);
+      kehadiranIdInput.value = "Gagal membuat ID";
+      kehadiranIdInput.classList.remove("bg-white");
+      kehadiranIdInput.classList.add("bg-gray-100", "cursor-not-allowed");
+    }
+  } else {
+    kehadiranIdInput.value = "Dihasilkan Otomatis";
+    kehadiranIdInput.classList.remove("bg-white");
+    kehadiranIdInput.classList.add("bg-gray-100", "cursor-not-allowed");
+  }
+}
+
+// --- Generate Catatan Guru ID based on NIS and Minggu_Ke ---
+function updateCatatanIdField() {
+  const nis = catatanNisSelect.value;
+  const mingguKe = catatanMingguInput.value;
+  const catatanIdInput = document.getElementById("catatan-id");
+
+  if (nis && mingguKe) {
+    // Simple check for valid week number (can be expanded)
+    if (isNaN(parseInt(mingguKe))) {
+      catatanIdInput.value = "Minggu ke salah";
+      catatanIdInput.classList.remove("bg-white");
+      catatanIdInput.classList.add("bg-gray-100", "cursor-not-allowed");
+      return;
+    }
+    catatanIdInput.value = `${nis}_${mingguKe}`;
+    catatanIdInput.classList.remove("bg-gray-100", "cursor-not-allowed");
+    catatanIdInput.classList.add("bg-white");
+  } else {
+    catatanIdInput.value = "Dihasilkan Otomatis";
+    catatanIdInput.classList.remove("bg-white");
+    catatanIdInput.classList.add("bg-gray-100", "cursor-not-allowed");
+  }
+}
+
+// Universal tab switching function
+function switchTab(targetTabId, buttons, prefix = "") {
+  document.querySelectorAll(`.${prefix}tab-content`).forEach((content) => {
+    content.classList.add("section-hidden");
+  });
+
+  buttons.forEach((btn) => {
+    btn.classList.remove("text-green-600", "border-green-600", "border-b-2");
+    btn.classList.add("text-gray-700");
+  });
+
+  document.getElementById(targetTabId).classList.remove("section-hidden");
+
+  const clickedButton = Array.from(buttons).find(
+    (btn) => btn.dataset.tab === targetTabId
+  );
+  if (clickedButton) {
+    clickedButton.classList.remove("text-gray-700");
+    clickedButton.classList.add(
+      "text-green-600",
+      "border-b-2",
+      "border-green-600"
+    );
+  }
+}
+
+// --- Admin Login Form Submission ---
+loginForm.addEventListener("submit", async (e) => {
+  e.preventDefault();
+  showLoading();
+
+  try {
+    const adminEmail = loginAdminEmailInput.value.trim();
+    if (!adminEmail) {
+      showToast("Email admin tidak boleh kosong.", "error");
+      hideLoading();
+      return;
+    }
+
+    // Fetch authorized emails from Google Apps Script
+    // Force refresh admin users as it's a critical initial fetch
+    const authorizedEmails = await fetchData("Admin_Users", null, true);
+    dataCache.admin_users = authorizedEmails; // Cache admin users
+
+    // Check if the entered email exists in the list of authorized emails (case-insensitive)
+    const emailExists = authorizedEmails.some(
+      (user) =>
+        user.Email && user.Email.toLowerCase() === adminEmail.toLowerCase()
+    );
+
+    if (emailExists) {
+      showToast("Login admin berhasil!", "success");
+      await loadAdminDropdownData(); // Load dropdowns for forms
+      await loadAdminTableData("Tugas"); // Load initial table for admin dashboard
+      updateTugasIdField(); // Initial generation for Tugas ID
+      updateKehadiranIdField(); // Initial generation for Kehadiran ID
+      updateCatatanIdField(); // Initial generation for Catatan Guru ID - Added
+      showSection("admin-dashboard-section"); // Show admin dashboard
+      switchTab("input-tugas", document.querySelectorAll(".admin-tab-button")); // Activate default tab
+    } else {
+      showToast("Email admin tidak terdaftar. Akses ditolak.", "error");
+    }
+  } catch (error) {
+    console.error("Login Error:", error);
+    showToast(
+      "Terjadi kesalahan saat login. Periksa konsol untuk detail.",
+      "error"
+    );
+  } finally {
+    hideLoading();
+  }
+});
+
+// Helper function to reset admin forms to create mode
+function resetAdminForm(
+  formElement,
+  formModeInput,
+  idKey,
+  submitButton,
+  defaultButtonText,
+  idInputElement
+) {
+  formElement.reset();
+  formModeInput.value = "create";
+  if (idInputElement) {
+    idInputElement.readOnly = true;
+    if (idKey === "ID_Nilai") {
+      idInputElement.placeholder = "Akan Dihasilkan Otomatis";
+      idInputElement.value = "";
+      nilaiInput.disabled = false;
+      nilaiStatusSelect.disabled = false;
+      if (nilaiNisSelect) nilaiNisSelect.disabled = false;
+      if (nilaiTugasIdSelect) nilaiTugasIdSelect.disabled = false;
+    } else if (idKey === "ID_Kehadiran") {
+      updateKehadiranIdField(); // Call to regenerate based on current dropdowns (which will be reset to empty)
+    } else if (idKey === "ID_Catatan") {
+      // Added
+      updateCatatanIdField(); // Call to regenerate based on current dropdowns (which will be reset to empty)
+    } else {
+      idInputElement.value = "Dihasilkan Otomatis";
+    }
+    idInputElement.classList.add("bg-gray-100", "cursor-not-allowed");
+    idInputElement.classList.remove("bg-white");
+  }
+  submitButton.textContent = defaultButtonText;
+  submitButton.disabled = false;
+}
+
+// --- Data Fetching Function (GET) with Caching ---
+async function fetchData(sheetName, param = null, forceRefresh = false) {
+  let cacheKey = sheetName;
+  if (param) {
+    // Convert param object to a consistent string for cache key, or use param directly if string
+    const paramString =
+      typeof param === "object" ? JSON.stringify(param) : String(param);
+    cacheKey += `_${paramString}`;
+  }
+
+  // Check cache first if not forced to refresh
+  if (!forceRefresh && dataCache[cacheKey]) {
+    console.log(`Mengambil data dari cache: ${cacheKey}`);
+    return dataCache[cacheKey];
+  }
+
+  let url = `${GOOGLE_APPS_SCRIPT_WEB_APP_URL}?sheet=${sheetName}`;
+  if (param) {
+    if (
+      sheetName === "Siswa" ||
+      sheetName === "Kehadiran" ||
+      sheetName === "Catatan_Guru"
+    ) {
+      if (typeof param === "object") {
+        url += `&nis=${param.nis || ""}`;
+      } else {
+        url += `&nis=${param}`;
+      }
+    } else if (sheetName === "Nilai") {
+      if (typeof param === "object" && param.nis && param.id_tugas) {
+        url += `&nis=${param.nis}&id_tugas=${param.id_tugas}`;
+      } else if (typeof param === "string") {
+        url += `&nis=${param}`;
+      }
+    } else if (sheetName === "Jadwal_Pelajaran" && param.class) {
+      url += `&class=${param.class}`;
+    } else if (sheetName === "Pengumuman" && param.class) {
+      url += `&class=${param.class}`;
+    }
+  }
+  try {
+    console.log(`Mengambil data dari server: ${url}`);
+    const response = await fetch(url);
     if (!response.ok) {
       throw new Error(`HTTP error! status: ${response.status}`);
     }
+    const data = await response.json();
+    console.log(`Data diterima dari ${sheetName}:`, data);
+    dataCache[cacheKey] = data; // Store in cache
+    return data;
+  } catch (error) {
+    console.error(`Error fetching data from ${sheetName}:`, error);
+    showToast(
+      `Gagal mengambil data dari ${sheetName}. Error: ${error.message}`,
+      "error"
+    );
+    return null;
+  }
+}
 
+// --- Data Posting/Updating/Deleting Function (POST) ---
+async function sendData(sheetName, data, action) {
+  const url = `${GOOGLE_APPS_SCRIPT_WEB_APP_URL}`;
+  try {
+    const response = await fetch(url, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded",
+      },
+      body: new URLSearchParams({
+        sheet: sheetName,
+        action: action,
+        data: JSON.stringify(data),
+      }),
+    });
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
     const result = await response.json();
+    console.log(`Response from ${sheetName} (${action}):`, result);
+
+    // Invalidate relevant cache entries after a successful CRUD operation
+    // For simplicity, invalidate all data for the affected sheet.
+    // More granular invalidation could be implemented if needed.
+    for (const key in dataCache) {
+      if (key.startsWith(sheetName)) {
+        dataCache[key] = null; // Mark as stale
+      }
+    }
+
     return result;
   } catch (error) {
-    console.error("Error sending request to GAS:", error);
-    showToast(`Error: ${error.message}`, "error");
-    throw error; // Re-throw to allow caller to handle it
-  } finally {
-    hideLoadingOverlay();
+    console.error(`Error sending data to ${sheetName} (${action}):`, error);
+    showToast(
+      `Gagal ${action} data ke ${sheetName}. Error: ${error.message}`,
+      "error"
+    );
+    return { success: false, message: `Error: ${error.message}` };
   }
 }
 
-/**
- * Menampilkan bagian tertentu dan menyembunyikan yang lain.
- * @param {string} sectionId - ID dari bagian yang akan ditampilkan.
- */
-function showSection(sectionId) {
-  document.querySelectorAll("section").forEach((section) => {
-    if (section.id === sectionId) {
-      section.classList.remove("section-hidden");
-    } else {
-      section.classList.add("section-hidden");
-    }
-  });
-}
-
-/**
- * Mengelola tampilan tab di dashboard admin.
- * @param {string} activeTabId - ID dari tombol tab yang aktif.
- * @param {NodeListOf<Element>} tabButtons - Semua tombol tab.
- */
-function switchAdminTab(activeTabId, tabButtons) {
-  tabButtons.forEach((button) => {
-    if (button.id === activeTabId) {
-      button.classList.add("bg-blue-600", "text-white");
-      button.classList.remove("bg-gray-200", "text-gray-700");
-    } else {
-      button.classList.remove("bg-blue-600", "text-white");
-      button.classList.add("bg-gray-200", "text-gray-700");
-    }
-  });
-
-  const allTabContents = document.querySelectorAll(".tab-content-admin");
-  allTabContents.forEach((content) => {
-    if (content.id === activeTabId.replace("-tab-button", "-content")) {
-      content.classList.remove("section-hidden");
-    } else {
-      content.classList.add("section-hidden");
-    }
-  });
-}
-
-/**
- * Menampilkan modal konfirmasi.
- * @param {string} title - Judul modal.
- * @param {string} message - Pesan konfirmasi.
- * @returns {Promise<boolean>} - Resolves true jika OK, false jika Batal.
- */
-function showConfirmationModal(title, message) {
-  return new Promise((resolve) => {
-    const modal = document.getElementById("confirm-modal");
-    const modalTitle = document.getElementById("confirm-modal-title");
-    const modalMessage = document.getElementById("confirm-modal-message");
-    const okButton = document.getElementById("confirm-ok-btn");
-    const cancelButton = document.getElementById("confirm-cancel-btn");
-
-    modalTitle.textContent = title;
-    modalMessage.textContent = message;
-
-    modal.classList.add("show"); // Tampilkan modal
-
-    const handleOk = () => {
-      hideConfirmationModal();
-      okButton.removeEventListener("click", handleOk);
-      cancelButton.removeEventListener("click", handleCancel);
-      resolve(true);
-    };
-
-    const handleCancel = () => {
-      hideConfirmationModal();
-      okButton.removeEventListener("click", handleOk);
-      cancelButton.removeEventListener("click", handleCancel);
-      resolve(false);
-    };
-
-    okButton.addEventListener("click", handleOk);
-    cancelButton.addEventListener("click", handleCancel);
-  });
-}
-
-/**
- * Menyembunyikan modal konfirmasi.
- */
-function hideConfirmationModal() {
-  const modal = document.getElementById("confirm-modal");
-  modal.classList.remove("show"); // Sembunyikan modal
-}
-
-// ===========================================
-// FUNGSI PENGOLAHAN DATA
-// ===========================================
-
-/**
- * Mengambil semua data dari Google Sheet.
- * @param {string} sheetName - Nama sheet yang akan diambil.
- * @returns {Promise<Array>} - Array objek data.
- */
-async function fetchData(sheetName) {
-  try {
-    const response = await sendRequestToGAS({
-      action: "read",
-      sheetName: sheetName,
+// Helper function to get header labels for data-label attribute
+function getHeaderLabels(tableBodyId) {
+  let headers = [];
+  const table = document.getElementById(tableBodyId).closest("table");
+  if (table && table.querySelector("thead tr")) {
+    // Only pick visible headers for data-label
+    table.querySelectorAll("thead th").forEach((th) => {
+      headers.push(th.textContent.trim());
     });
-    if (response.success) {
-      return response.data;
+  }
+  return headers;
+}
+
+// --- Helper function to populate dropdowns ---
+function populateDropdown(
+  selectElement,
+  data,
+  valueKey,
+  textKey,
+  initialOptionText = "Pilih..."
+) {
+  selectElement.innerHTML = `<option value="">${initialOptionText}</option>`;
+  if (data && data.length > 0) {
+    data.forEach((item) => {
+      const option = document.createElement("option");
+      option.value = item[valueKey];
+      option.textContent = item[textKey];
+      selectElement.appendChild(option);
+    });
+  } else {
+    selectElement.innerHTML = `<option value="">Tidak ada data tersedia</option>`;
+  }
+}
+
+// --- Load Data for Admin Dropdowns and Tables ---
+async function loadAdminDropdownData() {
+  populateDropdown(nilaiNisSelect, null, "", "", "Memuat siswa...");
+  populateDropdown(kehadiranNisSelect, null, "", "", "Memuat siswa...");
+  populateDropdown(catatanNisSelect, null, "", "", "Memuat siswa...");
+
+  // Force refresh for dropdown data to ensure latest options
+  const siswaData = await fetchData("Siswa", null, true);
+  if (siswaData) {
+    dataCache.siswa = siswaData; // Update cache explicitly
+    populateDropdown(
+      nilaiNisSelect,
+      siswaData,
+      "NIS",
+      "Nama",
+      "Pilih Siswa..."
+    );
+    populateDropdown(
+      kehadiranNisSelect,
+      siswaData,
+      "NIS",
+      "Nama",
+      "Pilih Siswa..."
+    );
+    populateDropdown(
+      catatanNisSelect,
+      siswaData,
+      "NIS",
+      "Nama",
+      "Pilih Siswa..."
+    );
+  } else {
+    showToast("Gagal memuat daftar siswa untuk dropdown.", "error");
+  }
+
+  const subjectOptions = HARDCODED_SUBJECTS.map((s) => ({
+    value: s,
+    text: s,
+  }));
+  populateDropdown(
+    tugasMapelSelect,
+    subjectOptions,
+    "value",
+    "text",
+    "Pilih Mata Pelajaran..."
+  );
+  populateDropdown(
+    jadwalMapelSelect,
+    subjectOptions,
+    "value",
+    "text",
+    "Pilih Mata Pelajaran..."
+  );
+
+  if (nilaiTugasIdSelect) {
+    populateDropdown(nilaiTugasIdSelect, null, "", "", "Memuat tugas...");
+    // Force refresh for task data
+    const tugasData = await fetchData("Tugas", null, true);
+    if (tugasData) {
+      dataCache.tugas = tugasData; // Update cache explicitly
+      populateDropdown(
+        nilaiTugasIdSelect,
+        tugasData,
+        "ID_Tugas",
+        "Nama_Tugas",
+        "Pilih Tugas..."
+      );
+    } else {
+      showToast("Gagal memuat daftar tugas untuk dropdown.", "error");
+    }
+  }
+}
+
+async function loadAdminTableData(sheetName) {
+  let tableBodyElement;
+  let idKey;
+  let dataFetch;
+  let renderFunction;
+
+  // Assign tableBodyElement first
+  switch (sheetName) {
+    case "Tugas":
+      tableBodyElement = document.getElementById("tugas-list-table-body");
+      break;
+    case "Nilai":
+      tableBodyElement = document.getElementById("nilai-list-table-body");
+      break;
+    case "Kehadiran":
+      tableBodyElement = document.getElementById("kehadiran-list-table-body");
+      break;
+    case "Catatan_Guru":
+      tableBodyElement = document.getElementById("catatan-list-table-body");
+      break;
+    case "Jadwal_Pelajaran":
+      tableBodyElement = document.getElementById("jadwal-list-table-body");
+      break;
+    case "Pengumuman":
+      tableBodyElement = document.getElementById("pengumuman-list-table-body");
+      break;
+    default:
+      showToast("Nama sheet tidak valid untuk tabel admin.", "error");
+      return;
+  }
+
+  if (!tableBodyElement) {
+    console.error(`Elemen tabel untuk sheet "${sheetName}" tidak ditemukan.`);
+    showToast(
+      `Error: Elemen tabel untuk sheet "${sheetName}" tidak ditemukan.`,
+      "error"
+    );
+    return;
+  }
+
+  tableBodyElement.innerHTML = `<tr><td colspan="99" class="text-center py-4 text-gray-500">Memuat data...</td></tr>`; // Show loading in table
+
+  // Force refresh for all table data to ensure latest state
+  dataFetch = await fetchData(sheetName, null, true);
+  dataCache[sheetName.toLowerCase().replace("_", "")] = dataFetch; // Update cache explicitly
+
+  if (!dataFetch || dataFetch.length === 0) {
+    tableBodyElement.innerHTML = `<tr><td colspan="99" class="text-center py-4 text-gray-500">Tidak ada data ${sheetName}.</td></tr>`;
+    return;
+  }
+
+  // Define renderFunction after dataFetch and caching is handled
+  switch (sheetName) {
+    case "Tugas":
+      idKey = "ID_Tugas";
+      renderFunction = (item, headers) => `
+                  <td data-label="${headers[0]}">${item.Nama_Tugas}</td>
+                  <td data-label="${headers[1]}">${item.Mata_Pelajaran}</td>
+                  <td data-label="${headers[2]}">${item.Batas_Waktu}</td>
+                  <td data-label="${headers[3]}">${item.Untuk_Kelas}</td>
+              `;
+      break;
+    case "Nilai":
+      idKey = "ID_Nilai";
+      renderFunction = (item, headers) => `
+                  <td data-label="${headers[0]}">${item.NIS}</td>
+                  <td data-label="${headers[1]}">${item.ID_Tugas}</td>
+                  <td data-label="${headers[2]}">${item.Nilai}</td>
+                  <td data-label="${headers[3]}">${item.Status_Pengerjaan}</td>
+                  <td data-label="${headers[4]}">${
+        item.Tanggal_Input || "N/A"
+      }</td>
+              `;
+      break;
+    case "Kehadiran":
+      idKey = "ID_Kehadiran";
+      renderFunction = (item, headers) => `
+                  <td data-label="${headers[0]}">${item.ID_Kehadiran}</td>
+                  <td data-label="${headers[1]}">${item.NIS}</td>
+                  <td data-label="${headers[2]}">${item.Tanggal}</td>
+                  <td data-label="${headers[3]}">${item.Status}</td>
+              `;
+      break;
+    case "Catatan_Guru":
+      idKey = "ID_Catatan";
+      renderFunction = (item, headers) => `
+                  <td data-label="${headers[0]}">${item.ID_Catatan}</td>
+                  <td data-label="${headers[1]}">${item.NIS}</td>
+                  <td data-label="${headers[2]}">${item.Minggu_Ke}</td>
+                  <td data-label="${headers[3]}">${item.Catatan}</td>
+                  <td data-label="${headers[4]}">${
+        item.Tanggal_Input || "N/A"
+      }</td>
+              `;
+      break;
+    case "Jadwal_Pelajaran":
+      idKey = "ID_Jadwal";
+      renderFunction = (item, headers) => `
+                  <td data-label="${headers[0]}">${item.ID_Jadwal}</td>
+                  <td data-label="${headers[1]}">${item.Kelas}</td>
+                  <td data-label="${headers[2]}">${item.Hari}</td>
+                  <td data-label="${headers[3]}">${item.Jam}</td>
+                  <td data-label="${headers[4]}">${item.Mata_Pelajaran}</td>
+                  <td data-label="${headers[5]}">${item.Guru}</td>
+              `;
+      break;
+    case "Pengumuman":
+      idKey = "ID_Pengumuman";
+      renderFunction = (item, headers) => `
+                  <td data-label="${headers[0]}">${item.ID_Pengumuman}</td>
+                  <td data-label="${headers[1]}">${item.Judul}</td>
+                  <td data-label="${headers[2]}">${item.Tanggal_Pengumuman}</td>
+                  <td data-label="${headers[3]}">${
+        item.Untuk_Kelas || "Semua Kelas"
+      }</td>
+              `;
+      break;
+    default:
+      // This case should ideally not be reached due to the initial switch
+      console.error("renderFunction not defined for sheet:", sheetName);
+      return;
+  }
+
+  tableBodyElement.innerHTML = ""; // Clear loading message
+
+  const headers = getHeaderLabels(tableBodyElement.id); // Get headers from the specific table
+
+  dataFetch.forEach((item) => {
+    const row = document.createElement("tr");
+    row.innerHTML =
+      renderFunction(item, headers) +
+      `
+                  <td class="py-2 px-4 border-b text-sm text-gray-700">
+                      <button onclick="editEntry('${sheetName}', ${JSON.stringify(
+        item[idKey]
+      )})" class="bg-yellow-500 hover:bg-yellow-600 text-white py-1 px-2 rounded-md text-xs mr-2">Edit</button>
+                      <button onclick="deleteEntry('${sheetName}', ${JSON.stringify(
+        item[idKey]
+      )})" class="bg-red-500 hover:bg-red-600 text-white py-1 px-2 rounded-md text-xs">Hapus</button>
+                  </td>
+              `;
+    tableBodyElement.appendChild(row);
+  });
+}
+
+// --- Configure Nilai Form based on NIS and ID Tugas selection ---
+async function configureNilaiFormBasedOnSelection() {
+  const nis = nilaiNisSelect.value;
+  const tugasId = nilaiTugasIdSelect.value;
+  const nilaiIdInput = document.getElementById("nilai-id");
+
+  nilaiInput.disabled = false;
+  nilaiStatusSelect.disabled = false;
+  submitNilaiBtn.disabled = false;
+  nilaiInput.value = "";
+  nilaiStatusSelect.value = "";
+  nilaiEditId.value = "";
+  nilaiFormMode.value = "create";
+  submitNilaiBtn.textContent = "Simpan Nilai";
+
+  if (nis && tugasId) {
+    nilaiIdInput.value = `${nis}_${tugasId}`;
+    nilaiIdInput.classList.remove("bg-gray-100", "cursor-not-allowed");
+    nilaiIdInput.classList.add("bg-white");
+
+    // Fetch existing Nilai for this student and task combination (force refresh)
+    const existingNilai = await fetchData(
+      "Nilai",
+      {
+        nis: nis,
+        id_tugas: tugasId,
+      },
+      true
+    );
+
+    if (existingNilai && existingNilai.length > 0) {
+      const foundNilai = existingNilai[0];
+      showToast(
+        "Nilai untuk siswa dan tugas ini sudah ada. Mode Edit diaktifkan.",
+        "info"
+      );
+
+      nilaiInput.value = foundNilai.Nilai;
+      nilaiStatusSelect.value = foundNilai.Status_Pengerjaan;
+      nilaiEditId.value = foundNilai.ID_Nilai;
+      nilaiFormMode.value = "edit";
+      submitNilaiBtn.textContent = "Perbarui Nilai";
+
+      if (foundNilai.Status_Pengerjaan === "Tuntas") {
+        showToast(
+          "Nilai ini sudah Tuntas. Input tidak bisa dilakukan ulang.",
+          "warning",
+          5000
+        );
+        nilaiInput.disabled = true;
+        nilaiStatusSelect.disabled = true;
+        submitNilaiBtn.disabled = true;
+      }
+    }
+  } else {
+    nilaiIdInput.value = "";
+    nilaiIdInput.placeholder = "Akan Dihasilkan Otomatis";
+    nilaiIdInput.classList.add("bg-gray-100", "cursor-not-allowed");
+    nilaiIdInput.classList.remove("bg-white");
+  }
+}
+
+if (nilaiNisSelect)
+  nilaiNisSelect.addEventListener("change", configureNilaiFormBasedOnSelection);
+if (nilaiTugasIdSelect)
+  nilaiTugasIdSelect.addEventListener(
+    "change",
+    configureNilaiFormBasedOnSelection
+  );
+
+// --- Event Listeners for Kehadiran ID Generation ---
+if (kehadiranNisSelect) {
+  kehadiranNisSelect.addEventListener("change", updateKehadiranIdField);
+}
+if (kehadiranTanggalInput) {
+  kehadiranTanggalInput.addEventListener("change", updateKehadiranIdField);
+}
+
+// --- Event Listeners for Catatan Guru ID Generation --- Added
+if (catatanNisSelect) {
+  catatanNisSelect.addEventListener("change", updateCatatanIdField);
+}
+if (catatanMingguInput) {
+  catatanMingguInput.addEventListener("input", updateCatatanIdField); // Use 'input' for instant feedback
+}
+
+// --- Update Tugas ID field based on Mata Pelajaran selection ---
+async function updateTugasIdField() {
+  const selectedSubject = tugasMapelSelect.value;
+  const tugasIdInput = document.getElementById("tugas-id");
+
+  if (selectedSubject) {
+    const subjectAbbr = SUBJECT_ABBREVIATIONS[selectedSubject] || "OTH";
+    const currentMonth = new Date().getMonth() + 1;
+
+    // Fetch all existing tasks to determine the next sequential number (force refresh)
+    const allTugas = (await fetchData("Tugas", null, true)) || [];
+    dataCache.tugas = allTugas;
+
+    const tasksForSubjectInMonth = allTugas.filter((task) => {
+      const taskSubject = task.Mata_Pelajaran;
+      let taskMonth = currentMonth;
+      if (task.ID_Tugas && task.ID_Tugas.length >= 6) {
+        const monthFromId = parseInt(
+          task.ID_Tugas.substring(task.ID_Tugas.length - 2)
+        );
+        if (!isNaN(monthFromId) && monthFromId >= 1 && monthFromId <= 12) {
+          taskMonth = monthFromId;
+        }
+      }
+
+      return taskSubject === selectedSubject && taskMonth === currentMonth;
+    });
+
+    const nextTaskNumber = tasksForSubjectInMonth.length + 1;
+    const newTugasId = generateTugasId(
+      subjectAbbr,
+      nextTaskNumber,
+      currentMonth
+    );
+
+    tugasIdInput.value = newTugasId;
+    tugasIdInput.classList.remove("bg-gray-100", "cursor-not-allowed");
+    tugasIdInput.classList.add("bg-white");
+  } else {
+    tugasIdInput.value = "Dihasilkan Otomatis";
+    tugasIdInput.classList.add("bg-gray-100", "cursor-not-allowed");
+    tugasIdInput.classList.remove("bg-white");
+  }
+}
+
+tugasMapelSelect.addEventListener("change", updateTugasIdField);
+
+// --- Update Pengumuman ID field ---
+async function updatePengumumanIdField() {
+  const pengumumanIdInput = document.getElementById("pengumuman-id");
+  // Force refresh for all announcements
+  const allPengumuman = (await fetchData("Pengumuman", null, true)) || [];
+  dataCache.pengumuman = allPengumuman;
+
+  const nextPengumumanNumber = allPengumuman.length + 1;
+  const newPengumumanId = `PGM_${String(nextPengumumanNumber).padStart(
+    3,
+    "0"
+  )}`;
+
+  pengumumanIdInput.value = newPengumumanId;
+  pengumumanIdInput.classList.remove("bg-gray-100", "cursor-not-allowed");
+  pengumumanIdInput.classList.add("bg-white");
+}
+
+// --- Edit Entry Function ---
+async function editEntry(sheetName, id) {
+  let formElement;
+  let idInput;
+  let modeInput;
+  let submitButton;
+  let itemToEdit;
+  let idKey;
+
+  try {
+    showLoading();
+
+    // Fetch the latest data for editing, always force refresh for edit operations
+    const currentData = await fetchData(sheetName, null, true);
+    if (!currentData) {
+      showToast("Gagal memuat data untuk edit.", "error");
+      return;
+    }
+    // Update the specific cache entry for this sheet
+    dataCache[sheetName.toLowerCase().replace("_", "")] = currentData;
+
+    switch (sheetName) {
+      case "Tugas":
+        formElement = document.getElementById("form-input-tugas");
+        idInput = document.getElementById("tugas-id");
+        modeInput = tugasFormMode;
+        submitButton = submitTugasBtn;
+        itemToEdit = dataCache.tugas.find((item) => item.ID_Tugas === id);
+        idKey = "ID_Tugas";
+        document.getElementById("tugas-nama").value = itemToEdit.Nama_Tugas;
+        tugasMapelSelect.value = itemToEdit.Mata_Pelajaran;
+        document.getElementById("tugas-deadline").value =
+          itemToEdit.Batas_Waktu;
+        document.getElementById("tugas-kelas").value = itemToEdit.Untuk_Kelas;
+        tugasEditId.value = itemToEdit.ID_Tugas;
+        break;
+      case "Nilai":
+        formElement = document.getElementById("form-input-nilai");
+        idInput = document.getElementById("nilai-id");
+        modeInput = nilaiFormMode;
+        submitButton = submitNilaiBtn;
+        itemToEdit = dataCache.nilai.find((item) => item.ID_Nilai === id);
+        idKey = "ID_Nilai";
+        if (nilaiNisSelect) nilaiNisSelect.value = itemToEdit.NIS;
+        if (nilaiTugasIdSelect) nilaiTugasIdSelect.value = itemToEdit.ID_Tugas;
+        nilaiInput.value = itemToEdit.Nilai;
+        nilaiStatusSelect.value = itemToEdit.Status_Pengerjaan;
+        nilaiEditId.value = itemToEdit.ID_Nilai;
+        nilaiInput.disabled = false;
+        nilaiStatusSelect.disabled = false;
+        if (nilaiNisSelect) nilaiNisSelect.disabled = true;
+        if (nilaiTugasIdSelect) nilaiTugasIdSelect.disabled = true;
+        break;
+      case "Kehadiran":
+        formElement = document.getElementById("form-input-kehadiran");
+        idInput = document.getElementById("kehadiran-id");
+        modeInput = kehadiranFormMode;
+        submitButton = submitKehadiranBtn;
+        itemToEdit = dataCache.kehadiran.find(
+          (item) => item.ID_Kehadiran === id
+        );
+        idKey = "ID_Kehadiran";
+        kehadiranNisSelect.value = itemToEdit.NIS;
+        document.getElementById("kehadiran-tanggal").value = itemToEdit.Tanggal;
+        document.getElementById("kehadiran-status").value = itemToEdit.Status;
+        kehadiranEditId.value = itemToEdit.ID_Kehadiran;
+        break;
+      case "Catatan_Guru":
+        formElement = document.getElementById("form-input-catatan");
+        idInput = document.getElementById("catatan-id");
+        modeInput = catatanFormMode;
+        submitButton = submitCatatanBtn;
+        itemToEdit = dataCache.catatan_guru.find(
+          (item) => item.ID_Catatan === id
+        );
+        idKey = "ID_Catatan";
+        catatanNisSelect.value = itemToEdit.NIS;
+        document.getElementById("catatan-minggu").value = itemToEdit.Minggu_Ke;
+        document.getElementById("catatan-isi").value = itemToEdit.Catatan;
+        catatanEditId.value = itemToEdit.ID_Catatan;
+        break;
+      case "Jadwal_Pelajaran":
+        formElement = document.getElementById("form-input-jadwal");
+        idInput = document.getElementById("jadwal-id");
+        modeInput = jadwalFormMode;
+        submitButton = submitJadwalBtn;
+        itemToEdit = dataCache.jadwal_pelajaran.find(
+          (item) => item.ID_Jadwal === id
+        );
+        idKey = "ID_Jadwal";
+        document.getElementById("jadwal-kelas").value = itemToEdit.Kelas;
+        document.getElementById("jadwal-hari").value = itemToEdit.Hari;
+        document.getElementById("jadwal-jam").value = itemToEdit.Jam;
+        jadwalMapelSelect.value = itemToEdit.Mata_Pelajaran;
+        document.getElementById("jadwal-guru").value = itemToEdit.Guru;
+        jadwalEditId.value = itemToEdit.ID_Jadwal;
+        break;
+      case "Pengumuman":
+        formElement = document.getElementById("form-input-pengumuman");
+        idInput = document.getElementById("pengumuman-id");
+        modeInput = pengumumanFormMode;
+        submitButton = submitPengumumanBtn;
+        itemToEdit = dataCache.pengumuman.find(
+          (item) => item.ID_Pengumuman === id
+        );
+        idKey = "ID_Pengumuman";
+        document.getElementById("pengumuman-judul").value = itemToEdit.Judul;
+        document.getElementById("pengumuman-isi").value =
+          itemToEdit.Isi_Pengumuman;
+        document.getElementById("pengumuman-tanggal").value =
+          itemToEdit.Tanggal_Pengumuman;
+        document.getElementById("pengumuman-untuk-kelas").value =
+          itemToEdit.Untuk_Kelas || "";
+        pengumumanEditId.value = itemToEdit.ID_Pengumuman;
+        break;
+      default:
+        showToast("Aksi edit tidak didukung untuk sheet ini.", "error");
+        return;
+    }
+
+    if (itemToEdit) {
+      idInput.value = itemToEdit[idKey];
+      idInput.readOnly = true;
+      idInput.classList.remove("bg-gray-100", "cursor-not-allowed");
+      idInput.classList.add("bg-white");
+      modeInput.value = "edit";
+      submitButton.textContent = "Perbarui Data";
+      submitButton.disabled = false;
+
+      showToast(`Mode Edit: ${sheetName} ID ${id}`, "info");
     } else {
       showToast(
-        `Gagal mengambil data ${sheetName}: ${response.message}`,
+        `Data dengan ID ${id} tidak ditemukan di ${sheetName}.`,
         "error"
       );
-      return [];
     }
   } catch (error) {
-    console.error(`Error fetching ${sheetName} data:`, error);
-    showToast(`Error: Gagal mengambil data ${sheetName}.`, "error");
-    return [];
-  }
-}
-
-/**
- * Memuat semua data dashboard admin dari Google Sheet ke cache.
- */
-async function loadAdminDashboardData() {
-  showLoadingOverlay();
-  try {
-    dataCache.siswa = await fetchData("Siswa");
-    dataCache.tugas = await fetchData("Tugas");
-    dataCache.nilai = await fetchData("Nilai");
-    dataCache.kehadiran = await fetchData("Kehadiran");
-    dataCache.catatan_guru = await fetchData("Catatan_Guru");
-    dataCache.jadwal_pelajaran = await fetchData("Jadwal_Pelajaran");
-    dataCache.pengumuman = await fetchData("Pengumuman");
-    dataCache.admin_users = await fetchData("Admin_Users"); // Ambil daftar admin
-
-    renderSiswaTable(dataCache.siswa);
-    renderTugasTable(dataCache.tugas);
-    renderNilaiTable(dataCache.nilai);
-    renderKehadiranTable(dataCache.kehadiran);
-    renderCatatanGuruTable(dataCache.catatan_guru);
-    renderJadwalPelajaranTable(dataCache.jadwal_pelajaran);
-    renderPengumumanTable(dataCache.pengumuman);
-    renderAdminUsersTable(dataCache.admin_users);
-
-    // Perbarui dropdown siswa di semua form CRUD yang memerlukannya
-    populateSiswaDropdowns();
-    populateTugasDropdowns();
-    populateKelasDropdowns();
-    populateMapelDropdowns();
-    updateTugasIdField();
-    updateNilaiIdField();
-    updateKehadiranIdField();
-    updateCatatanIdField();
-    updateJadwalIdField();
-    updatePengumumanIdField();
-    updateAdminUserIdField();
-
-    showToast("Data dashboard admin berhasil dimuat.", "success");
-  } catch (error) {
-    console.error("Error loading admin dashboard data:", error);
-    showToast("Gagal memuat data dashboard admin.", "error");
+    console.error("Edit Entry Error:", error);
+    showToast("Terjadi kesalahan saat mencoba mengedit data.", "error");
   } finally {
-    hideLoadingOverlay();
+    hideLoading();
   }
 }
 
-// ===========================================
-// FUNGSI RENDERING TABEL
-// ===========================================
+// --- Delete Entry Function ---
+async function deleteEntry(sheetName, id) {
+  showConfirmModal(
+    `Apakah Anda yakin ingin menghapus data dengan ID ${id} dari ${sheetName}?`,
+    async () => {
+      let idKey;
+      switch (sheetName) {
+        case "Tugas":
+          idKey = "ID_Tugas";
+          break;
+        case "Nilai":
+          idKey = "ID_Nilai";
+          break;
+        case "Kehadiran":
+          idKey = "ID_Kehadiran";
+          break;
+        case "Catatan_Guru":
+          idKey = "ID_Catatan";
+          break;
+        case "Jadwal_Pelajaran":
+          idKey = "ID_Jadwal";
+          break;
+        case "Pengumuman":
+          idKey = "ID_Pengumuman";
+          break;
+        case "Siswa":
+          idKey = "NIS";
+          break;
+        case "Admin_Users":
+          idKey = "Email";
+          break;
+        default:
+          showToast("Aksi hapus tidak didukung untuk sheet ini.", "error");
+          return;
+      }
 
-/**
- * Merender tabel siswa.
- * @param {Array<object>} siswaData - Data siswa.
- */
-function renderSiswaTable(siswaData) {
-  const tableBody = document.getElementById("siswa-table-body");
-  if (!tableBody) return;
-  tableBody.innerHTML = "";
-  siswaData.forEach((siswa) => {
-    const row = `
-      <tr class="border-b last:border-b-0">
-        <td class="px-4 py-2">${siswa.NIS}</td>
-        <td class="px-4 py-2">${siswa.Nama}</td>
-        <td class="px-4 py-2">${siswa.Kelas}</td>
-        <td class="px-4 py-2">${siswa.Wali_Murid}</td>
-        <td class="px-4 py-2">
-          <button onclick="editSiswa('${siswa.NIS}')" class="text-blue-600 hover:text-blue-800 mr-2"><i class="fas fa-edit"></i> Edit</button>
-          <button onclick="deleteSiswa('${siswa.NIS}')" class="text-red-600 hover:text-red-800"><i class="fas fa-trash"></i> Hapus</button>
-        </td>
-      </tr>
-    `;
-    tableBody.insertAdjacentHTML("beforeend", row);
-  });
-}
+      const dataToDelete = {};
+      dataToDelete[idKey] = id;
 
-/**
- * Merender tabel tugas.
- * @param {Array<object>} tugasData - Data tugas.
- */
-function renderTugasTable(tugasData) {
-  const tableBody = document.getElementById("tugas-table-body");
-  if (!tableBody) return;
-  tableBody.innerHTML = "";
-  tugasData.forEach((tugas) => {
-    const row = `
-      <tr class="border-b last:border-b-0">
-        <td class="px-4 py-2">${tugas.ID_Tugas}</td>
-        <td class="px-4 py-2">${tugas.Nama_Tugas}</td>
-        <td class="px-4 py-2">${tugas.Mata_Pelajaran}</td>
-        <td class="px-4 py-2">${tugas.Batas_Waktu}</td>
-        <td class="px-4 py-2">${tugas.Untuk_Kelas}</td>
-        <td class="px-4 py-2">
-          <button onclick="editTugas('${tugas.ID_Tugas}')" class="text-blue-600 hover:text-blue-800 mr-2"><i class="fas fa-edit"></i> Edit</button>
-          <button onclick="deleteTugas('${tugas.ID_Tugas}')" class="text-red-600 hover:text-red-800"><i class="fas fa-trash"></i> Hapus</button>
-        </td>
-      </tr>
-    `;
-    tableBody.insertAdjacentHTML("beforeend", row);
-  });
-}
-
-/**
- * Merender tabel nilai.
- * @param {Array<object>} nilaiData - Data nilai.
- */
-function renderNilaiTable(nilaiData) {
-  const tableBody = document.getElementById("nilai-table-body");
-  if (!tableBody) return;
-  tableBody.innerHTML = "";
-  nilaiData.forEach((nilai) => {
-    const row = `
-      <tr class="border-b last:border-b-0">
-        <td class="px-4 py-2">${nilai.ID_Nilai}</td>
-        <td class="px-4 py-2">${nilai.NIS}</td>
-        <td class="px-4 py-2">${nilai.ID_Tugas}</td>
-        <td class="px-4 py-2">${nilai.Nilai}</td>
-        <td class="px-4 py-2">${nilai.Status_Pengerjaan}</td>
-        <td class="px-4 py-2">${nilai.Tanggal_Input}</td>
-        <td class="px-4 py-2">
-          <button onclick="editNilai('${nilai.ID_Nilai}')" class="text-blue-600 hover:text-blue-800 mr-2"><i class="fas fa-edit"></i> Edit</button>
-          <button onclick="deleteNilai('${nilai.ID_Nilai}')" class="text-red-600 hover:text-red-800"><i class="fas fa-trash"></i> Hapus</button>
-        </td>
-      </tr>
-    `;
-    tableBody.insertAdjacentHTML("beforeend", row);
-  });
-}
-
-/**
- * Merender tabel kehadiran.
- * @param {Array<object>} kehadiranData - Data kehadiran.
- */
-function renderKehadiranTable(kehadiranData) {
-  const tableBody = document.getElementById("kehadiran-table-body");
-  if (!tableBody) return;
-  tableBody.innerHTML = "";
-  kehadiranData.forEach((kehadiran) => {
-    const row = `
-      <tr class="border-b last:border-b-0">
-        <td class="px-4 py-2">${kehadiran.ID_Kehadiran}</td>
-        <td class="px-4 py-2">${kehadiran.NIS}</td>
-        <td class="px-4 py-2">${kehadiran.Tanggal}</td>
-        <td class="px-4 py-2">${kehadiran.Status}</td>
-        <td class="px-4 py-2">
-          <button onclick="editKehadiran('${kehadiran.ID_Kehadiran}')" class="text-blue-600 hover:text-blue-800 mr-2"><i class="fas fa-edit"></i> Edit</button>
-          <button onclick="deleteKehadiran('${kehadiran.ID_Kehadiran}')" class="text-red-600 hover:text-red-800"><i class="fas fa-trash"></i> Hapus</button>
-        </td>
-      </tr>
-    `;
-    tableBody.insertAdjacentHTML("beforeend", row);
-  });
-}
-
-/**
- * Merender tabel catatan guru.
- * @param {Array<object>} catatanData - Data catatan guru.
- */
-function renderCatatanGuruTable(catatanData) {
-  const tableBody = document.getElementById("catatan-table-body");
-  if (!tableBody) return;
-  tableBody.innerHTML = "";
-  catatanData.forEach((catatan) => {
-    const row = `
-      <tr class="border-b last:border-b-0">
-        <td class="px-4 py-2">${catatan.ID_Catatan}</td>
-        <td class="px-4 py-2">${catatan.NIS}</td>
-        <td class="px-4 py-2">${catatan.Minggu_Ke}</td>
-        <td class="px-4 py-2">${catatan.Catatan}</td>
-        <td class="px-4 py-2">${catatan.Tanggal_Input}</td>
-        <td class="px-4 py-2">
-          <button onclick="editCatatan('${catatan.ID_Catatan}')" class="text-blue-600 hover:text-blue-800 mr-2"><i class="fas fa-edit"></i> Edit</button>
-          <button onclick="deleteCatatan('${catatan.ID_Catatan}')" class="text-red-600 hover:text-red-800"><i class="fas fa-trash"></i> Hapus</button>
-        </td>
-      </tr>
-    `;
-    tableBody.insertAdjacentHTML("beforeend", row);
-  });
-}
-
-/**
- * Merender tabel jadwal pelajaran.
- * @param {Array<object>} jadwalData - Data jadwal pelajaran.
- */
-function renderJadwalPelajaranTable(jadwalData) {
-  const tableBody = document.getElementById("jadwal-table-body");
-  if (!tableBody) return;
-  tableBody.innerHTML = "";
-  jadwalData.forEach((jadwal) => {
-    const row = `
-      <tr class="border-b last:border-b-0">
-        <td class="px-4 py-2">${jadwal.ID_Jadwal}</td>
-        <td class="px-4 py-2">${jadwal.Kelas}</td>
-        <td class="px-4 py-2">${jadwal.Hari}</td>
-        <td class="px-4 py-2">${jadwal.Jam}</td>
-        <td class="px-4 py-2">${jadwal.Mata_Pelajaran}</td>
-        <td class="px-4 py-2">${jadwal.Guru}</td>
-        <td class="px-4 py-2">
-          <button onclick="editJadwal('${jadwal.ID_Jadwal}')" class="text-blue-600 hover:text-blue-800 mr-2"><i class="fas fa-edit"></i> Edit</button>
-          <button onclick="deleteJadwal('${jadwal.ID_Jadwal}')" class="text-red-600 hover:text-red-800"><i class="fas fa-trash"></i> Hapus</button>
-        </td>
-      </tr>
-    `;
-    tableBody.insertAdjacentHTML("beforeend", row);
-  });
-}
-
-/**
- * Merender tabel pengumuman.
- * @param {Array<object>} pengumumanData - Data pengumuman.
- */
-function renderPengumumanTable(pengumumanData) {
-  const tableBody = document.getElementById("pengumuman-table-body");
-  if (!tableBody) return;
-  tableBody.innerHTML = "";
-  pengumumanData.forEach((pengumuman) => {
-    const row = `
-      <tr class="border-b last:border-b-0">
-        <td class="px-4 py-2">${pengumuman.ID_Pengumuman}</td>
-        <td class="px-4 py-2">${pengumuman.Judul}</td>
-        <td class="px-4 py-2">${pengumuman.Isi_Pengumuman.substring(
-          0,
-          50
-        )}...</td>
-        <td class="px-4 py-2">${pengumuman.Tanggal_Pengumuman}</td>
-        <td class="px-4 py-2">${pengumuman.Untuk_Kelas}</td>
-        <td class="px-4 py-2">
-          <button onclick="editPengumuman('${
-            pengumuman.ID_Pengumuman
-          }')" class="text-blue-600 hover:text-blue-800 mr-2"><i class="fas fa-edit"></i> Edit</button>
-          <button onclick="deletePengumuman('${
-            pengumuman.ID_Pengumuman
-          }')" class="text-red-600 hover:text-red-800"><i class="fas fa-trash"></i> Hapus</button>
-        </td>
-      </tr>
-    `;
-    tableBody.insertAdjacentHTML("beforeend", row);
-  });
-}
-
-/**
- * Merender tabel Admin_Users.
- * @param {Array<object>} adminUserData - Data pengguna admin.
- */
-function renderAdminUsersTable(adminUserData) {
-  const tableBody = document.getElementById("admin-users-table-body");
-  if (!tableBody) return;
-  tableBody.innerHTML = "";
-  adminUserData.forEach((admin) => {
-    const row = `
-      <tr class="border-b last:border-b-0">
-        <td class="px-4 py-2">${admin.Email}</td>
-        <td class="px-4 py-2">
-          <button onclick="editAdminUser('${admin.Email}')" class="text-blue-600 hover:text-blue-800 mr-2"><i class="fas fa-edit"></i> Edit</button>
-          <button onclick="deleteAdminUser('${admin.Email}')" class="text-red-600 hover:text-red-800"><i class="fas fa-trash"></i> Hapus</button>
-        </td>
-      </tr>
-    `;
-    tableBody.insertAdjacentHTML("beforeend", row);
-  });
-}
-
-// ===========================================
-// FUNGSI POPULATE DROPDOWN
-// ===========================================
-
-/**
- * Mengisi dropdown siswa di form CRUD.
- */
-function populateSiswaDropdowns() {
-  const siswaNisSelects = document.querySelectorAll(".siswa-nis-select");
-  siswaNisSelects.forEach((select) => {
-    select.innerHTML = '<option value="">Pilih NIS Siswa</option>';
-    if (dataCache.siswa) {
-      dataCache.siswa.forEach((siswa) => {
-        const option = document.createElement("option");
-        option.value = siswa.NIS;
-        option.textContent = `${siswa.NIS} - ${siswa.Nama}`;
-        select.appendChild(option);
-      });
+      try {
+        showLoading();
+        const result = await sendData(sheetName, dataToDelete, "delete"); // sendData now handles cache invalidation
+        if (result.success) {
+          showToast(
+            `${sheetName} dengan ID ${id} berhasil dihapus!`,
+            "success"
+          );
+          await loadAdminTableData(sheetName); // Reload table after deletion
+          if (sheetName === "Siswa" || sheetName === "Tugas") {
+            await loadAdminDropdownData(); // Refresh dropdowns if relevant data is modified
+          }
+        } else {
+          showToast(
+            `Gagal menghapus ${sheetName} dengan ID ${id}: ${result.message}`,
+            "error"
+          );
+        }
+      } catch (error) {
+        console.error("Delete Entry Error:", error);
+        showToast("Terjadi kesalahan saat menghapus data.", "error");
+      } finally {
+        hideLoading();
+      }
     }
-  });
-}
-
-/**
- * Mengisi dropdown tugas di form Nilai.
- */
-function populateTugasDropdowns() {
-  const nilaiTugasSelect = document.getElementById("nilai-id-tugas");
-  if (nilaiTugasSelect) {
-    nilaiTugasSelect.innerHTML = '<option value="">Pilih ID Tugas</option>';
-    if (dataCache.tugas) {
-      dataCache.tugas.forEach((tugas) => {
-        const option = document.createElement("option");
-        option.value = tugas.ID_Tugas;
-        option.textContent = `${tugas.ID_Tugas} - ${tugas.Nama_Tugas}`;
-        nilaiTugasSelect.appendChild(option);
-      });
-    }
-  }
-}
-
-/**
- * Mengisi dropdown kelas.
- */
-function populateKelasDropdowns() {
-  const kelasSelects = document.querySelectorAll(".kelas-select");
-  const uniqueClasses = [
-    ...new Set(dataCache.siswa.map((s) => s.Kelas)),
-  ].sort();
-  kelasSelects.forEach((select) => {
-    select.innerHTML = '<option value="">Pilih Kelas</option>';
-    uniqueClasses.forEach((kelas) => {
-      const option = document.createElement("option");
-      option.value = kelas;
-      option.textContent = kelas;
-      select.appendChild(option);
-    });
-    // Tambahkan opsi "Semua" untuk pengumuman/tugas jika relevan
-    if (
-      select.id === "pengumuman-untuk-kelas" ||
-      select.id === "tugas-untuk-kelas"
-    ) {
-      const allOption = document.createElement("option");
-      allOption.value = "Semua";
-      allOption.textContent = "Semua Kelas";
-      select.prepend(allOption); // Tambahkan di awal
-    }
-  });
-}
-
-/**
- * Mengisi dropdown mata pelajaran.
- */
-function populateMapelDropdowns() {
-  const mapelSelects = document.querySelectorAll(".mapel-select");
-  mapelSelects.forEach((select) => {
-    select.innerHTML = '<option value="">Pilih Mata Pelajaran</option>';
-    HARDCODED_SUBJECTS.forEach((mapel) => {
-      const option = document.createElement("option");
-      option.value = mapel;
-      option.textContent = mapel;
-      select.appendChild(option);
-    });
-  });
-}
-
-// ===========================================
-// FUNGSI PEMBUAT ID OTOMATIS
-// ===========================================
-
-/**
- * Menghasilkan ID unik sederhana.
- * @returns {string} - ID unik.
- */
-function generateUniqueId() {
-  return Date.now().toString(36) + Math.random().toString(36).substring(2, 7);
-}
-
-/**
- * Menghasilkan ID Tugas berdasarkan mata pelajaran dan jumlah tugas yang ada.
- * Format: [SingkatanMapel]-[YYMM]-[Urutan]
- * @param {string} mataPelajaran - Mata pelajaran untuk tugas.
- * @returns {string} - ID Tugas yang dihasilkan.
- */
-function generateTugasId(mataPelajaran) {
-  if (!mataPelajaran) {
-    return "MTK-YYMM-XXX"; // Placeholder
-  }
-  const abbreviation = SUBJECT_ABBREVIATIONS[mataPelajaran] || "OTH"; // Default ke OTH (Other)
-  const date = new Date();
-  const year = date.getFullYear().toString().slice(-2);
-  const month = (date.getMonth() + 1).toString().padStart(2, "0");
-
-  const existingTugasCount = dataCache.tugas.filter((t) =>
-    t.ID_Tugas.startsWith(`${abbreviation}-${year}${month}`)
-  ).length;
-
-  const newSequence = (existingTugasCount + 1).toString().padStart(3, "0");
-  return `${abbreviation}-${year}${month}-${newSequence}`;
-}
-
-/**
- * Memperbarui field ID Tugas.
- */
-function updateTugasIdField() {
-  const tugasIdInput = document.getElementById("tugas-id");
-  const tugasMapelSelect = document.getElementById("tugas-mata-pelajaran");
-  if (tugasIdInput && tugasMapelSelect) {
-    if (tugasIdInput.readOnly) {
-      tugasIdInput.value = generateTugasId(tugasMapelSelect.value);
-    } else {
-      tugasIdInput.value = ""; // Kosongkan jika tidak readonly (untuk edit)
-    }
-  }
-}
-
-/**
- * Memperbarui field ID Nilai.
- */
-function updateNilaiIdField() {
-  const nilaiIdInput = document.getElementById("nilai-id");
-  if (nilaiIdInput) {
-    nilaiIdInput.value = nilaiIdInput.readOnly ? generateUniqueId() : "";
-  }
-}
-
-/**
- * Memperbarui field ID Kehadiran.
- */
-function updateKehadiranIdField() {
-  const kehadiranIdInput = document.getElementById("kehadiran-id");
-  if (kehadiranIdInput) {
-    kehadiranIdInput.value = kehadiranIdInput.readOnly
-      ? generateUniqueId()
-      : "";
-  }
-}
-
-/**
- * Memperbarui field ID Catatan Guru.
- */
-function updateCatatanIdField() {
-  const catatanIdInput = document.getElementById("catatan-id");
-  if (catatanIdInput) {
-    catatanIdInput.value = catatanIdInput.readOnly ? generateUniqueId() : "";
-  }
-}
-
-/**
- * Memperbarui field ID Jadwal.
- */
-function updateJadwalIdField() {
-  const jadwalIdInput = document.getElementById("jadwal-id");
-  if (jadwalIdInput) {
-    jadwalIdInput.value = jadwalIdInput.readOnly ? generateUniqueId() : "";
-  }
-}
-
-/**
- * Memperbarui field ID Pengumuman.
- */
-function updatePengumumanIdField() {
-  const pengumumanIdInput = document.getElementById("pengumuman-id");
-  if (pengumumanIdInput) {
-    pengumumanIdInput.value = pengumumanIdInput.readOnly
-      ? generateUniqueId()
-      : "";
-  }
-}
-
-/**
- * Memperbarui field Email Admin User.
- */
-function updateAdminUserIdField() {
-  const adminEmailInput = document.getElementById("admin-email");
-  if (adminEmailInput) {
-    adminEmailInput.value = adminEmailInput.readOnly ? "" : ""; // Email diisi manual atau untuk edit
-  }
-}
-
-// ===========================================
-// FUNGSI CRUD SISWA
-// ===========================================
-
-/**
- * Mengisi form Siswa untuk penambahan atau pengeditan.
- * @param {object} siswaData - Data siswa untuk diisi (kosong untuk tambah baru).
- * @param {boolean} isEdit - True jika mode edit, false jika mode tambah.
- */
-function fillSiswaForm(siswaData = {}, isEdit = false) {
-  document.getElementById("siswa-nis").value = siswaData.NIS || "";
-  document.getElementById("siswa-nama").value = siswaData.Nama || "";
-  document.getElementById("siswa-kelas").value = siswaData.Kelas || "";
-  document.getElementById("siswa-wali-murid").value =
-    siswaData.Wali_Murid || "";
-
-  const nisInput = document.getElementById("siswa-nis");
-  nisInput.readOnly = isEdit;
-  if (isEdit) {
-    nisInput.classList.add("bg-gray-100", "cursor-not-allowed");
-  } else {
-    nisInput.classList.remove("bg-gray-100", "cursor-not-allowed");
-  }
-}
-
-/**
- * Menambahkan atau memperbarui siswa.
- */
-async function addOrUpdateSiswa() {
-  const nis = document.getElementById("siswa-nis").value;
-  const nama = document.getElementById("siswa-nama").value;
-  const kelas = document.getElementById("siswa-kelas").value;
-  const waliMurid = document.getElementById("siswa-wali-murid").value;
-
-  if (!nis || !nama || !kelas || !waliMurid) {
-    showToast("Semua field siswa harus diisi.", "warning");
-    return;
-  }
-
-  const isEdit = document.getElementById("siswa-nis").readOnly;
-  const action = isEdit ? "update" : "create";
-  const payload = {
-    sheetName: "Siswa",
-    action: action,
-    NIS: nis, // Menggunakan NIS sebagai ID unik untuk update
-    data: {
-      NIS: nis,
-      Nama: nama,
-      Kelas: kelas,
-      Wali_Murid: waliMurid,
-    },
-  };
-
-  const confirmMessage = isEdit
-    ? `Apakah Anda yakin ingin memperbarui data siswa NIS ${nis}?`
-    : `Apakah Anda yakin ingin menambahkan siswa NIS ${nis}?`;
-  const confirmed = await showConfirmationModal(
-    "Konfirmasi Aksi",
-    confirmMessage
   );
-  if (!confirmed) return;
+}
+
+// --- Admin Form Submissions ---
+async function handleAdminFormSubmit(
+  e,
+  sheetName,
+  idKeyName,
+  formModeElement,
+  editIdElement,
+  submitButtonElement
+) {
+  e.preventDefault();
+  showLoading();
 
   try {
-    const result = await sendRequestToGAS(payload);
-    if (result.success) {
-      showToast(result.message, "success");
-      // Muat ulang data untuk memperbarui tabel
-      await loadAdminDashboardData();
-      // Kosongkan form setelah operasi berhasil
-      fillSiswaForm({});
-    } else {
-      showToast(result.message, "error");
+    const formData = new FormData(e.target);
+    const data = Object.fromEntries(formData.entries());
+    let action = formModeElement.value;
+    let idInputElement = e.target.querySelector(`input[name="${idKeyName}"]`);
+
+    let result;
+
+    if (action === "create") {
+      if (
+        idKeyName === "ID_Tugas" &&
+        idInputElement.value === "Dihasilkan Otomatis"
+      ) {
+        showToast(
+          "Silakan pilih Mata Pelajaran untuk menghasilkan ID Tugas.",
+          "error"
+        );
+        hideLoading();
+        return;
+      } else if (
+        idKeyName === "ID_Nilai" &&
+        (!idInputElement.value || idInputElement.value.trim() === "")
+      ) {
+        showToast(
+          "NIS dan ID Tugas harus dipilih untuk menghasilkan ID Nilai.",
+          "error"
+        );
+        hideLoading();
+        return;
+      } else if (
+        idKeyName === "ID_Kehadiran" &&
+        (idInputElement.value === "Dihasilkan Otomatis" ||
+          idInputElement.value.trim() === "")
+      ) {
+        showToast(
+          "Silakan pilih NIS dan Tanggal untuk menghasilkan ID Kehadiran.",
+          "error"
+        );
+        hideLoading();
+        return;
+      } else if (
+        // Added validation for Catatan Guru
+        idKeyName === "ID_Catatan" &&
+        (idInputElement.value === "Dihasilkan Otomatis" ||
+          idInputElement.value.trim() === "")
+      ) {
+        showToast(
+          "Silakan pilih NIS dan Minggu ke- untuk menghasilkan ID Catatan.",
+          "error"
+        );
+        hideLoading();
+        return;
+      } else if (
+        idKeyName === "ID_Pengumuman" &&
+        idInputElement.value === "Dihasilkan Otomatis"
+      ) {
+        showToast("Silakan tunggu ID Pengumuman dihasilkan.", "error");
+        hideLoading();
+        return;
+      }
+
+      if (
+        idKeyName !== "ID_Nilai" &&
+        idKeyName !== "ID_Tugas" &&
+        idKeyName !== "ID_Pengumuman" &&
+        idKeyName !== "ID_Kehadiran" &&
+        idKeyName !== "ID_Catatan" && // Added condition for Catatan Guru
+        idInputElement &&
+        (idInputElement.value === "Dihasilkan Otomatis" ||
+          idInputElement.value.trim() === "")
+      ) {
+        data[idKeyName] = generateUniqueId(
+          idKeyName.split("_")[0].substring(0, 3).toUpperCase()
+        );
+      } else if (idInputElement && idInputElement.value.trim() !== "") {
+        data[idKeyName] = idInputElement.value;
+      }
+
+      result = await sendData(sheetName, data, "create");
+    } else if (action === "edit") {
+      data.originalId = editIdElement.value;
+      result = await sendData(sheetName, data, "update");
     }
-  } catch (error) {
-    console.error("Error add/update siswa:", error);
-    showToast("Gagal melakukan operasi siswa.", "error");
-  }
-}
-
-/**
- * Mengisi form Siswa untuk pengeditan.
- * @param {string} nis - NIS siswa yang akan diedit.
- */
-function editSiswa(nis) {
-  const siswa = dataCache.siswa.find((s) => String(s.NIS) === String(nis));
-  if (siswa) {
-    fillSiswaForm(siswa, true);
-    showToast(`Mengedit data siswa NIS: ${nis}`, "info");
-  } else {
-    showToast("Siswa tidak ditemukan untuk diedit.", "error");
-  }
-}
-
-/**
- * Menghapus data siswa.
- * @param {string} nis - NIS siswa yang akan dihapus.
- */
-async function deleteSiswa(nis) {
-  const confirmed = await showConfirmationModal(
-    "Konfirmasi Hapus",
-    `Apakah Anda yakin ingin menghapus data siswa NIS ${nis}? Ini akan menghapus semua data terkait siswa ini (nilai, kehadiran, catatan).`
-  );
-  if (!confirmed) return;
-
-  try {
-    const result = await sendRequestToGAS({
-      sheetName: "Siswa",
-      action: "delete",
-      NIS: nis, // Menggunakan NIS sebagai ID unik untuk delete
-    });
-
-    if (result.success) {
-      showToast(result.message, "success");
-      await loadAdminDashboardData(); // Muat ulang semua data terkait
-      fillSiswaForm({}); // Kosongkan form
-    } else {
-      showToast(result.message, "error");
-    }
-  } catch (error) {
-    console.error("Error delete siswa:", error);
-    showToast("Gagal menghapus siswa.", "error");
-  }
-}
-
-// ===========================================
-// FUNGSI CRUD TUGAS
-// ===========================================
-
-/**
- * Mengisi form Tugas untuk penambahan atau pengeditan.
- * @param {object} tugasData - Data tugas untuk diisi (kosong untuk tambah baru).
- * @param {boolean} isEdit - True jika mode edit, false jika mode tambah.
- */
-function fillTugasForm(tugasData = {}, isEdit = false) {
-  document.getElementById("tugas-id").value =
-    tugasData.ID_Tugas || (isEdit ? "" : "Dihasilkan Otomatis");
-  document.getElementById("tugas-id").readOnly = !isEdit; // ID tugas readonly jika bukan edit
-  if (!isEdit) {
-    document
-      .getElementById("tugas-id")
-      .classList.add("bg-gray-100", "cursor-not-allowed");
-  } else {
-    document
-      .getElementById("tugas-id")
-      .classList.remove("bg-gray-100", "cursor-not-allowed");
-  }
-  document.getElementById("tugas-nama").value = tugasData.Nama_Tugas || "";
-  document.getElementById("tugas-mata-pelajaran").value =
-    tugasData.Mata_Pelajaran || "";
-  document.getElementById("tugas-batas-waktu").value =
-    tugasData.Batas_Waktu || "";
-  document.getElementById("tugas-untuk-kelas").value =
-    tugasData.Untuk_Kelas || "";
-
-  updateTugasIdField(); // Perbarui ID saat mata pelajaran berubah jika dalam mode tambah
-}
-
-/**
- * Menambahkan atau memperbarui tugas.
- */
-async function addOrUpdateTugas() {
-  let idTugas = document.getElementById("tugas-id").value;
-  const namaTugas = document.getElementById("tugas-nama").value;
-  const mataPelajaran = document.getElementById("tugas-mata-pelajaran").value;
-  const batasWaktu = document.getElementById("tugas-batas-waktu").value;
-  const untukKelas = document.getElementById("tugas-untuk-kelas").value;
-
-  if (!namaTugas || !mataPelajaran || !batasWaktu || !untukKelas) {
-    showToast("Semua field tugas harus diisi.", "warning");
-    return;
-  }
-
-  const isEdit = document.getElementById("tugas-id").readOnly === false; // true if editable (edit mode)
-  const action = isEdit ? "update" : "create";
-
-  if (!isEdit) {
-    // Generate ID for new task
-    idTugas = generateTugasId(mataPelajaran);
-  }
-
-  const payload = {
-    sheetName: "Tugas",
-    action: action,
-    ID_Tugas: idTugas, // Menggunakan ID_Tugas sebagai ID unik untuk update
-    data: {
-      ID_Tugas: idTugas,
-      Nama_Tugas: namaTugas,
-      Mata_Pelajaran: mataPelajaran,
-      Batas_Waktu: batasWaktu,
-      Untuk_Kelas: untukKelas,
-    },
-  };
-
-  const confirmMessage = isEdit
-    ? `Apakah Anda yakin ingin memperbarui tugas ID ${idTugas}?`
-    : `Apakah Anda yakin ingin menambahkan tugas ID ${idTugas}?`;
-  const confirmed = await showConfirmationModal(
-    "Konfirmasi Aksi",
-    confirmMessage
-  );
-  if (!confirmed) return;
-
-  try {
-    const result = await sendRequestToGAS(payload);
-    if (result.success) {
-      showToast(result.message, "success");
-      await loadAdminDashboardData();
-      fillTugasForm({});
-    } else {
-      showToast(result.message, "error");
-    }
-  } catch (error) {
-    console.error("Error add/update tugas:", error);
-    showToast("Gagal melakukan operasi tugas.", "error");
-  }
-}
-
-/**
- * Mengisi form Tugas untuk pengeditan.
- * @param {string} idTugas - ID tugas yang akan diedit.
- */
-function editTugas(idTugas) {
-  const tugas = dataCache.tugas.find(
-    (t) => String(t.ID_Tugas) === String(idTugas)
-  );
-  if (tugas) {
-    fillTugasForm(tugas, true);
-    showToast(`Mengedit data tugas ID: ${idTugas}`, "info");
-  } else {
-    showToast("Tugas tidak ditemukan untuk diedit.", "error");
-  }
-}
-
-/**
- * Menghapus data tugas.
- * @param {string} idTugas - ID tugas yang akan dihapus.
- */
-async function deleteTugas(idTugas) {
-  const confirmed = await showConfirmationModal(
-    "Konfirmasi Hapus",
-    `Apakah Anda yakin ingin menghapus tugas ID ${idTugas}? Ini juga akan menghapus nilai terkait tugas ini.`
-  );
-  if (!confirmed) return;
-
-  try {
-    const result = await sendRequestToGAS({
-      sheetName: "Tugas",
-      action: "delete",
-      ID_Tugas: idTugas, // Menggunakan ID_Tugas sebagai ID unik untuk delete
-    });
 
     if (result.success) {
-      showToast(result.message, "success");
-      await loadAdminDashboardData();
-      fillTugasForm({});
+      showToast(
+        `${sheetName} berhasil ${
+          action === "create" ? "disimpan" : "diperbarui"
+        }!`,
+        "success"
+      );
+      e.target.reset();
+
+      resetAdminForm(
+        e.target,
+        formModeElement,
+        idKeyName,
+        submitButtonElement,
+        `Simpan ${sheetName.replace("_", " ")}`,
+        idInputElement
+      );
+
+      await loadAdminTableData(sheetName); // Reload table after submission
+      await loadAdminDropdownData(); // Reload dropdowns just in case (e.g., new tasks added or subjects)
+      if (idKeyName === "ID_Nilai") {
+        configureNilaiFormBasedOnSelection(); // Re-trigger for Nilai to reset its field state
+      } else if (idKeyName === "ID_Tugas") {
+        updateTugasIdField(); // Re-trigger for Tugas to reset its field state
+      } else if (idKeyName === "ID_Kehadiran") {
+        updateKehadiranIdField(); // Re-trigger for Kehadiran to reset its field state
+      } else if (idKeyName === "ID_Catatan") {
+        // Added
+        updateCatatanIdField(); // Re-trigger for Catatan to reset its field state
+      } else if (idKeyName === "ID_Pengumuman") {
+        updatePengumumanIdField();
+      }
     } else {
-      showToast(result.message, "error");
+      showToast(`Gagal ${action} ${sheetName}: ${result.message}`, "error");
     }
   } catch (error) {
-    console.error("Error delete tugas:", error);
-    showToast("Gagal menghapus tugas.", "error");
+    console.error("Admin Form Submit Error:", error);
+    showToast("Terjadi kesalahan saat submit data.", "error");
+  } finally {
+    hideLoading();
   }
 }
 
-// ===========================================
-// FUNGSI CRUD NILAI
-// ===========================================
-
-/**
- * Mengisi form Nilai untuk penambahan atau pengeditan.
- * @param {object} nilaiData - Data nilai untuk diisi (kosong untuk tambah baru).
- * @param {boolean} isEdit - True jika mode edit, false jika mode tambah.
- */
-function fillNilaiForm(nilaiData = {}, isEdit = false) {
-  document.getElementById("nilai-id").value =
-    nilaiData.ID_Nilai || (isEdit ? "" : "Dihasilkan Otomatis");
-  document.getElementById("nilai-id").readOnly = !isEdit;
-  if (!isEdit) {
-    document
-      .getElementById("nilai-id")
-      .classList.add("bg-gray-100", "cursor-not-allowed");
-  } else {
-    document
-      .getElementById("nilai-id")
-      .classList.remove("bg-gray-100", "cursor-not-allowed");
-  }
-  document.getElementById("nilai-nis").value = nilaiData.NIS || "";
-  document.getElementById("nilai-id-tugas").value = nilaiData.ID_Tugas || "";
-  document.getElementById("nilai-nilai").value = nilaiData.Nilai || "";
-  document.getElementById("nilai-status-pengerjaan").value =
-    nilaiData.Status_Pengerjaan || "";
-  document.getElementById("nilai-tanggal-input").value =
-    nilaiData.Tanggal_Input || new Date().toISOString().split("T")[0];
-
-  updateNilaiIdField();
-}
-
-/**
- * Menambahkan atau memperbarui nilai.
- */
-async function addOrUpdateNilai() {
-  let idNilai = document.getElementById("nilai-id").value;
-  const nis = document.getElementById("nilai-nis").value;
-  const idTugas = document.getElementById("nilai-id-tugas").value;
-  const nilai = document.getElementById("nilai-nilai").value;
-  const statusPengerjaan = document.getElementById(
-    "nilai-status-pengerjaan"
-  ).value;
-  const tanggalInput = document.getElementById("nilai-tanggal-input").value;
-
-  if (!nis || !idTugas || !nilai || !statusPengerjaan || !tanggalInput) {
-    showToast("Semua field nilai harus diisi.", "warning");
-    return;
-  }
-
-  const isEdit = document.getElementById("nilai-id").readOnly === false;
-  const action = isEdit ? "update" : "create";
-
-  if (!isEdit) {
-    idNilai = generateUniqueId();
-  }
-
-  const payload = {
-    sheetName: "Nilai",
-    action: action,
-    ID_Nilai: idNilai,
-    data: {
-      ID_Nilai: idNilai,
-      NIS: nis,
-      ID_Tugas: idTugas,
-      Nilai: nilai,
-      Status_Pengerjaan: statusPengerjaan,
-      Tanggal_Input: tanggalInput,
-    },
-  };
-
-  const confirmMessage = isEdit
-    ? `Apakah Anda yakin ingin memperbarui nilai ID ${idNilai}?`
-    : `Apakah Anda yakin ingin menambahkan nilai baru?`;
-  const confirmed = await showConfirmationModal(
-    "Konfirmasi Aksi",
-    confirmMessage
+document.getElementById("form-input-tugas").addEventListener("submit", (e) => {
+  handleAdminFormSubmit(
+    e,
+    "Tugas",
+    "ID_Tugas",
+    tugasFormMode,
+    tugasEditId,
+    submitTugasBtn
   );
-  if (!confirmed) return;
+});
 
-  try {
-    const result = await sendRequestToGAS(payload);
-    if (result.success) {
-      showToast(result.message, "success");
-      await loadAdminDashboardData();
-      fillNilaiForm({});
-    } else {
-      showToast(result.message, "error");
-    }
-  } catch (error) {
-    console.error("Error add/update nilai:", error);
-    showToast("Gagal melakukan operasi nilai.", "error");
-  }
-}
-
-/**
- * Mengisi form Nilai untuk pengeditan.
- * @param {string} idNilai - ID nilai yang akan diedit.
- */
-function editNilai(idNilai) {
-  const nilai = dataCache.nilai.find(
-    (n) => String(n.ID_Nilai) === String(idNilai)
+document.getElementById("form-input-nilai").addEventListener("submit", (e) => {
+  handleAdminFormSubmit(
+    e,
+    "Nilai",
+    "ID_Nilai",
+    nilaiFormMode,
+    nilaiEditId,
+    submitNilaiBtn
   );
-  if (nilai) {
-    fillNilaiForm(nilai, true);
-    showToast(`Mengedit data nilai ID: ${idNilai}`, "info");
-  } else {
-    showToast("Nilai tidak ditemukan untuk diedit.", "error");
-  }
-}
-
-/**
- * Menghapus data nilai.
- * @param {string} idNilai - ID nilai yang akan dihapus.
- */
-async function deleteNilai(idNilai) {
-  const confirmed = await showConfirmationModal(
-    "Konfirmasi Hapus",
-    `Apakah Anda yakin ingin menghapus nilai ID ${idNilai}?`
-  );
-  if (!confirmed) return;
-
-  try {
-    const result = await sendRequestToGAS({
-      sheetName: "Nilai",
-      action: "delete",
-      ID_Nilai: idNilai,
-    });
-
-    if (result.success) {
-      showToast(result.message, "success");
-      await loadAdminDashboardData();
-      fillNilaiForm({});
-    } else {
-      showToast(result.message, "error");
-    }
-  } catch (error) {
-    console.error("Error delete nilai:", error);
-    showToast("Gagal menghapus nilai.", "error");
-  }
-}
-
-// ===========================================
-// FUNGSI CRUD KEHADIRAN
-// ===========================================
-
-/**
- * Mengisi form Kehadiran untuk penambahan atau pengeditan.
- * @param {object} kehadiranData - Data kehadiran untuk diisi (kosong untuk tambah baru).
- * @param {boolean} isEdit - True jika mode edit, false jika mode tambah.
- */
-function fillKehadiranForm(kehadiranData = {}, isEdit = false) {
-  document.getElementById("kehadiran-id").value =
-    kehadiranData.ID_Kehadiran || (isEdit ? "" : "Dihasilkan Otomatis");
-  document.getElementById("kehadiran-id").readOnly = !isEdit;
-  if (!isEdit) {
-    document
-      .getElementById("kehadiran-id")
-      .classList.add("bg-gray-100", "cursor-not-allowed");
-  } else {
-    document
-      .getElementById("kehadiran-id")
-      .classList.remove("bg-gray-100", "cursor-not-allowed");
-  }
-  document.getElementById("kehadiran-nis").value = kehadiranData.NIS || "";
-  document.getElementById("kehadiran-tanggal").value =
-    kehadiranData.Tanggal || new Date().toISOString().split("T")[0];
-  document.getElementById("kehadiran-status").value =
-    kehadiranData.Status || "";
-
-  updateKehadiranIdField();
-}
-
-/**
- * Menambahkan atau memperbarui kehadiran.
- */
-async function addOrUpdateKehadiran() {
-  let idKehadiran = document.getElementById("kehadiran-id").value;
-  const nis = document.getElementById("kehadiran-nis").value;
-  const tanggal = document.getElementById("kehadiran-tanggal").value;
-  const status = document.getElementById("kehadiran-status").value;
-
-  if (!nis || !tanggal || !status) {
-    showToast("Semua field kehadiran harus diisi.", "warning");
-    return;
-  }
-
-  const isEdit = document.getElementById("kehadiran-id").readOnly === false;
-  const action = isEdit ? "update" : "create";
-
-  if (!isEdit) {
-    idKehadiran = generateUniqueId();
-  }
-
-  const payload = {
-    sheetName: "Kehadiran",
-    action: action,
-    ID_Kehadiran: idKehadiran,
-    data: {
-      ID_Kehadiran: idKehadiran,
-      NIS: nis,
-      Tanggal: tanggal,
-      Status: status,
-    },
-  };
-
-  const confirmMessage = isEdit
-    ? `Apakah Anda yakin ingin memperbarui kehadiran ID ${idKehadiran}?`
-    : `Apakah Anda yakin ingin menambahkan data kehadiran baru?`;
-  const confirmed = await showConfirmationModal(
-    "Konfirmasi Aksi",
-    confirmMessage
-  );
-  if (!confirmed) return;
-
-  try {
-    const result = await sendRequestToGAS(payload);
-    if (result.success) {
-      showToast(result.message, "success");
-      await loadAdminDashboardData();
-      fillKehadiranForm({});
-    } else {
-      showToast(result.message, "error");
-    }
-  } catch (error) {
-    console.error("Error add/update kehadiran:", error);
-    showToast("Gagal melakukan operasi kehadiran.", "error");
-  }
-}
-
-/**
- * Mengisi form Kehadiran untuk pengeditan.
- * @param {string} idKehadiran - ID kehadiran yang akan diedit.
- */
-function editKehadiran(idKehadiran) {
-  const kehadiran = dataCache.kehadiran.find(
-    (k) => String(k.ID_Kehadiran) === String(idKehadiran)
-  );
-  if (kehadiran) {
-    fillKehadiranForm(kehadiran, true);
-    showToast(`Mengedit data kehadiran ID: ${idKehadiran}`, "info");
-  } else {
-    showToast("Kehadiran tidak ditemukan untuk diedit.", "error");
-  }
-}
-
-/**
- * Menghapus data kehadiran.
- * @param {string} idKehadiran - ID kehadiran yang akan dihapus.
- */
-async function deleteKehadiran(idKehadiran) {
-  const confirmed = await showConfirmationModal(
-    "Konfirmasi Hapus",
-    `Apakah Anda yakin ingin menghapus kehadiran ID ${idKehadiran}?`
-  );
-  if (!confirmed) return;
-
-  try {
-    const result = await sendRequestToGAS({
-      sheetName: "Kehadiran",
-      action: "delete",
-      ID_Kehadiran: idKehadiran,
-    });
-
-    if (result.success) {
-      showToast(result.message, "success");
-      await loadAdminDashboardData();
-      fillKehadiranForm({});
-    } else {
-      showToast(result.message, "error");
-    }
-  } catch (error) {
-    console.error("Error delete kehadiran:", error);
-    showToast("Gagal menghapus kehadiran.", "error");
-  }
-}
-
-// ===========================================
-// FUNGSI CRUD CATATAN GURU
-// ===========================================
-
-/**
- * Mengisi form Catatan Guru untuk penambahan atau pengeditan.
- * @param {object} catatanData - Data catatan guru untuk diisi (kosong untuk tambah baru).
- * @param {boolean} isEdit - True jika mode edit, false jika mode tambah.
- */
-function fillCatatanGuruForm(catatanData = {}, isEdit = false) {
-  document.getElementById("catatan-id").value =
-    catatanData.ID_Catatan || (isEdit ? "" : "Dihasilkan Otomatis");
-  document.getElementById("catatan-id").readOnly = !isEdit;
-  if (!isEdit) {
-    document
-      .getElementById("catatan-id")
-      .classList.add("bg-gray-100", "cursor-not-allowed");
-  } else {
-    document
-      .getElementById("catatan-id")
-      .classList.remove("bg-gray-100", "cursor-not-allowed");
-  }
-  document.getElementById("catatan-nis").value = catatanData.NIS || "";
-  document.getElementById("catatan-minggu-ke").value =
-    catatanData.Minggu_Ke || "";
-  document.getElementById("catatan-catatan").value = catatanData.Catatan || "";
-  document.getElementById("catatan-tanggal-input").value =
-    catatanData.Tanggal_Input || new Date().toISOString().split("T")[0];
-
-  updateCatatanIdField();
-}
-
-/**
- * Menambahkan atau memperbarui catatan guru.
- */
-async function addOrUpdateCatatan() {
-  let idCatatan = document.getElementById("catatan-id").value;
-  const nis = document.getElementById("catatan-nis").value;
-  const mingguKe = document.getElementById("catatan-minggu-ke").value;
-  const catatan = document.getElementById("catatan-catatan").value;
-  const tanggalInput = document.getElementById("catatan-tanggal-input").value;
-
-  if (!nis || !mingguKe || !catatan || !tanggalInput) {
-    showToast("Semua field catatan guru harus diisi.", "warning");
-    return;
-  }
-
-  const isEdit = document.getElementById("catatan-id").readOnly === false;
-  const action = isEdit ? "update" : "create";
-
-  if (!isEdit) {
-    idCatatan = generateUniqueId();
-  }
-
-  const payload = {
-    sheetName: "Catatan_Guru",
-    action: action,
-    ID_Catatan: idCatatan,
-    data: {
-      ID_Catatan: idCatatan,
-      NIS: nis,
-      Minggu_Ke: mingguKe,
-      Catatan: catatan,
-      Tanggal_Input: tanggalInput,
-    },
-  };
-
-  const confirmMessage = isEdit
-    ? `Apakah Anda yakin ingin memperbarui catatan ID ${idCatatan}?`
-    : `Apakah Anda yakin ingin menambahkan catatan baru?`;
-  const confirmed = await showConfirmationModal(
-    "Konfirmasi Aksi",
-    confirmMessage
-  );
-  if (!confirmed) return;
-
-  try {
-    const result = await sendRequestToGAS(payload);
-    if (result.success) {
-      showToast(result.message, "success");
-      await loadAdminDashboardData();
-      fillCatatanGuruForm({});
-    } else {
-      showToast(result.message, "error");
-    }
-  } catch (error) {
-    console.error("Error add/update catatan guru:", error);
-    showToast("Gagal melakukan operasi catatan guru.", "error");
-  }
-}
-
-/**
- * Mengisi form Catatan Guru untuk pengeditan.
- * @param {string} idCatatan - ID catatan yang akan diedit.
- */
-function editCatatan(idCatatan) {
-  const catatan = dataCache.catatan_guru.find(
-    (c) => String(c.ID_Catatan) === String(idCatatan)
-  );
-  if (catatan) {
-    fillCatatanGuruForm(catatan, true);
-    showToast(`Mengedit data catatan guru ID: ${idCatatan}`, "info");
-  } else {
-    showToast("Catatan guru tidak ditemukan untuk diedit.", "error");
-  }
-}
-
-/**
- * Menghapus data catatan guru.
- * @param {string} idCatatan - ID catatan yang akan dihapus.
- */
-async function deleteCatatan(idCatatan) {
-  const confirmed = await showConfirmationModal(
-    "Konfirmasi Hapus",
-    `Apakah Anda yakin ingin menghapus catatan guru ID ${idCatatan}?`
-  );
-  if (!confirmed) return;
-
-  try {
-    const result = await sendRequestToGAS({
-      sheetName: "Catatan_Guru",
-      action: "delete",
-      ID_Catatan: idCatatan,
-    });
-
-    if (result.success) {
-      showToast(result.message, "success");
-      await loadAdminDashboardData();
-      fillCatatanGuruForm({});
-    } else {
-      showToast(result.message, "error");
-    }
-  } catch (error) {
-    console.error("Error delete catatan guru:", error);
-    showToast("Gagal menghapus catatan guru.", "error");
-  }
-}
-
-// ===========================================
-// FUNGSI CRUD JADWAL PELAJARAN
-// ===========================================
-
-/**
- * Mengisi form Jadwal Pelajaran untuk penambahan atau pengeditan.
- * @param {object} jadwalData - Data jadwal pelajaran untuk diisi (kosong untuk tambah baru).
- * @param {boolean} isEdit - True jika mode edit, false jika mode tambah.
- */
-function fillJadwalPelajaranForm(jadwalData = {}, isEdit = false) {
-  document.getElementById("jadwal-id").value =
-    jadwalData.ID_Jadwal || (isEdit ? "" : "Dihasilkan Otomatis");
-  document.getElementById("jadwal-id").readOnly = !isEdit;
-  if (!isEdit) {
-    document
-      .getElementById("jadwal-id")
-      .classList.add("bg-gray-100", "cursor-not-allowed");
-  } else {
-    document
-      .getElementById("jadwal-id")
-      .classList.remove("bg-gray-100", "cursor-not-allowed");
-  }
-  document.getElementById("jadwal-kelas").value = jadwalData.Kelas || "";
-  document.getElementById("jadwal-hari").value = jadwalData.Hari || "";
-  document.getElementById("jadwal-jam").value = jadwalData.Jam || "";
-  document.getElementById("jadwal-mata-pelajaran").value =
-    jadwalData.Mata_Pelajaran || "";
-  document.getElementById("jadwal-guru").value = jadwalData.Guru || "";
-
-  updateJadwalIdField();
-}
-
-/**
- * Menambahkan atau memperbarui jadwal pelajaran.
- */
-async function addOrUpdateJadwal() {
-  let idJadwal = document.getElementById("jadwal-id").value;
-  const kelas = document.getElementById("jadwal-kelas").value;
-  const hari = document.getElementById("jadwal-hari").value;
-  const jam = document.getElementById("jadwal-jam").value;
-  const mataPelajaran = document.getElementById("jadwal-mata-pelajaran").value;
-  const guru = document.getElementById("jadwal-guru").value;
-
-  if (!kelas || !hari || !jam || !mataPelajaran || !guru) {
-    showToast("Semua field jadwal pelajaran harus diisi.", "warning");
-    return;
-  }
-
-  const isEdit = document.getElementById("jadwal-id").readOnly === false;
-  const action = isEdit ? "update" : "create";
-
-  if (!isEdit) {
-    idJadwal = generateUniqueId();
-  }
-
-  const payload = {
-    sheetName: "Jadwal_Pelajaran",
-    action: action,
-    ID_Jadwal: idJadwal,
-    data: {
-      ID_Jadwal: idJadwal,
-      Kelas: kelas,
-      Hari: hari,
-      Jam: jam,
-      Mata_Pelajaran: mataPelajaran,
-      Guru: guru,
-    },
-  };
-
-  const confirmMessage = isEdit
-    ? `Apakah Anda yakin ingin memperbarui jadwal ID ${idJadwal}?`
-    : `Apakah Anda yakin ingin menambahkan jadwal baru?`;
-  const confirmed = await showConfirmationModal(
-    "Konfirmasi Aksi",
-    confirmMessage
-  );
-  if (!confirmed) return;
-
-  try {
-    const result = await sendRequestToGAS(payload);
-    if (result.success) {
-      showToast(result.message, "success");
-      await loadAdminDashboardData();
-      fillJadwalPelajaranForm({});
-    } else {
-      showToast(result.message, "error");
-    }
-  } catch (error) {
-    console.error("Error add/update jadwal pelajaran:", error);
-    showToast("Gagal melakukan operasi jadwal pelajaran.", "error");
-  }
-}
-
-/**
- * Mengisi form Jadwal Pelajaran untuk pengeditan.
- * @param {string} idJadwal - ID jadwal yang akan diedit.
- */
-function editJadwal(idJadwal) {
-  const jadwal = dataCache.jadwal_pelajaran.find(
-    (j) => String(j.ID_Jadwal) === String(idJadwal)
-  );
-  if (jadwal) {
-    fillJadwalPelajaranForm(jadwal, true);
-    showToast(`Mengedit data jadwal pelajaran ID: ${idJadwal}`, "info");
-  } else {
-    showToast("Jadwal pelajaran tidak ditemukan untuk diedit.", "error");
-  }
-}
-
-/**
- * Menghapus data jadwal pelajaran.
- * @param {string} idJadwal - ID jadwal yang akan dihapus.
- */
-async function deleteJadwal(idJadwal) {
-  const confirmed = await showConfirmationModal(
-    "Konfirmasi Hapus",
-    `Apakah Anda yakin ingin menghapus jadwal pelajaran ID ${idJadwal}?`
-  );
-  if (!confirmed) return;
-
-  try {
-    const result = await sendRequestToGAS({
-      sheetName: "Jadwal_Pelajaran",
-      action: "delete",
-      ID_Jadwal: idJadwal,
-    });
-
-    if (result.success) {
-      showToast(result.message, "success");
-      await loadAdminDashboardData();
-      fillJadwalPelajaranForm({});
-    } else {
-      showToast(result.message, "error");
-    }
-  } catch (error) {
-    console.error("Error delete jadwal pelajaran:", error);
-    showToast("Gagal menghapus jadwal pelajaran.", "error");
-  }
-}
-
-// ===========================================
-// FUNGSI CRUD PENGUMUMAN
-// ===========================================
-
-/**
- * Mengisi form Pengumuman untuk penambahan atau pengeditan.
- * @param {object} pengumumanData - Data pengumuman untuk diisi (kosong untuk tambah baru).
- * @param {boolean} isEdit - True jika mode edit, false jika mode tambah.
- */
-function fillPengumumanForm(pengumumanData = {}, isEdit = false) {
-  document.getElementById("pengumuman-id").value =
-    pengumumanData.ID_Pengumuman || (isEdit ? "" : "Dihasilkan Otomatis");
-  document.getElementById("pengumuman-id").readOnly = !isEdit;
-  if (!isEdit) {
-    document
-      .getElementById("pengumuman-id")
-      .classList.add("bg-gray-100", "cursor-not-allowed");
-  } else {
-    document
-      .getElementById("pengumuman-id")
-      .classList.remove("bg-gray-100", "cursor-not-allowed");
-  }
-  document.getElementById("pengumuman-judul").value =
-    pengumumanData.Judul || "";
-  document.getElementById("pengumuman-isi").value =
-    pengumumanData.Isi_Pengumuman || "";
-  document.getElementById("pengumuman-tanggal").value =
-    pengumumanData.Tanggal_Pengumuman || new Date().toISOString().split("T")[0];
-  document.getElementById("pengumuman-untuk-kelas").value =
-    pengumumanData.Untuk_Kelas || "";
-
-  updatePengumumanIdField();
-}
-
-/**
- * Menambahkan atau memperbarui pengumuman.
- */
-async function addOrUpdatePengumuman() {
-  let idPengumuman = document.getElementById("pengumuman-id").value;
-  const judul = document.getElementById("pengumuman-judul").value;
-  const isi = document.getElementById("pengumuman-isi").value;
-  const tanggal = document.getElementById("pengumuman-tanggal").value;
-  const untukKelas = document.getElementById("pengumuman-untuk-kelas").value;
-
-  if (!judul || !isi || !tanggal || !untukKelas) {
-    showToast("Semua field pengumuman harus diisi.", "warning");
-    return;
-  }
-
-  const isEdit = document.getElementById("pengumuman-id").readOnly === false;
-  const action = isEdit ? "update" : "create";
-
-  if (!isEdit) {
-    idPengumuman = generateUniqueId();
-  }
-
-  const payload = {
-    sheetName: "Pengumuman",
-    action: action,
-    ID_Pengumuman: idPengumuman,
-    data: {
-      ID_Pengumuman: idPengumuman,
-      Judul: judul,
-      Isi_Pengumuman: isi,
-      Tanggal_Pengumuman: tanggal,
-      Untuk_Kelas: untukKelas,
-    },
-  };
-
-  const confirmMessage = isEdit
-    ? `Apakah Anda yakin ingin memperbarui pengumuman ID ${idPengumuman}?`
-    : `Apakah Anda yakin ingin menambahkan pengumuman baru?`;
-  const confirmed = await showConfirmationModal(
-    "Konfirmasi Aksi",
-    confirmMessage
-  );
-  if (!confirmed) return;
-
-  try {
-    const result = await sendRequestToGAS(payload);
-    if (result.success) {
-      showToast(result.message, "success");
-      await loadAdminDashboardData();
-      fillPengumumanForm({});
-    } else {
-      showToast(result.message, "error");
-    }
-  } catch (error) {
-    console.error("Error add/update pengumuman:", error);
-    showToast("Gagal melakukan operasi pengumuman.", "error");
-  }
-}
-
-/**
- * Mengisi form Pengumuman untuk pengeditan.
- * @param {string} idPengumuman - ID pengumuman yang akan diedit.
- */
-function editPengumuman(idPengumuman) {
-  const pengumuman = dataCache.pengumuman.find(
-    (p) => String(p.ID_Pengumuman) === String(idPengumuman)
-  );
-  if (pengumuman) {
-    fillPengumumanForm(pengumuman, true);
-    showToast(`Mengedit data pengumuman ID: ${idPengumuman}`, "info");
-  } else {
-    showToast("Pengumuman tidak ditemukan untuk diedit.", "error");
-  }
-}
-
-/**
- * Menghapus data pengumuman.
- * @param {string} idPengumuman - ID pengumuman yang akan dihapus.
- */
-async function deletePengumuman(idPengumuman) {
-  const confirmed = await showConfirmationModal(
-    "Konfirmasi Hapus",
-    `Apakah Anda yakin ingin menghapus pengumuman ID ${idPengumuman}?`
-  );
-  if (!confirmed) return;
-
-  try {
-    const result = await sendRequestToGAS({
-      sheetName: "Pengumuman",
-      action: "delete",
-      ID_Pengumuman: idPengumuman,
-    });
-
-    if (result.success) {
-      showToast(result.message, "success");
-      await loadAdminDashboardData();
-      fillPengumumanForm({});
-    } else {
-      showToast(result.message, "error");
-    }
-  } catch (error) {
-    console.error("Error delete pengumuman:", error);
-    showToast("Gagal menghapus pengumuman.", "error");
-  }
-}
-
-// ===========================================
-// FUNGSI CRUD ADMIN USERS
-// ===========================================
-
-/**
- * Mengisi form Admin User untuk penambahan atau pengeditan.
- * @param {object} adminUserData - Data admin user untuk diisi (kosong untuk tambah baru).
- * @param {boolean} isEdit - True jika mode edit, false jika mode tambah.
- */
-function fillAdminUserForm(adminUserData = {}, isEdit = false) {
-  document.getElementById("admin-email").value = adminUserData.Email || "";
-
-  const emailInput = document.getElementById("admin-email");
-  emailInput.readOnly = isEdit;
-  if (isEdit) {
-    emailInput.classList.add("bg-gray-100", "cursor-not-allowed");
-  } else {
-    emailInput.classList.remove("bg-gray-100", "cursor-not-allowed");
-  }
-}
-
-/**
- * Menambahkan atau memperbarui admin user.
- */
-async function addOrUpdateAdminUser() {
-  const email = document.getElementById("admin-email").value;
-
-  if (!email) {
-    showToast("Email admin harus diisi.", "warning");
-    return;
-  }
-
-  const isEdit = document.getElementById("admin-email").readOnly;
-  const action = isEdit ? "update" : "create";
-  const payload = {
-    sheetName: "Admin_Users",
-    action: action,
-    Email: email, // Menggunakan Email sebagai ID unik untuk update
-    data: {
-      Email: email,
-    },
-  };
-
-  const confirmMessage = isEdit
-    ? `Apakah Anda yakin ingin memperbarui email admin ${email}?`
-    : `Apakah Anda yakin ingin menambahkan email admin ${email}?`;
-  const confirmed = await showConfirmationModal(
-    "Konfirmasi Aksi",
-    confirmMessage
-  );
-  if (!confirmed) return;
-
-  try {
-    const result = await sendRequestToGAS(payload);
-    if (result.success) {
-      showToast(result.message, "success");
-      await loadAdminDashboardData();
-      fillAdminUserForm({});
-    } else {
-      showToast(result.message, "error");
-    }
-  } catch (error) {
-    console.error("Error add/update admin user:", error);
-    showToast("Gagal melakukan operasi admin user.", "error");
-  }
-}
-
-/**
- * Mengisi form Admin User untuk pengeditan.
- * @param {string} email - Email admin user yang akan diedit.
- */
-function editAdminUser(email) {
-  const adminUser = dataCache.admin_users.find(
-    (a) => String(a.Email) === String(email)
-  );
-  if (adminUser) {
-    fillAdminUserForm(adminUser, true);
-    showToast(`Mengedit email admin: ${email}`, "info");
-  } else {
-    showToast("Pengguna admin tidak ditemukan untuk diedit.", "error");
-  }
-}
-
-/**
- * Menghapus data admin user.
- * @param {string} email - Email admin user yang akan dihapus.
- */
-async function deleteAdminUser(email) {
-  const confirmed = await showConfirmationModal(
-    "Konfirmasi Hapus",
-    `Apakah Anda yakin ingin menghapus email admin ${email}?`
-  );
-  if (!confirmed) return;
-
-  try {
-    const result = await sendRequestToGAS({
-      sheetName: "Admin_Users",
-      action: "delete",
-      Email: email,
-    });
-
-    if (result.success) {
-      showToast(result.message, "success");
-      await loadAdminDashboardData();
-      fillAdminUserForm({});
-    } else {
-      showToast(result.message, "error");
-    }
-  } catch (error) {
-    console.error("Error delete admin user:", error);
-    showToast("Gagal menghapus admin user.", "error");
-  }
-}
-
-// ===========================================
-// LISTENERS DAN INISIALISASI
-// ===========================================
-
-document.addEventListener("DOMContentLoaded", async () => {
-  // Jika script ini dijalankan, itu berarti pengguna telah berhasil diautentikasi dan diotorisasi oleh doGet()
-  // di Google Apps Script. Oleh karena itu, kita langsung memuat dashboard.
-
-  // Inisialisasi event listener untuk tombol tab admin
-  document.querySelectorAll(".tab-button-admin").forEach((button) => {
-    button.addEventListener("click", () => {
-      switchAdminTab(button.id, document.querySelectorAll(".tab-button-admin"));
-    });
+});
+
+document
+  .getElementById("form-input-kehadiran")
+  .addEventListener("submit", (e) => {
+    handleAdminFormSubmit(
+      e,
+      "Kehadiran",
+      "ID_Kehadiran",
+      kehadiranFormMode,
+      kehadiranEditId,
+      submitKehadiranBtn
+    );
   });
 
-  // Event listener untuk tombol refresh data
-  const refreshButton = document.getElementById("refresh-admin-data");
-  if (refreshButton) {
-    refreshButton.addEventListener("click", loadAdminDashboardData);
-  }
+document
+  .getElementById("form-input-catatan")
+  .addEventListener("submit", (e) => {
+    handleAdminFormSubmit(
+      e,
+      "Catatan_Guru",
+      "ID_Catatan",
+      catatanFormMode,
+      catatanEditId,
+      submitCatatanBtn
+    );
+  });
 
-  // Event listener untuk form Siswa
-  const siswaForm = document.getElementById("siswa-form");
-  if (siswaForm) {
-    siswaForm.addEventListener("submit", (e) => {
-      e.preventDefault();
-      addOrUpdateSiswa();
-    });
-    document
-      .getElementById("siswa-clear-btn")
-      .addEventListener("click", () => fillSiswaForm({}));
-  }
+document.getElementById("form-input-jadwal").addEventListener("submit", (e) => {
+  handleAdminFormSubmit(
+    e,
+    "Jadwal_Pelajaran",
+    "ID_Jadwal",
+    jadwalFormMode,
+    jadwalEditId,
+    submitJadwalBtn
+  );
+});
 
-  // Event listener untuk form Tugas
-  const tugasForm = document.getElementById("tugas-form");
-  if (tugasForm) {
-    tugasForm.addEventListener("submit", (e) => {
-      e.preventDefault();
-      addOrUpdateTugas();
-    });
-    document
-      .getElementById("tugas-clear-btn")
-      .addEventListener("click", () => fillTugasForm({}));
-    // Tambahkan listener untuk perubahan mata pelajaran untuk memperbarui ID tugas otomatis
-    document
-      .getElementById("tugas-mata-pelajaran")
-      .addEventListener("change", updateTugasIdField);
-  }
+document
+  .getElementById("form-input-pengumuman")
+  .addEventListener("submit", (e) => {
+    handleAdminFormSubmit(
+      e,
+      "Pengumuman",
+      "ID_Pengumuman",
+      pengumumanFormMode,
+      pengumumanEditId,
+      submitPengumumanBtn
+    );
+  });
 
-  // Event listener untuk form Nilai
-  const nilaiForm = document.getElementById("nilai-form");
-  if (nilaiForm) {
-    nilaiForm.addEventListener("submit", (e) => {
-      e.preventDefault();
-      addOrUpdateNilai();
-    });
-    document
-      .getElementById("nilai-clear-btn")
-      .addEventListener("click", () => fillNilaiForm({}));
-    // Perbarui NIS di form nilai saat dipilih
-    document
-      .getElementById("nilai-nis")
-      .addEventListener("change", updateNilaiIdField);
-  }
+// --- Tab Switching Logic for Admin Dashboard ---
+document.querySelectorAll(".admin-tab-button").forEach((button) => {
+  button.addEventListener("click", async () => {
+    const targetTab = button.dataset.tab;
+    switchTab(
+      targetTab,
+      document.querySelectorAll(".admin-tab-button"),
+      "admin-"
+    );
+    showLoading();
+    try {
+      // Reset forms to 'create' mode when switching tabs and clear old data
+      resetAdminForm(
+        document.getElementById("form-input-tugas"),
+        tugasFormMode,
+        "ID_Tugas",
+        submitTugasBtn,
+        "Simpan Tugas",
+        document.getElementById("tugas-id")
+      );
+      resetAdminForm(
+        document.getElementById("form-input-nilai"),
+        nilaiFormMode,
+        "ID_Nilai",
+        submitNilaiBtn,
+        "Simpan Nilai",
+        document.getElementById("nilai-id")
+      );
+      resetAdminForm(
+        document.getElementById("form-input-kehadiran"),
+        kehadiranFormMode,
+        "ID_Kehadiran",
+        submitKehadiranBtn,
+        "Simpan Kehadiran",
+        document.getElementById("kehadiran-id")
+      );
+      resetAdminForm(
+        document.getElementById("form-input-catatan"),
+        catatanFormMode,
+        "ID_Catatan",
+        submitCatatanBtn,
+        "Simpan Catatan",
+        document.getElementById("catatan-id")
+      );
+      resetAdminForm(
+        document.getElementById("form-input-jadwal"),
+        jadwalFormMode,
+        "ID_Jadwal",
+        submitJadwalBtn,
+        "Simpan Jadwal",
+        document.getElementById("jadwal-id")
+      );
+      resetAdminForm(
+        document.getElementById("form-input-pengumuman"),
+        pengumumanFormMode,
+        "ID_Pengumuman",
+        submitPengumumanBtn,
+        "Simpan Pengumuman",
+        document.getElementById("pengumuman-id")
+      );
 
-  // Event listener untuk form Kehadiran
-  const kehadiranForm = document.getElementById("kehadiran-form");
-  if (kehadiranForm) {
-    kehadiranForm.addEventListener("submit", (e) => {
-      e.preventDefault();
-      addOrUpdateKehadiran();
-    });
-    document
-      .getElementById("kehadiran-clear-btn")
-      .addEventListener("click", () => fillKehadiranForm({}));
-    document
-      .getElementById("kehadiran-nis")
-      .addEventListener("change", updateKehadiranIdField);
-    document
-      .getElementById("kehadiran-tanggal")
-      .addEventListener("change", updateKehadiranIdField);
-  }
+      // Reload dropdowns and tables if navigating to a form that uses them
+      if (
+        [
+          "input-nilai",
+          "input-kehadiran",
+          "input-catatan",
+          "input-tugas",
+          "input-jadwal",
+          "input-pengumuman",
+        ].includes(targetTab)
+      ) {
+        await loadAdminDropdownData(); // Ensure dropdowns are populated with latest data
+        if (targetTab === "input-nilai") {
+          configureNilaiFormBasedOnSelection(); // Trigger initial configuration for Nilai form
+        } else if (targetTab === "input-tugas") {
+          updateTugasIdField(); // Trigger initial ID generation for Tugas form
+        } else if (targetTab === "input-kehadiran") {
+          updateKehadiranIdField(); // Trigger initial ID generation for Kehadiran form
+        } else if (targetTab === "input-catatan") {
+          // Added
+          updateCatatanIdField(); // Trigger initial ID generation for Catatan form
+        } else if (targetTab === "input-pengumuman") {
+          updatePengumumanIdField();
+        }
+      }
 
-  // Event listener untuk form Catatan Guru
-  const catatanForm = document.getElementById("catatan-form");
-  if (catatanForm) {
-    catatanForm.addEventListener("submit", (e) => {
-      e.preventDefault();
-      addOrUpdateCatatan();
-    });
-    document
-      .getElementById("catatan-clear-btn")
-      .addEventListener("click", () => fillCatatanGuruForm({}));
-    document
-      .getElementById("catatan-nis")
-      .addEventListener("change", updateCatatanIdField);
-  }
+      let sheetNameForTable;
+      switch (targetTab) {
+        case "input-tugas":
+          sheetNameForTable = "Tugas";
+          break;
+        case "input-nilai":
+          sheetNameForTable = "Nilai";
+          break;
+        case "input-kehadiran":
+          sheetNameForTable = "Kehadiran";
+          break;
+        case "input-catatan":
+          sheetNameForTable = "Catatan_Guru";
+          break;
+        case "input-jadwal":
+          sheetNameForTable = "Jadwal_Pelajaran";
+          break;
+        case "input-pengumuman":
+          sheetNameForTable = "Pengumuman";
+          break;
+        default:
+          sheetNameForTable = "";
+      }
+      if (sheetNameForTable) {
+        await loadAdminTableData(sheetNameForTable); // Load table data for the current tab
+      }
+    } catch (error) {
+      console.error("Error loading admin tab data:", error);
+      showToast("Gagal memuat data untuk tab admin ini.", "error");
+    } finally {
+      hideLoading();
+    }
+  });
+});
 
-  // Event listener untuk form Jadwal Pelajaran
-  const jadwalForm = document.getElementById("jadwal-form");
-  if (jadwalForm) {
-    jadwalForm.addEventListener("submit", (e) => {
-      e.preventDefault();
-      addOrUpdateJadwal();
-    });
-    document
-      .getElementById("jadwal-clear-btn")
-      .addEventListener("click", () => fillJadwalPelajaranForm({}));
-  }
+// Initialize admin view: show login by default, hide dashboard
+showSection("login-section");
 
-  // Event listener untuk form Pengumuman
-  const pengumumanForm = document.getElementById("pengumuman-form");
-  if (pengumumanForm) {
-    pengumumanForm.addEventListener("submit", (e) => {
-      e.preventDefault();
-      addOrUpdatePengumuman();
-    });
-    document
-      .getElementById("pengumuman-clear-btn")
-      .addEventListener("click", () => fillPengumumanForm({}));
-  }
+// Apply initial 'Dihasilkan Otomatis' and readonly state to admin ID fields
+// This part is modified slightly to rely on updateKehadiranIdField for initial state
+document.getElementById("tugas-id").readOnly = true;
+document.getElementById("tugas-id").value = "Dihasilkan Otomatis";
+document
+  .getElementById("tugas-id")
+  .classList.add("bg-gray-100", "cursor-not-allowed");
 
-  // Event listener untuk form Admin User
-  const adminUserForm = document.getElementById("admin-user-form");
-  if (adminUserForm) {
-    adminUserForm.addEventListener("submit", (e) => {
-      e.preventDefault();
-      addOrUpdateAdminUser();
-    });
-    document
-      .getElementById("admin-user-clear-btn")
-      .addEventListener("click", () => fillAdminUserForm({}));
-  }
+document.getElementById("nilai-id").readOnly = true;
+document.getElementById("nilai-id").value = "";
+document.getElementById("nilai-id").placeholder = "Akan Dihasilkan Otomatis";
+document
+  .getElementById("nilai-id")
+  .classList.add("bg-gray-100", "cursor-not-allowed");
 
-  // --- Initial calls for ID fields (ensure they reflect the 'Dihasilkan Otomatis' state initially) ---
+document.getElementById("kehadiran-id").readOnly = true;
+// Initial call for kehadiran-id, will show "Dihasilkan Otomatis" if NIS/Tanggal are empty
+// This is now handled by resetAdminForm when tab is switched or login is complete
+// document.getElementById("kehadiran-id").value = "Dihasilkan Otomatis"; // Removed, handled by updateKehadiranIdField
+document
+  .getElementById("kehadiran-id")
+  .classList.add("bg-gray-100", "cursor-not-allowed");
+
+document.getElementById("catatan-id").readOnly = true;
+// document.getElementById("catatan-id").value = "Dihasilkan Otomatis"; // Removed, handled by updateCatatanIdField
+document
+  .getElementById("catatan-id")
+  .classList.add("bg-gray-100", "cursor-not-allowed");
+
+document.getElementById("jadwal-id").readOnly = true;
+document.getElementById("jadwal-id").value = "Dihasilkan Otomatis";
+document
+  .getElementById("jadwal-id")
+  .classList.add("bg-gray-100", "cursor-not-allowed");
+
+document.getElementById("pengumuman-id").readOnly = true;
+document.getElementById("pengumuman-id").value = "Dihasilkan Otomatis";
+document
+  .getElementById("pengumuman-id")
+  .classList.add("bg-gray-100", "cursor-not-allowed");
+
+// Initial call to update Kehadiran ID on page load, if elements are ready
+document.addEventListener("DOMContentLoaded", () => {
   // These calls are mainly for when the admin section is directly loaded.
   // If navigated via login, the login process will handle initial ID generation.
   // The presence of if (kehadiranNisSelect) / if (kehadiranTanggalInput) protects against errors
   // if the dashboard is not yet visible or elements aren't populated.
-  document.getElementById("siswa-nis").readOnly = false; // NIS Siswa tidak readonly saat tambah
-  updateTugasIdField(); // Ensure initial state for tugas ID
-  updateNilaiIdField(); // Ensure initial state for nilai ID
-  updateKehadiranIdField(); // Ensure initial state for kehadiran ID
-  updateCatatanIdField(); // Ensure initial state for catatan ID
-  updateJadwalIdField(); // Ensure initial state for jadwal ID
-  updatePengumumanIdField(); // Ensure initial state for pengumuman ID
-  updateAdminUserIdField(); // Ensure initial state for admin user email
-
-  // Mulai memuat data dan menampilkan dashboard
-  await loadAdminDashboardData();
-  showSection("admin-dashboard-section"); // Pastikan dashboard admin ditampilkan
-  // Atur tab default yang aktif
-  switchAdminTab(
-    "siswa-tab-button",
-    document.querySelectorAll(".tab-button-admin")
-  );
-  hideLoadingOverlay(); // Sembunyikan overlay loading setelah semua data dimuat dan ditampilkan
+  if (
+    document
+      .getElementById("admin-dashboard-section")
+      .classList.contains("section-hidden")
+  ) {
+    // Only run if not already on dashboard, to avoid double updates on login redirect.
+    updateKehadiranIdField(); // Ensure initial state reflects empty dropdowns.
+    updateCatatanIdField(); // Ensure initial state reflects empty dropdowns for Catatan
+  }
 });
