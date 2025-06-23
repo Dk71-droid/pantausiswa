@@ -670,6 +670,7 @@ function logout() {
   showSection("login-section");
   // Ensure login button text is reset
   mainLoginButton.textContent = "Cari Siswa";
+  closeSidebar(); // FIX: Close sidebar on logout
 }
 // Attach logout function to the new sidebar logout button
 logoutButtonSidebar.addEventListener("click", logout);
@@ -898,10 +899,10 @@ function renderTugasStatus(tugasData, nilaiData, filterSubject = "Semua") {
     ...tuntas,
   ];
 
-  // FIX: Revert to previous HTML structure for 2-line condensed display
+  // FIX: Ensure the tugas-simplified-row structure is used to make it 2 lines on mobile
   orderedTasks.forEach((task) => {
     const row = document.createElement("tr");
-    row.classList.add("tugas-simplified-row", "rounded-md", "mb-2"); // Add simplified class
+    row.classList.add("tugas-simplified-row", "rounded-md", "mb-2");
     row.innerHTML = `
         <td colspan="5">
             <div class="flex flex-col md:flex-row md:justify-between items-start md:items-center py-2 px-2 border-b border-gray-100 last:border-none">
@@ -909,13 +910,16 @@ function renderTugasStatus(tugasData, nilaiData, filterSubject = "Semua") {
                     <span class="font-semibold text-gray-800">${
                       task.Nama_Tugas
                     } (${task.Mata_Pelajaran})</span>
+                    <div class="text-xs text-gray-500">Batas: ${
+                      task.Batas_Waktu
+                    }</div>
                 </div>
                 <div class="text-right ${
                   task.statusColorClass
                 } mt-1 md:mt-0 font-medium">
                     ${
                       task.status === "Belum Dikerjakan"
-                        ? `Belum Dikerjakan. Batas: ${task.Batas_Waktu}`
+                        ? `Belum Dikerjakan`
                         : `${task.status}! Nilai: ${task.nilai}`
                     }
                 </div>
