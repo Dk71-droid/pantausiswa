@@ -124,8 +124,6 @@ function closeSidebar() {
 }
 // Attach click listener to overlay to close sidebar
 sidebarOverlay.addEventListener("click", closeSidebar);
-// Attach to menu icon
-sidebarMenuIcon.addEventListener("click", openSidebar);
 
 // --- Toast Notification Function ---
 function showToast(message, type = "info", duration = 3000) {
@@ -296,148 +294,129 @@ function processAndFilterExportWebData(
         case "Tugas":
         case "Nilai": // Nilai is embedded in Tugas for parent view
           if (row.statustugas && row.statustugas.trim() !== "") {
-            // Split the statustugas string by newline to get individual records if there are multiple
-            const records = row.statustugas.split("\n");
-            for (const recordString of records) {
-              if (recordString.trim() === "") continue; // Skip empty strings
-              const parts = parseExportWebEntry(recordString); // Each record string is one record
-              if (parts.length === 6) {
-                // NIM,Nama Tugas,Mata Pelajaran,hari tanggal bulan tahun,Nilai,Status
-                if (String(parts[0]) === nisFilter) {
-                  // Filter by NIM
-                  results.push({
-                    NIS: parts[0],
-                    Nama_Tugas: parts[1],
-                    Mata_Pelajaran: parts[2],
-                    Batas_Waktu: parts[3],
-                    Nilai:
-                      parts[4] === "" || parts[4] === "null"
-                        ? null
-                        : parseInt(parts[4]),
-                    Status_Pengerjaan: parts[5],
-                  });
-                }
-              } else {
-                console.warn("Invalid statustugas entry format:", recordString);
+            const parts = parseExportWebEntry(row.statustugas); // Each cell is one record
+            if (parts.length === 6) {
+              // NIM,Nama Tugas,Mata Pelajaran,hari tanggal bulan tahun,Nilai,Status
+              if (String(parts[0]) === nisFilter) {
+                // Filter by NIM
+                results.push({
+                  NIS: parts[0],
+                  Nama_Tugas: parts[1],
+                  Mata_Pelajaran: parts[2],
+                  Batas_Waktu: parts[3],
+                  Nilai:
+                    parts[4] === "" || parts[4] === "null"
+                      ? null
+                      : parseInt(parts[4]),
+                  Status_Pengerjaan: parts[5],
+                });
               }
+            } else {
+              console.warn(
+                "Invalid statustugas entry format:",
+                row.statustugas
+              );
             }
           }
           break;
 
         case "Kehadiran":
           if (row.kehadiran && row.kehadiran.trim() !== "") {
-            // Split the kehadiran string by newline to get individual records if there are multiple
-            const records = row.kehadiran.split("\n");
-            for (const recordString of records) {
-              if (recordString.trim() === "") continue; // Skip empty strings
-              const parts = parseExportWebEntry(recordString); // Each record string is one record
-              if (parts.length === 6) {
-                // NIM,hadir jumlah,izin jumlah,sakit jumlah,alpha jumlah,mmddyyyy
-                if (String(parts[0]) === nisFilter) {
-                  // Filter by NIM
-                  results.push({
-                    NIS: parts[0],
-                    Hadir: parseInt(parts[1] || 0),
-                    Izin: parseInt(parts[2] || 0),
-                    Sakit: parseInt(parts[3] || 0),
-                    Alpha: parseInt(parts[4] || 0),
-                    TanggalTerakhir: parts[5],
-                  });
-                }
-              } else {
-                console.warn("Invalid kehadiran entry format:", recordString);
+            const parts = parseExportWebEntry(row.kehadiran); // Each cell is one record
+            if (parts.length === 6) {
+              // NIM,hadir jumlah,izin jumlah,sakit jumlah,alpha jumlah,mmddyyyy
+              if (String(parts[0]) === nisFilter) {
+                // Filter by NIM
+                results.push({
+                  NIS: parts[0],
+                  Hadir: parseInt(parts[1] || 0),
+                  Izin: parseInt(parts[2] || 0),
+                  Sakit: parseInt(parts[3] || 0),
+                  Alpha: parseInt(parts[4] || 0),
+                  TanggalTerakhir: parts[5],
+                });
               }
+            } else {
+              console.warn("Invalid kehadiran entry format:", row.kehadiran);
             }
           }
           break;
 
         case "Catatan_Guru":
           if (row.catatanguru && row.catatanguru.trim() !== "") {
-            // Split the catatanguru string by newline to get individual records if there are multiple
-            const records = row.catatanguru.split("\n");
-            for (const recordString of records) {
-              if (recordString.trim() === "") continue; // Skip empty strings
-              const parts = parseExportWebEntry(recordString); // Each record string is one record
-              // FIX: Changed expected parts length from 2 to 3, and adjusted parsing
-              if (parts.length === 3) {
-                // Expected: NIM,Minggu_Ke,Catatan
-                const nisFromData = parts[0];
-                const mingguKe = parts[1];
-                const catatanText = parts[2];
-                if (String(nisFromData) === nisFilter) {
-                  // Filter by NIM
-                  results.push({
-                    ID_Catatan: `${nisFromData}_${mingguKe}`, // Reconstruct ID if needed
-                    NIS: nisFromData,
-                    Minggu_Ke: mingguKe,
-                    Catatan: catatanText,
-                    Tanggal_Input: "N/A", // Not available in ExportWeb format
-                  });
-                }
-              } else {
-                console.warn("Invalid catatanguru entry format:", recordString);
+            const parts = parseExportWebEntry(row.catatanguru); // Each cell is one record
+            // FIX: Changed expected parts length from 2 to 3, and adjusted parsing
+            if (parts.length === 3) {
+              // Expected: NIM,Minggu_Ke,Catatan
+              const nisFromData = parts[0];
+              const mingguKe = parts[1];
+              const catatanText = parts[2];
+              if (String(nisFromData) === nisFilter) {
+                // Filter by NIM
+                results.push({
+                  ID_Catatan: `${nisFromData}_${mingguKe}`, // Reconstruct ID if needed
+                  NIS: nisFromData,
+                  Minggu_Ke: mingguKe,
+                  Catatan: catatanText,
+                  Tanggal_Input: "N/A", // Not available in ExportWeb format
+                });
               }
+            } else {
+              console.warn(
+                "Invalid catatanguru entry format:",
+                row.catatanguru
+              );
             }
           }
           break;
 
         case "Jadwal_Pelajaran":
           if (row.jadwalpelajaran && row.jadwalpelajaran.trim() !== "") {
-            // Split the jadwalpelajaran string by newline to get individual records if there are multiple
-            const records = row.jadwalpelajaran.split("\n");
-            for (const recordString of records) {
-              if (recordString.trim() === "") continue; // Skip empty strings
-              const parts = parseExportWebEntry(recordString); // Each record string is one record
-              if (parts.length === 5) {
-                // ID_Jadwal,Kelas,Hari,Jam,Mata_Pelajaran
-                const kelasInJadwal = String(parts[1]).toLowerCase();
-                if (kelasInJadwal === classFilter.toLowerCase()) {
-                  // Filter by Class
-                  results.push({
-                    ID_Jadwal: parts[0],
-                    Kelas: parts[1],
-                    Hari: parts[2],
-                    Jam: parts[3],
-                    Mata_Pelajaran: parts[4],
-                    Guru: "N/A", // Not available in ExportWeb format
-                  });
-                }
-              } else {
-                console.warn(
-                  "Invalid jadwalpelajaran entry format:",
-                  recordString
-                );
+            const parts = parseExportWebEntry(row.jadwalpelajaran); // Each cell is one record
+            if (parts.length === 5) {
+              // ID_Jadwal,Kelas,Hari,Jam,Mata_Pelajaran
+              const kelasInJadwal = String(parts[1]).toLowerCase();
+              if (kelasInJadwal === classFilter.toLowerCase()) {
+                // Filter by Class
+                results.push({
+                  ID_Jadwal: parts[0],
+                  Kelas: parts[1],
+                  Hari: parts[2],
+                  Jam: parts[3],
+                  Mata_Pelajaran: parts[4],
+                  Guru: "N/A", // Not available in ExportWeb format
+                });
               }
+            } else {
+              console.warn(
+                "Invalid jadwalpelajaran entry format:",
+                row.jadwalpelajaran
+              );
             }
           }
           break;
 
         case "Pengumuman":
           if (row.pengumuman && row.pengumuman.trim() !== "") {
-            // Split the pengumuman string by newline to get individual records if there are multiple
-            const records = row.pengumuman.split("\n");
-            for (const recordString of records) {
-              if (recordString.trim() === "") continue; // Skip empty strings
-              const parts = parseExportWebEntry(recordString); // Each record string is one record
-              // FIX: Adjusted parts length for Pengumuman to 4
-              if (parts.length === 4) {
-                // Untuk_Kelas,Tanggal_Pengumuman,Judul,Isi_Pengumuman
-                const untukKelas = String(parts[0]).toLowerCase();
-                if (
-                  untukKelas === "semua" ||
-                  untukKelas.includes(classFilter.toLowerCase())
-                ) {
-                  // Filter by Class or 'Semua'
-                  results.push({
-                    Untuk_Kelas: parts[0],
-                    Tanggal_Pengumuman: parts[1],
-                    Judul: parts[2],
-                    Isi_Pengumuman: parts[3],
-                  });
-                }
-              } else {
-                console.warn("Invalid pengumuman entry format:", recordString);
+            const parts = parseExportWebEntry(row.pengumuman); // Each cell is one record
+            // FIX: Adjusted parts length for Pengumuman to 4
+            if (parts.length === 4) {
+              // Untuk_Kelas,Tanggal_Pengumuman,Judul,Isi_Pengumuman
+              const untukKelas = String(parts[0]).toLowerCase();
+              if (
+                untukKelas === "semua" ||
+                untukKelas.includes(classFilter.toLowerCase())
+              ) {
+                // Filter by Class or 'Semua'
+                results.push({
+                  Untuk_Kelas: parts[0],
+                  Tanggal_Pengumuman: parts[1],
+                  Judul: parts[2],
+                  Isi_Pengumuman: parts[3],
+                });
               }
+            } else {
+              console.warn("Invalid pengumuman entry format:", row.pengumuman);
             }
           }
           break;
