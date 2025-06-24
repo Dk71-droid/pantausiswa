@@ -3,14 +3,22 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Sistem Monitoring Siswa - Admin</title>
+    <title>Sistem Monitoring Siswa - Login Admin</title>
+    <meta
+      name="description"
+      content="Halaman login untuk administrator Sistem Monitoring Siswa."
+    />
+
     <!-- Tailwind CSS CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
+
+    <!-- Google Fonts: Inter -->
     <link
       href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap"
       rel="stylesheet"
     />
-    <!-- Font Awesome for icons (e.g., refresh button icon) -->
+
+    <!-- Font Awesome for icons -->
     <link
       rel="stylesheet"
       href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css"
@@ -18,98 +26,81 @@
       crossorigin="anonymous"
       referrerpolicy="no-referrer"
     />
-    <!-- Link ke file CSS eksternal (shared style) -->
+
+    <!-- Link to shared CSS file -->
     <link rel="stylesheet" href="style.css" />
   </head>
   <body class="min-h-screen flex flex-col p-0">
     <!-- Loading Overlay -->
     <div id="loading-overlay">
       <div class="spinner"></div>
-      <p class="mt-4 text-gray-700 text-lg font-semibold">Memuat data...</p>
+      <p class="mt-4 text-gray-700">Memuat...</p>
     </div>
 
-    <!-- Main Content Area: Sekarang bertindak sebagai kontainer fleksibel untuk menengahkan anak-anaknya -->
-    <div
+    <!-- Main Content Area: Centering container -->
+    <main
       class="main-content-area relative flex flex-col flex-grow items-center justify-center"
     >
       <!-- Back button to index.html -->
       <a
         href="index.html"
-        class="absolute top-4 left-4 p-2 bg-gray-200 rounded-full shadow hover:bg-gray-300 transition-colors z-10"
+        class="absolute top-4 left-4 bg-gray-200 hover:bg-gray-300 text-gray-800 font-semibold py-2 px-4 rounded-full shadow-sm flex items-center transition duration-300 ease-in-out z-10"
       >
-        <i class="fas fa-arrow-left text-gray-700 text-lg"></i>
+        <i class="fas fa-arrow-left mr-2"></i> Kembali
       </a>
 
-      <!-- Login Section (for Admin) -->
-      <!-- Hapus min-h-screen dari sini, sekarang ditengahkan oleh main-content-area parent -->
+      <!-- Login Section -->
       <section
         id="login-section"
-        class="pt-4 px-4 md:px-0 w-full max-w-sm mx-auto"
+        class="py-6 px-4 w-full max-w-sm mx-auto flex flex-col items-center"
       >
-        <h2 class="text-3xl font-bold text-center text-gray-800 mb-8">
-          Sistem Monitoring Siswa
+        <!-- Logo Removed -->
+        <h2 class="text-4xl font-extrabold text-gray-800 mb-6 text-center">
+          Login Admin
         </h2>
+        <p class="text-center text-gray-600 mb-8">
+          Silakan login menggunakan akun Google Anda yang terdaftar sebagai
+          admin.
+        </p>
 
-        <!-- Admin Login Form Card -->
-        <div id="unified-login-card" class="p-6 bg-white rounded-lg shadow-md">
-          <h3
-            id="login-title"
-            class="text-2xl font-semibold text-gray-800 mb-6 text-center"
-          >
-            Login Admin
-          </h3>
-          <form id="login-form" class="space-y-4">
-            <div>
-              <label for="login-email-admin" class="block text-gray-700"
-                >Email Admin:</label
-              >
-              <input
-                type="email"
-                id="login-email-admin"
-                name="email"
-                class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-                required
-              />
-            </div>
-            <button
-              type="submit"
-              id="main-login-button"
-              class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-md transition duration-300 ease-in-out"
-            >
-              Login
-            </button>
-          </form>
-        </div>
+        <!-- Google Sign-In Button Container -->
+        <!-- Pastikan data-client_id sudah diisi dengan Client ID Anda yang valid -->
+        <div
+          id="g_id_onload"
+          data-client_id="948744029963-gcui6aqpgi9rbvllsa2hbjtl5acfarqs.apps.googleusercontent.com"
+          data-callback="handleCredentialResponse"
+          data-auto_prompt="false"
+          data-cancel_on_tap_outside="false"
+        ></div>
+        <div class="g_id_signin" data-type="standard" data-size="large"></div>
       </section>
 
-      <!-- Admin Configuration Section (Onboarding) -->
+      <!-- Admin Config Section -->
       <section
         id="admin-config-section"
         class="section-hidden py-6 px-4 w-full max-w-2xl mx-auto"
       >
         <div class="bg-white p-6 rounded-lg shadow-md">
-          <h3 class="text-2xl font-bold text-gray-800 mb-6 text-center">
-            Konfigurasi Admin
+          <h3 class="text-2xl font-bold text-gray-800 mb-4">
+            Pengaturan Aplikasi
           </h3>
-          <p class="text-gray-700 text-center mb-6">
-            Selamat datang! Mohon lengkapi informasi berikut untuk memulai.
+          <p class="text-gray-600 mb-6">
+            Lengkapi detail konfigurasi aplikasi Anda.
           </p>
 
           <form id="admin-config-form" class="space-y-6">
             <div>
               <label
                 for="admin-kelas-mengampu"
-                class="block text-gray-700 font-medium mb-2"
+                class="block text-gray-700 text-sm font-semibold mb-2"
+                >Kelas Mengampu:</label
               >
-                Kelas
-              </label>
               <select
                 id="admin-kelas-mengampu"
-                name="Kelas_Mengampu"
                 class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
                 required
               >
-                <option value="">Pilih Kelas...</option>
+                <option value="">Pilih Kelas</option>
                 <option value="I">I</option>
                 <option value="II">II</option>
                 <option value="III">III</option>
@@ -119,35 +110,32 @@
               </select>
             </div>
 
-            <!-- Bagian untuk Menambah Mata Pelajaran Baru -->
             <div>
               <label
                 for="new-mapel-input"
-                class="block text-gray-700 font-medium mb-2"
+                class="block text-gray-700 text-sm font-semibold mb-2"
                 >Tambah Mata Pelajaran Baru:</label
               >
               <div class="flex gap-2">
                 <input
                   type="text"
                   id="new-mapel-input"
+                  class="shadow-sm appearance-none border rounded-md flex-grow py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   placeholder="Contoh: Seni Musik"
-                  class="flex-grow px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
                 />
                 <button
                   type="button"
                   id="add-new-mapel-btn"
-                  class="bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded-md shadow-sm transition duration-300 ease-in-out"
+                  class="bg-green-500 hover:bg-green-600 text-white font-bold py-2 px-4 rounded-md transition duration-300 ease-in-out shadow-sm"
                 >
                   Tambah
                 </button>
               </div>
             </div>
-
             <div>
-              <!-- Bagian ini diubah: label asli dengan instruksi dihapus -->
               <div
                 id="admin-mapel-selection-container"
-                class="mt-2 flex flex-wrap gap-2 p-3 border border-gray-300 rounded-md bg-gray-50 min-h-[100px] content-start"
+                class="flex flex-wrap gap-2 p-3 border border-gray-300 rounded-md bg-gray-50 min-h-[100px] content-start"
               >
                 <!-- Mata pelajaran yang dipilih akan dirender di sini oleh JavaScript -->
                 <p class="text-gray-500 text-center w-full">
@@ -192,12 +180,15 @@
           </button>
         </div>
       </section>
-    </div>
+    </main>
 
-    <!-- Toast Container (Shared style) -->
+    <!-- Toast Container -->
     <div id="toast-container"></div>
 
-    <!-- Link ke file JavaScript eksternal khusus admin -->
+    <!-- Google Identity Services (GIS) Library -->
+    <script src="https://accounts.google.com/gsi/client" async defer></script>
+
+    <!-- Link ke file JavaScript utama untuk admin -->
     <script src="script_admin.js"></script>
   </body>
 </html>
