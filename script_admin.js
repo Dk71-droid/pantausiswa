@@ -1,6 +1,6 @@
 // Ganti URL ini dengan URL Web App Google Apps Script Anda setelah di-deploy
 const GOOGLE_APPS_SCRIPT_WEB_APP_URL =
-  "https://script.google.com/macros/s/AKfycbyjWPxvpYLjbkEas8eFFoup4q1Sqah0v-RYndsd7qL6B-dwsftXix0OUaXGaZKAo1mNSQ/exec";
+  "https://script.google.com/macros/s/AKfycbxNlmkT0ciRb-LGxc59VG3WdoAtYF5DlnvH1DaXo73IfisirnN4njfcWeJoLoj3LxJ9qA/exec";
 const PASS_MARK = 75; // Nilai minimum untuk status "Tuntas" - (used in value configuration)
 
 // Hardcoded list of subjects
