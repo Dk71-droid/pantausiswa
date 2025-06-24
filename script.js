@@ -1,6 +1,6 @@
 // Ganti URL ini dengan URL Web App Google Apps Script Anda setelah di-deploy
 const GOOGLE_APPS_SCRIPT_WEB_APP_URL =
-  "https://script.google.com/macros/s/AKfycbyA74lf_vJL6Z6Xq6WmuD6kBJlcFiGvY-ei6I283YGESmLuOA0iP3hVol40JGEzbpAO3g/exec";
+  "https://script.google.com/macros/s/AKfycbzY3vKWP0c1TwYCGXcQ9ITCgImDpFLJyc4gjzI-Eu5cAp6YJrExlIRSxEpUDQSjm5ov/exec";
 const PASS_MARK = 75; // Nilai minimum untuk status "Tuntas"
 
 // Hardcoded list of subjects (needed for parent view subject filter)
