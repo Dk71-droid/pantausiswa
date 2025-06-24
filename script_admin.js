@@ -1,6 +1,6 @@
 // Ganti URL ini dengan URL Web App Google Apps Script Anda setelah deploy code_admin.gs.txt
 const GOOGLE_APPS_SCRIPT_WEB_APP_URL =
-  "https://script.google.com/macros/s/AKfycbz8Vofi3bFSW4L0wrzJUtYSK35tJZI4EcNtwa0iXNb9X2iyEyViOcZqp15yVgxx7kGR/exec"; // GANTI INI!
+  "https://script.google.com/macros/s/AKfycbzN1daif0NyrrL-ojAYIVQvmtVhU7LHWwzBgRbHrTt_87udBmLt42mkssUmEqoJtb0p/exec"; // GANTI INI!
 
 const PASS_MARK = 75; // Nilai minimum untuk status "Tuntas" - (used in value configuration)
 
