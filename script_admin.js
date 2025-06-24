@@ -1,6 +1,6 @@
 // Ganti URL ini dengan URL Web App Google Apps Script Anda setelah di-deploy
 const GOOGLE_APPS_SCRIPT_WEB_APP_URL =
-  "https://script.google.com/macros/s/AKfycbyA74lf_vJL6Z6Xq6WmuD6kBJlcFiGvY-ei6I283YGESmLuOA0iP3hVol40JGEzbpAO3g/exec";
+  "https://script.google.com/macros/s/AKfycbyjWPxvpYLjbkEas8eFFoup4q1Sqah0v-RYndsd7qL6B-dwsftXix0OUaXGaZKAo1mNSQ/exec";
 const PASS_MARK = 75; // Nilai minimum untuk status "Tuntas" - (used in value configuration)
 
 // Hardcoded list of subjects
@@ -12,11 +12,13 @@ const HARDCODED_SUBJECTS = [
   "IPAS",
   "Seni Rupa",
   "PJOK",
-  "Bahasa Jawa",
-  "Dawet Ayu",
+  "Bahasa Inggris", // Ditambahkan
+  "Seni Tari", // Ditambahkan
+  "Seni Musik", // Ditambahkan
 ];
 
 // Mapping for subject abbreviations for ID Tugas
+// This object will be dynamically populated with new custom subjects and their abbreviations
 const SUBJECT_ABBREVIATIONS = {
   PAI: "PAI",
   Pancasila: "PANC",
@@ -25,8 +27,9 @@ const SUBJECT_ABBREVIATIONS = {
   IPAS: "IPAS",
   "Seni Rupa": "SNI",
   PJOK: "PJOK",
-  "Bahasa Jawa": "BHSJW",
-  "Dawet Ayu": "DWA",
+  "Bahasa Inggris": "BINGG",
+  "Seni Tari": "STARI",
+  "Seni Musik": "SMUSK",
 };
 
 // Client-side cache for fetched data to reduce API calls
@@ -38,1412 +41,537 @@ const dataCache = {
   catatan_guru: null,
   jadwal_pelajaran: null,
   pengumuman: null,
-  admin_users: null,
+  nilai_konfigurasi: null, // New: To store dynamic values like PASS_MARK
+  admin_config: null, // To store admin specific configurations (kelas, mapel)
 };
 
-// DOM Elements specific to admin view
-const loadingOverlay = document.getElementById("loading-overlay");
-const loginSection = document.getElementById("login-section"); // For admin login form
-const adminDashboardSection = document.getElementById(
-  "admin-dashboard-section"
-);
-const toastContainer = document.getElementById("toast-container");
-const unifiedLoginCard = document.getElementById("unified-login-card");
-const loginTitle = document.getElementById("login-title");
-const loginForm = document.getElementById("login-form");
-const loginAdminEmailInput = document.getElementById("login-email-admin");
-const mainLoginButton = document.getElementById("main-login-button");
+// Admin configuration object
+let adminConfig = {
+  email: null,
+  kelasMengampu: null,
+  selectedMapel: [], // Mata pelajaran yang diajarkan admin
+};
 
-// Admin form dropdowns
-const nilaiNisSelect = document.getElementById("nilai-nis");
-const nilaiTugasIdSelect = document.getElementById("nilai-tugas-id");
-const kehadiranNisSelect = document.getElementById("kehadiran-nis");
-const kehadiranTanggalInput = document.getElementById("kehadiran-tanggal"); // Added
-const catatanNisSelect = document.getElementById("catatan-nis");
-const catatanMingguInput = document.getElementById("catatan-minggu"); // Added
-const tugasMapelSelect = document.getElementById("tugas-mapel");
-const jadwalMapelSelect = document.getElementById("jadwal-mapel");
-
-// Admin form specific inputs for Nilai
-const nilaiInput = document.getElementById("nilai-input");
-const nilaiStatusSelect = document.getElementById("nilai-status");
-
-// Admin form mode inputs
-const tugasFormMode = document.getElementById("tugas-form-mode");
-const nilaiFormMode = document.getElementById("nilai-form-mode");
-const kehadiranFormMode = document.getElementById("kehadiran-form-mode");
-const catatanFormMode = document.getElementById("catatan-form-mode");
-const jadwalFormMode = document.getElementById("jadwal-form-mode");
-const pengumumanFormMode = document.getElementById("pengumuman-form-mode");
-
-// Admin form edit ID inputs
-const tugasEditId = document.getElementById("tugas-edit-id");
-const nilaiEditId = document.getElementById("nilai-edit-id");
-const kehadiranEditId = document.getElementById("kehadiran-edit-id");
-const catatanEditId = document.getElementById("catatan-edit-id");
-const jadwalEditId = document.getElementById("jadwal-edit-id");
-const pengumumanEditId = document.getElementById("pengumuman-edit-id");
-
-// Admin form submit buttons
-const submitTugasBtn = document.getElementById("submit-tugas");
-const submitNilaiBtn = document.getElementById("submit-nilai");
-const submitKehadiranBtn = document.getElementById("submit-kehadiran");
-const submitCatatanBtn = document.getElementById("submit-catatan");
-const submitJadwalBtn = document.getElementById("submit-jadwal");
-const submitPengumumanBtn = document.getElementById("submit-pengumuman");
-
-// Confirmation Modal Elements (copied from main script for shared functionality)
-const confirmModal = document.getElementById("confirm-modal");
-const confirmModalTitle = document.getElementById("confirm-modal-title");
-const confirmModalMessage = document.getElementById("confirm-modal-message");
-const confirmCancelBtn = document.getElementById("confirm-cancel-btn");
-const confirmOkBtn = document.getElementById("confirm-ok-btn");
-let onConfirmCallback = null;
-
-// --- Loading Overlay Functions ---
-function showLoading() {
-  loadingOverlay.classList.add("visible");
+// Function to generate a random string for IDs
+function generateRandomId(length = 8) {
+  const characters =
+    "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0987654321";
+  let result = "";
+  for (let i = 0; i < length; i++) {
+    result += characters.charAt(Math.floor(Math.random() * characters.length));
+  }
+  return result;
 }
 
-function hideLoading() {
-  loadingOverlay.classList.remove("visible");
+// Function to show loading overlay
+function showLoadingOverlay() {
+  const overlay = document.getElementById("loading-overlay");
+  if (overlay) {
+    overlay.style.opacity = "1";
+    overlay.style.visibility = "visible";
+  }
 }
 
-// Fungsi untuk menampilkan atau menyembunyikan bagian aplikasi
+// Function to hide loading overlay
+function hideLoadingOverlay() {
+  const overlay = document.getElementById("loading-overlay");
+  if (overlay) {
+    overlay.style.opacity = "0";
+    overlay.style.visibility = "hidden";
+  }
+}
+
+// Function to show a specific section and hide others
 function showSection(sectionId) {
-  loginSection.classList.add("section-hidden");
-  adminDashboardSection.classList.add("section-hidden");
-  document.getElementById(sectionId).classList.remove("section-hidden");
+  const sections = document.querySelectorAll("section");
+  sections.forEach((section) => {
+    if (section.id === sectionId) {
+      section.classList.remove("section-hidden");
+    } else {
+      section.classList.add("section-hidden");
+    }
+  });
 }
 
-// --- Toast Notification Function ---
-function showToast(message, type = "info", duration = 3000) {
+// Function to show toast messages
+function showToast(message, type = "info") {
+  const toastContainer = document.getElementById("toast-container");
+  if (!toastContainer) {
+    console.error("Toast container not found!");
+    return;
+  }
+
   const toast = document.createElement("div");
-  toast.classList.add("toast", type);
+  toast.className = `toast-message px-4 py-2 rounded-md shadow-md text-white ${
+    type === "success"
+      ? "bg-green-500"
+      : type === "error"
+      ? "bg-red-500"
+      : type === "warning"
+      ? "bg-yellow-500"
+      : "bg-blue-500"
+  } opacity-0 transition-opacity duration-300 ease-in-out transform -translate-y-2`;
   toast.textContent = message;
+
   toastContainer.appendChild(toast);
 
-  void toast.offsetWidth;
-  toast.classList.add("show");
-
+  // Animate toast in
   setTimeout(() => {
-    toast.classList.remove("show");
-    toast.addEventListener("transitionend", () => {
-      toast.remove();
-    });
-  }, duration);
-}
+    toast.style.opacity = "1";
+    toast.style.transform = "translateY(0)";
+  }, 50);
 
-// --- Custom Confirmation Modal Functions ---
-function showConfirmModal(message, onConfirm, title = "Konfirmasi") {
-  confirmModalTitle.textContent = title;
-  confirmModalMessage.textContent = message;
-  onConfirmCallback = onConfirm;
-  confirmModal.classList.add("open");
-}
-
-function hideConfirmModal() {
-  confirmModal.classList.remove("open");
-  onConfirmCallback = null;
-}
-
-confirmCancelBtn.addEventListener("click", hideConfirmModal);
-confirmOkBtn.addEventListener("click", () => {
-  if (onConfirmCallback) {
-    onConfirmCallback();
-  }
-  hideConfirmModal();
-});
-
-// --- Generate Unique ID (Generic) ---
-function generateUniqueId(prefix) {
-  return (
-    prefix +
-    "_" +
-    Date.now().toString(36) +
-    Math.random().toString(36).substring(2, 5).toUpperCase()
-  );
-}
-
-// --- Generate Task ID based on subject, task number, and month ---
-function generateTugasId(subjectAbbr, taskNumber, month) {
-  const formattedTaskNumber = String(taskNumber).padStart(2, "0");
-  const formattedMonth = String(month).padStart(2, "0");
-  return `${subjectAbbr}${formattedTaskNumber}${formattedMonth}`;
-}
-
-// --- Generate Kehadiran ID based on NIS and Date ---
-function updateKehadiranIdField() {
-  const nis = kehadiranNisSelect.value;
-  const tanggal = kehadiranTanggalInput.value;
-  const kehadiranIdInput = document.getElementById("kehadiran-id");
-
-  if (nis && tanggal) {
-    try {
-      const date = new Date(tanggal);
-      if (isNaN(date.getTime())) {
-        kehadiranIdInput.value = "Format tanggal salah";
-        kehadiranIdInput.classList.remove("bg-white");
-        kehadiranIdInput.classList.add("bg-gray-100", "cursor-not-allowed");
-        return;
-      }
-      const month = String(date.getMonth() + 1).padStart(2, "0");
-      const day = String(date.getDate()).padStart(2, "0");
-      const year = date.getFullYear();
-      const formattedDate = `${day}${month}${year}`; // Changed format to DDMMYYYY
-      kehadiranIdInput.value = `${nis}_${formattedDate}`;
-      kehadiranIdInput.classList.remove("bg-gray-100", "cursor-not-allowed");
-      kehadiranIdInput.classList.add("bg-white");
-    } catch (error) {
-      console.error("Error formatting date for Kehadiran ID:", error);
-      kehadiranIdInput.value = "Gagal membuat ID";
-      kehadiranIdInput.classList.remove("bg-white");
-      kehadiranIdInput.classList.add("bg-gray-100", "cursor-not-allowed");
-    }
-  } else {
-    kehadiranIdInput.value = "Dihasilkan Otomatis";
-    kehadiranIdInput.classList.remove("bg-white");
-    kehadiranIdInput.classList.add("bg-gray-100", "cursor-not-allowed");
-  }
-}
-
-// --- Generate Catatan Guru ID based on NIS and Minggu_Ke ---
-function updateCatatanIdField() {
-  const nis = catatanNisSelect.value;
-  const mingguKe = catatanMingguInput.value;
-  const catatanIdInput = document.getElementById("catatan-id");
-
-  if (nis && mingguKe) {
-    // Simple check for valid week number (can be expanded)
-    if (isNaN(parseInt(mingguKe))) {
-      catatanIdInput.value = "Minggu ke salah";
-      catatanIdInput.classList.remove("bg-white");
-      catatanIdInput.classList.add("bg-gray-100", "cursor-not-allowed");
-      return;
-    }
-    catatanIdInput.value = `${nis}_${mingguKe}`;
-    catatanIdInput.classList.remove("bg-gray-100", "cursor-not-allowed");
-    catatanIdInput.classList.add("bg-white");
-  } else {
-    catatanIdInput.value = "Dihasilkan Otomatis";
-    catatanIdInput.classList.remove("bg-white");
-    catatanIdInput.classList.add("bg-gray-100", "cursor-not-allowed");
-  }
-}
-
-// Universal tab switching function
-function switchTab(targetTabId, buttons, prefix = "") {
-  document.querySelectorAll(`.${prefix}tab-content`).forEach((content) => {
-    content.classList.add("section-hidden");
-  });
-
-  buttons.forEach((btn) => {
-    btn.classList.remove("text-green-600", "border-green-600", "border-b-2");
-    btn.classList.add("text-gray-700");
-  });
-
-  document.getElementById(targetTabId).classList.remove("section-hidden");
-
-  const clickedButton = Array.from(buttons).find(
-    (btn) => btn.dataset.tab === targetTabId
-  );
-  if (clickedButton) {
-    clickedButton.classList.remove("text-gray-700");
-    clickedButton.classList.add(
-      "text-green-600",
-      "border-b-2",
-      "border-green-600"
+  // Animate toast out and remove after 3 seconds
+  setTimeout(() => {
+    toast.style.opacity = "0";
+    toast.style.transform = "translateY(-20px)";
+    toast.addEventListener(
+      "transitionend",
+      () => {
+        toast.remove();
+      },
+      { once: true }
     );
-  }
+  }, 3000);
 }
 
-// --- Admin Login Form Submission ---
-loginForm.addEventListener("submit", async (e) => {
-  e.preventDefault();
-  showLoading();
-
+// Function to handle fetching data from Google Apps Script Web App
+async function fetchDataFromGAS(action, params = {}) {
+  showLoadingOverlay();
   try {
-    const adminEmail = loginAdminEmailInput.value.trim();
-    if (!adminEmail) {
-      showToast("Email admin tidak boleh kosong.", "error");
-      hideLoading();
-      return;
-    }
-
-    // Fetch authorized emails from Google Apps Script
-    // Force refresh admin users as it's a critical initial fetch
-    const authorizedEmails = await fetchData("Admin_Users", null, true);
-    dataCache.admin_users = authorizedEmails; // Cache admin users
-
-    // Check if the entered email exists in the list of authorized emails (case-insensitive)
-    const emailExists = authorizedEmails.some(
-      (user) =>
-        user.Email && user.Email.toLowerCase() === adminEmail.toLowerCase()
+    const queryString = new URLSearchParams({
+      action: action,
+      ...params,
+    }).toString();
+    const response = await fetch(
+      `${GOOGLE_APPS_SCRIPT_WEB_APP_URL}?${queryString}`
     );
-
-    if (emailExists) {
-      showToast("Login admin berhasil!", "success");
-      await loadAdminDropdownData(); // Load dropdowns for forms
-      await loadAdminTableData("Tugas"); // Load initial table for admin dashboard
-      updateTugasIdField(); // Initial generation for Tugas ID
-      updateKehadiranIdField(); // Initial generation for Kehadiran ID
-      updateCatatanIdField(); // Initial generation for Catatan Guru ID - Added
-      showSection("admin-dashboard-section"); // Show admin dashboard
-      switchTab("input-tugas", document.querySelectorAll(".admin-tab-button")); // Activate default tab
-    } else {
-      showToast("Email admin tidak terdaftar. Akses ditolak.", "error");
-    }
-  } catch (error) {
-    console.error("Login Error:", error);
-    showToast(
-      "Terjadi kesalahan saat login. Periksa konsol untuk detail.",
-      "error"
-    );
-  } finally {
-    hideLoading();
-  }
-});
-
-// Helper function to reset admin forms to create mode
-function resetAdminForm(
-  formElement,
-  formModeInput,
-  idKey,
-  submitButton,
-  defaultButtonText,
-  idInputElement
-) {
-  formElement.reset();
-  formModeInput.value = "create";
-  if (idInputElement) {
-    idInputElement.readOnly = true;
-    if (idKey === "ID_Nilai") {
-      idInputElement.placeholder = "Akan Dihasilkan Otomatis";
-      idInputElement.value = "";
-      nilaiInput.disabled = false;
-      nilaiStatusSelect.disabled = false;
-      if (nilaiNisSelect) nilaiNisSelect.disabled = false;
-      if (nilaiTugasIdSelect) nilaiTugasIdSelect.disabled = false;
-    } else if (idKey === "ID_Kehadiran") {
-      updateKehadiranIdField(); // Call to regenerate based on current dropdowns (which will be reset to empty)
-    } else if (idKey === "ID_Catatan") {
-      // Added
-      updateCatatanIdField(); // Call to regenerate based on current dropdowns (which will be reset to empty)
-    } else {
-      idInputElement.value = "Dihasilkan Otomatis";
-    }
-    idInputElement.classList.add("bg-gray-100", "cursor-not-allowed");
-    idInputElement.classList.remove("bg-white");
-  }
-  submitButton.textContent = defaultButtonText;
-  submitButton.disabled = false;
-}
-
-// --- Data Fetching Function (GET) with Caching ---
-async function fetchData(sheetName, param = null, forceRefresh = false) {
-  let cacheKey = sheetName;
-  if (param) {
-    // Convert param object to a consistent string for cache key, or use param directly if string
-    const paramString =
-      typeof param === "object" ? JSON.stringify(param) : String(param);
-    cacheKey += `_${paramString}`;
-  }
-
-  // Check cache first if not forced to refresh
-  if (!forceRefresh && dataCache[cacheKey]) {
-    console.log(`Mengambil data dari cache: ${cacheKey}`);
-    return dataCache[cacheKey];
-  }
-
-  let url = `${GOOGLE_APPS_SCRIPT_WEB_APP_URL}?sheet=${sheetName}`;
-  if (param) {
-    if (
-      sheetName === "Siswa" ||
-      sheetName === "Kehadiran" ||
-      sheetName === "Catatan_Guru"
-    ) {
-      if (typeof param === "object") {
-        url += `&nis=${param.nis || ""}`;
-      } else {
-        url += `&nis=${param}`;
-      }
-    } else if (sheetName === "Nilai") {
-      if (typeof param === "object" && param.nis && param.id_tugas) {
-        url += `&nis=${param.nis}&id_tugas=${param.id_tugas}`;
-      } else if (typeof param === "string") {
-        url += `&nis=${param}`;
-      }
-    } else if (sheetName === "Jadwal_Pelajaran" && param.class) {
-      url += `&class=${param.class}`;
-    } else if (sheetName === "Pengumuman" && param.class) {
-      url += `&class=${param.class}`;
-    }
-  }
-  try {
-    console.log(`Mengambil data dari server: ${url}`);
-    const response = await fetch(url);
     if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
+      const errorText = await response.text();
+      throw new Error(
+        `Network response was not ok: ${response.status} - ${errorText}`
+      );
     }
     const data = await response.json();
-    console.log(`Data diterima dari ${sheetName}:`, data);
-    dataCache[cacheKey] = data; // Store in cache
+    if (data.error) {
+      throw new Error(data.error);
+    }
     return data;
   } catch (error) {
-    console.error(`Error fetching data from ${sheetName}:`, error);
-    showToast(
-      `Gagal mengambil data dari ${sheetName}. Error: ${error.message}`,
-      "error"
-    );
+    console.error("Error fetching data:", error);
+    showToast(`Error: ${error.message}`, "error");
     return null;
+  } finally {
+    hideLoadingOverlay();
   }
 }
 
-// --- Data Posting/Updating/Deleting Function (POST) ---
-async function sendData(sheetName, data, action) {
-  const url = `${GOOGLE_APPS_SCRIPT_WEB_APP_URL}`;
+// Function to send data to Google Apps Script Web App (POST request)
+async function sendDataToGAS(action, payload) {
+  showLoadingOverlay();
   try {
-    const response = await fetch(url, {
+    const response = await fetch(GOOGLE_APPS_SCRIPT_WEB_APP_URL, {
       method: "POST",
+      mode: "cors", // Enable CORS
       headers: {
-        "Content-Type": "application/x-www-form-urlencoded",
+        "Content-Type": "application/json",
       },
-      body: new URLSearchParams({
-        sheet: sheetName,
-        action: action,
-        data: JSON.stringify(data),
-      }),
+      body: JSON.stringify({ action, ...payload }),
     });
+
     if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
-    }
-    const result = await response.json();
-    console.log(`Response from ${sheetName} (${action}):`, result);
-
-    // Invalidate relevant cache entries after a successful CRUD operation
-    // For simplicity, invalidate all data for the affected sheet.
-    // More granular invalidation could be implemented if needed.
-    for (const key in dataCache) {
-      if (key.startsWith(sheetName)) {
-        dataCache[key] = null; // Mark as stale
-      }
-    }
-
-    return result;
-  } catch (error) {
-    console.error(`Error sending data to ${sheetName} (${action}):`, error);
-    showToast(
-      `Gagal ${action} data ke ${sheetName}. Error: ${error.message}`,
-      "error"
-    );
-    return { success: false, message: `Error: ${error.message}` };
-  }
-}
-
-// Helper function to get header labels for data-label attribute
-function getHeaderLabels(tableBodyId) {
-  let headers = [];
-  const table = document.getElementById(tableBodyId).closest("table");
-  if (table && table.querySelector("thead tr")) {
-    // Only pick visible headers for data-label
-    table.querySelectorAll("thead th").forEach((th) => {
-      headers.push(th.textContent.trim());
-    });
-  }
-  return headers;
-}
-
-// --- Helper function to populate dropdowns ---
-function populateDropdown(
-  selectElement,
-  data,
-  valueKey,
-  textKey,
-  initialOptionText = "Pilih..."
-) {
-  selectElement.innerHTML = `<option value="">${initialOptionText}</option>`;
-  if (data && data.length > 0) {
-    data.forEach((item) => {
-      const option = document.createElement("option");
-      option.value = item[valueKey];
-      option.textContent = item[textKey];
-      selectElement.appendChild(option);
-    });
-  } else {
-    selectElement.innerHTML = `<option value="">Tidak ada data tersedia</option>`;
-  }
-}
-
-// --- Load Data for Admin Dropdowns and Tables ---
-async function loadAdminDropdownData() {
-  populateDropdown(nilaiNisSelect, null, "", "", "Memuat siswa...");
-  populateDropdown(kehadiranNisSelect, null, "", "", "Memuat siswa...");
-  populateDropdown(catatanNisSelect, null, "", "", "Memuat siswa...");
-
-  // Force refresh for dropdown data to ensure latest options
-  const siswaData = await fetchData("Siswa", null, true);
-  if (siswaData) {
-    dataCache.siswa = siswaData; // Update cache explicitly
-    populateDropdown(
-      nilaiNisSelect,
-      siswaData,
-      "NIS",
-      "Nama",
-      "Pilih Siswa..."
-    );
-    populateDropdown(
-      kehadiranNisSelect,
-      siswaData,
-      "NIS",
-      "Nama",
-      "Pilih Siswa..."
-    );
-    populateDropdown(
-      catatanNisSelect,
-      siswaData,
-      "NIS",
-      "Nama",
-      "Pilih Siswa..."
-    );
-  } else {
-    showToast("Gagal memuat daftar siswa untuk dropdown.", "error");
-  }
-
-  const subjectOptions = HARDCODED_SUBJECTS.map((s) => ({
-    value: s,
-    text: s,
-  }));
-  populateDropdown(
-    tugasMapelSelect,
-    subjectOptions,
-    "value",
-    "text",
-    "Pilih Mata Pelajaran..."
-  );
-  populateDropdown(
-    jadwalMapelSelect,
-    subjectOptions,
-    "value",
-    "text",
-    "Pilih Mata Pelajaran..."
-  );
-
-  if (nilaiTugasIdSelect) {
-    populateDropdown(nilaiTugasIdSelect, null, "", "", "Memuat tugas...");
-    // Force refresh for task data
-    const tugasData = await fetchData("Tugas", null, true);
-    if (tugasData) {
-      dataCache.tugas = tugasData; // Update cache explicitly
-      populateDropdown(
-        nilaiTugasIdSelect,
-        tugasData,
-        "ID_Tugas",
-        "Nama_Tugas",
-        "Pilih Tugas..."
+      const errorText = await response.text();
+      throw new Error(
+        `Network response was not ok: ${response.status} - ${errorText}`
       );
-    } else {
-      showToast("Gagal memuat daftar tugas untuk dropdown.", "error");
     }
+    const data = await response.json();
+    if (data.error) {
+      throw new Error(data.error);
+    }
+    return data;
+  } catch (error) {
+    console.error("Error sending data:", error);
+    showToast(`Error: ${error.message}`, "error");
+    return null;
+  } finally {
+    hideLoadingOverlay();
   }
 }
 
-async function loadAdminTableData(sheetName) {
-  let tableBodyElement;
-  let idKey;
-  let dataFetch;
-  let renderFunction;
+// --- Admin Login & Config Functions ---
 
-  // Assign tableBodyElement first
-  switch (sheetName) {
-    case "Tugas":
-      tableBodyElement = document.getElementById("tugas-list-table-body");
-      break;
-    case "Nilai":
-      tableBodyElement = document.getElementById("nilai-list-table-body");
-      break;
-    case "Kehadiran":
-      tableBodyElement = document.getElementById("kehadiran-list-table-body");
-      break;
-    case "Catatan_Guru":
-      tableBodyElement = document.getElementById("catatan-list-table-body");
-      break;
-    case "Jadwal_Pelajaran":
-      tableBodyElement = document.getElementById("jadwal-list-table-body");
-      break;
-    case "Pengumuman":
-      tableBodyElement = document.getElementById("pengumuman-list-table-body");
-      break;
-    default:
-      showToast("Nama sheet tidak valid untuk tabel admin.", "error");
-      return;
+async function handleAdminLogin(event) {
+  event.preventDefault();
+  const email = document.getElementById("login-email-admin").value.trim();
+
+  if (!email) {
+    showToast("Email admin tidak boleh kosong.", "warning");
+    return;
   }
 
-  if (!tableBodyElement) {
-    console.error(`Elemen tabel untuk sheet "${sheetName}" tidak ditemukan.`);
+  showLoadingOverlay();
+  try {
+    // Tambahkan parameter `sheetName` ke panggilan fetchDataFromGAS
+    const gasResponse = await fetchDataFromGAS("getAdminConfig", {
+      adminEmail: email,
+      sheetName: "Admin_Users", // PASTIKAN NAMA SHEET INI SAMA DENGAN NAMA SHEET DI GOOGLE SHEETS ANDA
+    });
+
+    // Case 1: fetchDataFromGAS itself returned null (e.g., network error or generic GAS error)
+    if (gasResponse === null) {
+      // Error message would have been shown by fetchDataFromGAS
+      showSection("login-section");
+      return;
+    }
+
+    // Case 2: GAS script explicitly returned success: false (e.g., email not found in admin list)
+    if (!gasResponse.success) {
+      showToast(gasResponse.message || "Email tidak terdaftar.", "error");
+      showSection("login-section");
+      return;
+    }
+
+    // Case 3: GAS script returned success: true. Email is registered.
+    const adminDataFromGAS = gasResponse.adminData;
+    adminConfig.email = email;
+
+    // Case 3.1: Admin data exists and is complete (kelasMengampu and selectedMapel are present)
+    if (
+      adminDataFromGAS &&
+      adminDataFromGAS.kelasMengampu &&
+      adminDataFromGAS.selectedMapel
+    ) {
+      adminConfig.kelasMengampu = adminDataFromGAS.kelasMengampu;
+      // Combine selectedMapel from config with hardcoded subjects to ensure all are available
+      const combinedSelectedMapel = new Set([
+        ...adminDataFromGAS.selectedMapel,
+      ]);
+      HARDCODED_SUBJECTS.forEach((subject) =>
+        combinedSelectedMapel.add(subject)
+      );
+      adminConfig.selectedMapel = Array.from(combinedSelectedMapel);
+
+      // Ensure all selected subjects have abbreviations
+      adminConfig.selectedMapel.forEach((mapel) => {
+        if (!SUBJECT_ABBREVIATIONS[mapel]) {
+          SUBJECT_ABBREVIATIONS[mapel] = generateAbbreviation(mapel);
+        }
+      });
+
+      showToast("Login admin berhasil!", "success");
+      initializeAdminDashboard();
+    } else {
+      // Case 3.2: Admin data exists but is incomplete (or first-time login for a registered email)
+      // This means the email is registered but needs configuration.
+      // Pre-fill adminConfig with any existing partial data for the config form
+      adminConfig.kelasMengampu = adminDataFromGAS?.kelasMengampu || "";
+      adminConfig.selectedMapel = adminDataFromGAS?.selectedMapel || [];
+
+      showToast("Email admin dikenal. Mohon lengkapi konfigurasi.", "info");
+      showSection("admin-config-section");
+
+      // Render subject selection with partially existing data (if any)
+      renderMapelSelection();
+      // Pre-fill kelasMengampu input if it came from partial config
+      document.getElementById("admin-kelas-mengampu").value =
+        adminConfig.kelasMengampu;
+    }
+  } catch (error) {
+    console.error("Error during admin login:", error);
     showToast(
-      `Error: Elemen tabel untuk sheet "${sheetName}" tidak ditemukan.`,
+      "Terjadi kesalahan saat login admin. Silakan coba lagi.",
       "error"
+    );
+    showSection("login-section");
+  } finally {
+    hideLoadingOverlay();
+  }
+}
+
+async function handleAdminConfigSubmit(event) {
+  event.preventDefault();
+  const kelasMengampu = document.getElementById("admin-kelas-mengampu").value;
+
+  if (!kelasMengampu) {
+    showToast("Mohon pilih kelas yang Anda ampu.", "warning");
+    return;
+  }
+  if (adminConfig.selectedMapel.length === 0) {
+    showToast(
+      "Mohon pilih setidaknya satu mata pelajaran yang Anda ajarkan.",
+      "warning"
     );
     return;
   }
 
-  tableBodyElement.innerHTML = `<tr><td colspan="99" class="text-center py-4 text-gray-500">Memuat data...</td></tr>`; // Show loading in table
+  adminConfig.kelasMengampu = kelasMengampu;
 
-  // Force refresh for all table data to ensure latest state
-  dataFetch = await fetchData(sheetName, null, true);
-  dataCache[sheetName.toLowerCase().replace("_", "")] = dataFetch; // Update cache explicitly
+  showLoadingOverlay();
+  try {
+    const result = await sendDataToGAS("saveAdminConfig", {
+      adminEmail: adminConfig.email,
+      kelasMengampu: adminConfig.kelasMengampu,
+      selectedMapel: adminConfig.selectedMapel,
+      sheetName: "Admin_Users", // Tambahkan sheetName saat menyimpan konfigurasi juga
+    });
 
-  if (!dataFetch || dataFetch.length === 0) {
-    tableBodyElement.innerHTML = `<tr><td colspan="99" class="text-center py-4 text-gray-500">Tidak ada data ${sheetName}.</td></tr>`;
-    return;
+    if (result && result.status === "success") {
+      showToast("Konfigurasi admin berhasil disimpan!", "success");
+      initializeAdminDashboard();
+    } else {
+      showToast("Gagal menyimpan konfigurasi admin.", "error");
+    }
+  } catch (error) {
+    showToast(`Error menyimpan konfigurasi: ${error.message}`, "error");
+  } finally {
+    hideLoadingOverlay();
+  }
+}
+
+function initializeAdminDashboard() {
+  if (adminConfig.email) {
+    document.getElementById("dashboard-admin-email").textContent =
+      adminConfig.email;
+    showSection("admin-dashboard-section");
+  } else {
+    // If somehow adminConfig is not set, redirect to login
+    showSection("login-section");
+  }
+}
+
+function handleAdminLogout() {
+  adminConfig = { email: null, kelasMengampu: null, selectedMapel: [] };
+  showToast("Anda telah logout dari dashboard admin.", "info");
+  showSection("login-section");
+  document.getElementById("login-form").reset(); // Clear login form
+}
+
+// --- Mata Pelajaran Selection Logic ---
+
+// Function to generate abbreviation for custom subjects
+function generateAbbreviation(subjectName) {
+  const words = subjectName.split(" ").filter((word) => word.length > 0);
+  if (words.length === 0) return "";
+  if (words.length === 1) return words[0].substring(0, 5).toUpperCase();
+
+  let abbr = "";
+  // Take first letter of each word
+  for (let i = 0; i < words.length; i++) {
+    abbr += words[i][0];
+  }
+  abbr = abbr.toUpperCase();
+
+  // If still too long, truncate
+  if (abbr.length > 5) {
+    abbr = abbr.substring(0, 5);
+  }
+  // If too short, try to make it longer using parts of words
+  if (abbr.length < 3 && words.length > 1) {
+    abbr = words[0].substring(0, Math.min(words[0].length, 3)).toUpperCase();
+    if (words[1]) {
+      abbr += words[1].substring(0, Math.min(words[1].length, 2)).toUpperCase();
+    }
+    abbr = abbr.substring(0, 5); // Ensure it doesn't exceed 5 after extending
   }
 
-  // Define renderFunction after dataFetch and caching is handled
-  switch (sheetName) {
-    case "Tugas":
-      idKey = "ID_Tugas";
-      renderFunction = (item, headers) => `
-                  <td data-label="${headers[0]}">${item.Nama_Tugas}</td>
-                  <td data-label="${headers[1]}">${item.Mata_Pelajaran}</td>
-                  <td data-label="${headers[2]}">${item.Batas_Waktu}</td>
-                  <td data-label="${headers[3]}">${item.Untuk_Kelas}</td>
-              `;
+  let counter = 1;
+  let uniqueAbbr = abbr;
+  // Ensure abbreviation is unique across all known abbreviations
+  while (
+    Object.values(SUBJECT_ABBREVIATIONS).includes(uniqueAbbr) &&
+    uniqueAbbr !== SUBJECT_ABBREVIATIONS[subjectName]
+  ) {
+    uniqueAbbr = abbr + counter++;
+    if (counter > 100) {
+      // Prevent infinite loop for extremely common abbreviations
+      uniqueAbbr = abbr.substring(0, 3) + generateRandomId(2).toUpperCase(); // Fallback to random suffix
       break;
-    case "Nilai":
-      idKey = "ID_Nilai";
-      renderFunction = (item, headers) => `
-                  <td data-label="${headers[0]}">${item.NIS}</td>
-                  <td data-label="${headers[1]}">${item.ID_Tugas}</td>
-                  <td data-label="${headers[2]}">${item.Nilai}</td>
-                  <td data-label="${headers[3]}">${item.Status_Pengerjaan}</td>
-                  <td data-label="${headers[4]}">${
-        item.Tanggal_Input || "N/A"
-      }</td>
-              `;
-      break;
-    case "Kehadiran":
-      idKey = "ID_Kehadiran";
-      renderFunction = (item, headers) => `
-                  <td data-label="${headers[0]}">${item.ID_Kehadiran}</td>
-                  <td data-label="${headers[1]}">${item.NIS}</td>
-                  <td data-label="${headers[2]}">${item.Tanggal}</td>
-                  <td data-label="${headers[3]}">${item.Status}</td>
-              `;
-      break;
-    case "Catatan_Guru":
-      idKey = "ID_Catatan";
-      renderFunction = (item, headers) => `
-                  <td data-label="${headers[0]}">${item.ID_Catatan}</td>
-                  <td data-label="${headers[1]}">${item.NIS}</td>
-                  <td data-label="${headers[2]}">${item.Minggu_Ke}</td>
-                  <td data-label="${headers[3]}">${item.Catatan}</td>
-                  <td data-label="${headers[4]}">${
-        item.Tanggal_Input || "N/A"
-      }</td>
-              `;
-      break;
-    case "Jadwal_Pelajaran":
-      idKey = "ID_Jadwal";
-      renderFunction = (item, headers) => `
-                  <td data-label="${headers[0]}">${item.ID_Jadwal}</td>
-                  <td data-label="${headers[1]}">${item.Kelas}</td>
-                  <td data-label="${headers[2]}">${item.Hari}</td>
-                  <td data-label="${headers[3]}">${item.Jam}</td>
-                  <td data-label="${headers[4]}">${item.Mata_Pelajaran}</td>
-                  <td data-label="${headers[5]}">${item.Guru}</td>
-              `;
-      break;
-    case "Pengumuman":
-      idKey = "ID_Pengumuman";
-      renderFunction = (item, headers) => `
-                  <td data-label="${headers[0]}">${item.ID_Pengumuman}</td>
-                  <td data-label="${headers[1]}">${item.Judul}</td>
-                  <td data-label="${headers[2]}">${item.Tanggal_Pengumuman}</td>
-                  <td data-label="${headers[3]}">${
-        item.Untuk_Kelas || "Semua Kelas"
-      }</td>
-              `;
-      break;
-    default:
-      // This case should ideally not be reached due to the initial switch
-      console.error("renderFunction not defined for sheet:", sheetName);
-      return;
+    }
+  }
+  return uniqueAbbr;
+}
+
+// Function to render the subject selection UI
+function renderMapelSelection() {
+  const container = document.getElementById("admin-mapel-selection-container");
+  container.innerHTML = ""; // Clear existing content
+
+  // Ensure adminConfig.selectedMapel is initialized correctly for first-time load
+  if (!adminConfig.selectedMapel || adminConfig.selectedMapel.length === 0) {
+    // If no selection is saved, default to all HARDCODED_SUBJECTS being selected
+    adminConfig.selectedMapel = [...HARDCODED_SUBJECTS];
+  } else {
+    // Ensure any new HARDCODED_SUBJECTS are added to selectedMapel if not already present
+    HARDCODED_SUBJECTS.forEach((subject) => {
+      if (
+        !adminConfig.selectedMapel.some(
+          (s) => s.toLowerCase() === subject.toLowerCase()
+        )
+      ) {
+        adminConfig.selectedMapel.push(subject);
+      }
+    });
   }
 
-  tableBodyElement.innerHTML = ""; // Clear loading message
+  // Create a set of all unique subjects to display (hardcoded + currently selected custom ones)
+  const allSubjectsToDisplay = new Set();
+  HARDCODED_SUBJECTS.forEach((subject) => allSubjectsToDisplay.add(subject));
+  adminConfig.selectedMapel.forEach((subject) =>
+    allSubjectsToDisplay.add(subject)
+  ); // Adds custom subjects if present in selectedMapel
 
-  const headers = getHeaderLabels(tableBodyElement.id); // Get headers from the specific table
+  // Ensure all these subjects have abbreviations
+  Array.from(allSubjectsToDisplay).forEach((mapel) => {
+    if (!SUBJECT_ABBREVIATIONS[mapel]) {
+      SUBJECT_ABBREVIATIONS[mapel] = generateAbbreviation(mapel);
+    }
+  });
 
-  dataFetch.forEach((item) => {
-    const row = document.createElement("tr");
-    row.innerHTML =
-      renderFunction(item, headers) +
-      `
-                  <td class="py-2 px-4 border-b text-sm text-gray-700">
-                      <button onclick="editEntry('${sheetName}', ${JSON.stringify(
-        item[idKey]
-      )})" class="bg-yellow-500 hover:bg-yellow-600 text-white py-1 px-2 rounded-md text-xs mr-2">Edit</button>
-                      <button onclick="deleteEntry('${sheetName}', ${JSON.stringify(
-        item[idKey]
-      )})" class="bg-red-500 hover:bg-red-600 text-white py-1 px-2 rounded-md text-xs">Hapus</button>
-                  </td>
-              `;
-    tableBodyElement.appendChild(row);
+  const sortedSubjectsForDisplay = Array.from(allSubjectsToDisplay).sort(
+    (a, b) => a.localeCompare(b)
+  );
+
+  sortedSubjectsForDisplay.forEach((mapel) => {
+    const isSelected = adminConfig.selectedMapel.includes(mapel);
+    const mapelElement = document.createElement("span");
+    mapelElement.className = `inline-flex items-center px-3 py-1 rounded-full text-sm font-medium transition-colors cursor-pointer hover:shadow-md mr-2 mb-2 ${
+      isSelected ? "bg-green-100 text-green-800" : "bg-gray-200 text-gray-700"
+    }`;
+    mapelElement.innerHTML = `
+            ${mapel}
+            ${
+              isSelected
+                ? `<button type="button" class="ml-2 text-red-500 hover:text-red-700" data-mapel="${mapel}" aria-label="Hapus mata pelajaran">
+                <i class="fas fa-times"></i>
+            </button>`
+                : ""
+            }
+        `;
+
+    // Only add click listener for removing if selected, otherwise for adding
+    if (isSelected) {
+      mapelElement
+        .querySelector("button")
+        .addEventListener("click", (event) => {
+          event.stopPropagation(); // Prevent span click from propagating
+          removeMapel(mapel);
+        });
+    } else {
+      mapelElement.addEventListener("click", () => addMapel(mapel));
+    }
+    container.appendChild(mapelElement);
   });
 }
 
-// --- Configure Nilai Form based on NIS and ID Tugas selection ---
-async function configureNilaiFormBasedOnSelection() {
-  const nis = nilaiNisSelect.value;
-  const tugasId = nilaiTugasIdSelect.value;
-  const nilaiIdInput = document.getElementById("nilai-id");
+// Function to add a subject (either re-selecting an existing one or adding a new custom one)
+function addMapel(mapelToAdd) {
+  // Normalize input for case-insensitive comparison
+  const normalizedMapelToAdd = mapelToAdd.toLowerCase();
 
-  nilaiInput.disabled = false;
-  nilaiStatusSelect.disabled = false;
-  submitNilaiBtn.disabled = false;
-  nilaiInput.value = "";
-  nilaiStatusSelect.value = "";
-  nilaiEditId.value = "";
-  nilaiFormMode.value = "create";
-  submitNilaiBtn.textContent = "Simpan Nilai";
-
-  if (nis && tugasId) {
-    nilaiIdInput.value = `${nis}_${tugasId}`;
-    nilaiIdInput.classList.remove("bg-gray-100", "cursor-not-allowed");
-    nilaiIdInput.classList.add("bg-white");
-
-    // Fetch existing Nilai for this student and task combination (force refresh)
-    const existingNilai = await fetchData(
-      "Nilai",
-      {
-        nis: nis,
-        id_tugas: tugasId,
-      },
-      true
-    );
-
-    if (existingNilai && existingNilai.length > 0) {
-      const foundNilai = existingNilai[0];
-      showToast(
-        "Nilai untuk siswa dan tugas ini sudah ada. Mode Edit diaktifkan.",
-        "info"
-      );
-
-      nilaiInput.value = foundNilai.Nilai;
-      nilaiStatusSelect.value = foundNilai.Status_Pengerjaan;
-      nilaiEditId.value = foundNilai.ID_Nilai;
-      nilaiFormMode.value = "edit";
-      submitNilaiBtn.textContent = "Perbarui Nilai";
-
-      if (foundNilai.Status_Pengerjaan === "Tuntas") {
-        showToast(
-          "Nilai ini sudah Tuntas. Input tidak bisa dilakukan ulang.",
-          "warning",
-          5000
-        );
-        nilaiInput.disabled = true;
-        nilaiStatusSelect.disabled = true;
-        submitNilaiBtn.disabled = true;
-      }
-    }
-  } else {
-    nilaiIdInput.value = "";
-    nilaiIdInput.placeholder = "Akan Dihasilkan Otomatis";
-    nilaiIdInput.classList.add("bg-gray-100", "cursor-not-allowed");
-    nilaiIdInput.classList.remove("bg-white");
-  }
-}
-
-if (nilaiNisSelect)
-  nilaiNisSelect.addEventListener("change", configureNilaiFormBasedOnSelection);
-if (nilaiTugasIdSelect)
-  nilaiTugasIdSelect.addEventListener(
-    "change",
-    configureNilaiFormBasedOnSelection
+  // Check if it's already in the selected list (case-insensitive)
+  const isAlreadySelected = adminConfig.selectedMapel.some(
+    (mapel) => mapel.toLowerCase() === normalizedMapelToAdd
   );
 
-// --- Event Listeners for Kehadiran ID Generation ---
-if (kehadiranNisSelect) {
-  kehadiranNisSelect.addEventListener("change", updateKehadiranIdField);
-}
-if (kehadiranTanggalInput) {
-  kehadiranTanggalInput.addEventListener("change", updateKehadiranIdField);
-}
-
-// --- Event Listeners for Catatan Guru ID Generation --- Added
-if (catatanNisSelect) {
-  catatanNisSelect.addEventListener("change", updateCatatanIdField);
-}
-if (catatanMingguInput) {
-  catatanMingguInput.addEventListener("input", updateCatatanIdField); // Use 'input' for instant feedback
-}
-
-// --- Update Tugas ID field based on Mata Pelajaran selection ---
-async function updateTugasIdField() {
-  const selectedSubject = tugasMapelSelect.value;
-  const tugasIdInput = document.getElementById("tugas-id");
-
-  if (selectedSubject) {
-    const subjectAbbr = SUBJECT_ABBREVIATIONS[selectedSubject] || "OTH";
-    const currentMonth = new Date().getMonth() + 1;
-
-    // Fetch all existing tasks to determine the next sequential number (force refresh)
-    const allTugas = (await fetchData("Tugas", null, true)) || [];
-    dataCache.tugas = allTugas;
-
-    const tasksForSubjectInMonth = allTugas.filter((task) => {
-      const taskSubject = task.Mata_Pelajaran;
-      let taskMonth = currentMonth;
-      if (task.ID_Tugas && task.ID_Tugas.length >= 6) {
-        const monthFromId = parseInt(
-          task.ID_Tugas.substring(task.ID_Tugas.length - 2)
-        );
-        if (!isNaN(monthFromId) && monthFromId >= 1 && monthFromId <= 12) {
-          taskMonth = monthFromId;
-        }
-      }
-
-      return taskSubject === selectedSubject && taskMonth === currentMonth;
-    });
-
-    const nextTaskNumber = tasksForSubjectInMonth.length + 1;
-    const newTugasId = generateTugasId(
-      subjectAbbr,
-      nextTaskNumber,
-      currentMonth
+  if (!isAlreadySelected) {
+    // Find the correct casing if it's a hardcoded subject
+    const foundHardcoded = HARDCODED_SUBJECTS.find(
+      (s) => s.toLowerCase() === normalizedMapelToAdd
     );
+    const mapelToUse = foundHardcoded || mapelToAdd; // Use original hardcoded casing or user's input
 
-    tugasIdInput.value = newTugasId;
-    tugasIdInput.classList.remove("bg-gray-100", "cursor-not-allowed");
-    tugasIdInput.classList.add("bg-white");
+    adminConfig.selectedMapel.push(mapelToUse);
+    // Ensure it has an abbreviation if it's a new custom subject
+    if (!SUBJECT_ABBREVIATIONS[mapelToUse]) {
+      SUBJECT_ABBREVIATIONS[mapelToUse] = generateAbbreviation(mapelToUse);
+    }
+    showToast(`Mata pelajaran "${mapelToUse}" dipilih.`, "success");
+    renderMapelSelection(); // Re-render to update visual status
   } else {
-    tugasIdInput.value = "Dihasilkan Otomatis";
-    tugasIdInput.classList.add("bg-gray-100", "cursor-not-allowed");
-    tugasIdInput.classList.remove("bg-white");
+    showToast(`Mata pelajaran "${mapelToAdd}" sudah dipilih.`, "info");
   }
 }
 
-tugasMapelSelect.addEventListener("change", updateTugasIdField);
-
-// --- Update Pengumuman ID field ---
-async function updatePengumumanIdField() {
-  const pengumumanIdInput = document.getElementById("pengumuman-id");
-  // Force refresh for all announcements
-  const allPengumuman = (await fetchData("Pengumuman", null, true)) || [];
-  dataCache.pengumuman = allPengumuman;
-
-  const nextPengumumanNumber = allPengumuman.length + 1;
-  const newPengumumanId = `PGM_${String(nextPengumumanNumber).padStart(
-    3,
-    "0"
-  )}`;
-
-  pengumumanIdInput.value = newPengumumanId;
-  pengumumanIdInput.classList.remove("bg-gray-100", "cursor-not-allowed");
-  pengumumanIdInput.classList.add("bg-white");
+// Function to remove (deselect) a subject
+function removeMapel(mapelToRemove) {
+  adminConfig.selectedMapel = adminConfig.selectedMapel.filter(
+    (mapel) => mapel !== mapelToRemove
+  );
+  showToast(
+    `Mata pelajaran "${mapelToRemove}" dihapus dari daftar ajaran.`,
+    "info"
+  );
+  renderMapelSelection(); // Re-render to update visual status
 }
 
-// --- Edit Entry Function ---
-async function editEntry(sheetName, id) {
-  let formElement;
-  let idInput;
-  let modeInput;
-  let submitButton;
-  let itemToEdit;
-  let idKey;
+// Function to handle adding a new custom subject from the dedicated input field
+function addCustomSubject() {
+  const newMapelInput = document.getElementById("new-mapel-input");
+  const newMapelName = newMapelInput.value.trim();
 
-  try {
-    showLoading();
+  if (newMapelName) {
+    const normalizedNewMapelName = newMapelName.toLowerCase();
+    // Check if the subject already exists in the selected list (case-insensitive)
+    const isDuplicate = adminConfig.selectedMapel.some(
+      (s) => s.toLowerCase() === normalizedNewMapelName
+    );
+    // Check if it's already in the hardcoded list (case-insensitive)
+    const isHardcoded = HARDCODED_SUBJECTS.some(
+      (s) => s.toLowerCase() === normalizedNewMapelName
+    );
 
-    // Fetch the latest data for editing, always force refresh for edit operations
-    const currentData = await fetchData(sheetName, null, true);
-    if (!currentData) {
-      showToast("Gagal memuat data untuk edit.", "error");
-      return;
-    }
-    // Update the specific cache entry for this sheet
-    dataCache[sheetName.toLowerCase().replace("_", "")] = currentData;
-
-    switch (sheetName) {
-      case "Tugas":
-        formElement = document.getElementById("form-input-tugas");
-        idInput = document.getElementById("tugas-id");
-        modeInput = tugasFormMode;
-        submitButton = submitTugasBtn;
-        itemToEdit = dataCache.tugas.find((item) => item.ID_Tugas === id);
-        idKey = "ID_Tugas";
-        document.getElementById("tugas-nama").value = itemToEdit.Nama_Tugas;
-        tugasMapelSelect.value = itemToEdit.Mata_Pelajaran;
-        document.getElementById("tugas-deadline").value =
-          itemToEdit.Batas_Waktu;
-        document.getElementById("tugas-kelas").value = itemToEdit.Untuk_Kelas;
-        tugasEditId.value = itemToEdit.ID_Tugas;
-        break;
-      case "Nilai":
-        formElement = document.getElementById("form-input-nilai");
-        idInput = document.getElementById("nilai-id");
-        modeInput = nilaiFormMode;
-        submitButton = submitNilaiBtn;
-        itemToEdit = dataCache.nilai.find((item) => item.ID_Nilai === id);
-        idKey = "ID_Nilai";
-        if (nilaiNisSelect) nilaiNisSelect.value = itemToEdit.NIS;
-        if (nilaiTugasIdSelect) nilaiTugasIdSelect.value = itemToEdit.ID_Tugas;
-        nilaiInput.value = itemToEdit.Nilai;
-        nilaiStatusSelect.value = itemToEdit.Status_Pengerjaan;
-        nilaiEditId.value = itemToEdit.ID_Nilai;
-        nilaiInput.disabled = false;
-        nilaiStatusSelect.disabled = false;
-        if (nilaiNisSelect) nilaiNisSelect.disabled = true;
-        if (nilaiTugasIdSelect) nilaiTugasIdSelect.disabled = true;
-        break;
-      case "Kehadiran":
-        formElement = document.getElementById("form-input-kehadiran");
-        idInput = document.getElementById("kehadiran-id");
-        modeInput = kehadiranFormMode;
-        submitButton = submitKehadiranBtn;
-        itemToEdit = dataCache.kehadiran.find(
-          (item) => item.ID_Kehadiran === id
-        );
-        idKey = "ID_Kehadiran";
-        kehadiranNisSelect.value = itemToEdit.NIS;
-        document.getElementById("kehadiran-tanggal").value = itemToEdit.Tanggal;
-        document.getElementById("kehadiran-status").value = itemToEdit.Status;
-        kehadiranEditId.value = itemToEdit.ID_Kehadiran;
-        break;
-      case "Catatan_Guru":
-        formElement = document.getElementById("form-input-catatan");
-        idInput = document.getElementById("catatan-id");
-        modeInput = catatanFormMode;
-        submitButton = submitCatatanBtn;
-        itemToEdit = dataCache.catatan_guru.find(
-          (item) => item.ID_Catatan === id
-        );
-        idKey = "ID_Catatan";
-        catatanNisSelect.value = itemToEdit.NIS;
-        document.getElementById("catatan-minggu").value = itemToEdit.Minggu_Ke;
-        document.getElementById("catatan-isi").value = itemToEdit.Catatan;
-        catatanEditId.value = itemToEdit.ID_Catatan;
-        break;
-      case "Jadwal_Pelajaran":
-        formElement = document.getElementById("form-input-jadwal");
-        idInput = document.getElementById("jadwal-id");
-        modeInput = jadwalFormMode;
-        submitButton = submitJadwalBtn;
-        itemToEdit = dataCache.jadwal_pelajaran.find(
-          (item) => item.ID_Jadwal === id
-        );
-        idKey = "ID_Jadwal";
-        document.getElementById("jadwal-kelas").value = itemToEdit.Kelas;
-        document.getElementById("jadwal-hari").value = itemToEdit.Hari;
-        document.getElementById("jadwal-jam").value = itemToEdit.Jam;
-        jadwalMapelSelect.value = itemToEdit.Mata_Pelajaran;
-        document.getElementById("jadwal-guru").value = itemToEdit.Guru;
-        jadwalEditId.value = itemToEdit.ID_Jadwal;
-        break;
-      case "Pengumuman":
-        formElement = document.getElementById("form-input-pengumuman");
-        idInput = document.getElementById("pengumuman-id");
-        modeInput = pengumumanFormMode;
-        submitButton = submitPengumumanBtn;
-        itemToEdit = dataCache.pengumuman.find(
-          (item) => item.ID_Pengumuman === id
-        );
-        idKey = "ID_Pengumuman";
-        document.getElementById("pengumuman-judul").value = itemToEdit.Judul;
-        document.getElementById("pengumuman-isi").value =
-          itemToEdit.Isi_Pengumuman;
-        document.getElementById("pengumuman-tanggal").value =
-          itemToEdit.Tanggal_Pengumuman;
-        document.getElementById("pengumuman-untuk-kelas").value =
-          itemToEdit.Untuk_Kelas || "";
-        pengumumanEditId.value = itemToEdit.ID_Pengumuman;
-        break;
-      default:
-        showToast("Aksi edit tidak didukung untuk sheet ini.", "error");
-        return;
-    }
-
-    if (itemToEdit) {
-      idInput.value = itemToEdit[idKey];
-      idInput.readOnly = true;
-      idInput.classList.remove("bg-gray-100", "cursor-not-allowed");
-      idInput.classList.add("bg-white");
-      modeInput.value = "edit";
-      submitButton.textContent = "Perbarui Data";
-      submitButton.disabled = false;
-
-      showToast(`Mode Edit: ${sheetName} ID ${id}`, "info");
+    if (isDuplicate || isHardcoded) {
+      showToast(
+        `Mata pelajaran "${newMapelName}" sudah ada dalam daftar.`,
+        "warning"
+      );
     } else {
+      addMapel(newMapelName); // Use the existing addMapel logic to add and select
       showToast(
-        `Data dengan ID ${id} tidak ditemukan di ${sheetName}.`,
-        "error"
-      );
-    }
-  } catch (error) {
-    console.error("Edit Entry Error:", error);
-    showToast("Terjadi kesalahan saat mencoba mengedit data.", "error");
-  } finally {
-    hideLoading();
-  }
-}
-
-// --- Delete Entry Function ---
-async function deleteEntry(sheetName, id) {
-  showConfirmModal(
-    `Apakah Anda yakin ingin menghapus data dengan ID ${id} dari ${sheetName}?`,
-    async () => {
-      let idKey;
-      switch (sheetName) {
-        case "Tugas":
-          idKey = "ID_Tugas";
-          break;
-        case "Nilai":
-          idKey = "ID_Nilai";
-          break;
-        case "Kehadiran":
-          idKey = "ID_Kehadiran";
-          break;
-        case "Catatan_Guru":
-          idKey = "ID_Catatan";
-          break;
-        case "Jadwal_Pelajaran":
-          idKey = "ID_Jadwal";
-          break;
-        case "Pengumuman":
-          idKey = "ID_Pengumuman";
-          break;
-        case "Siswa":
-          idKey = "NIS";
-          break;
-        case "Admin_Users":
-          idKey = "Email";
-          break;
-        default:
-          showToast("Aksi hapus tidak didukung untuk sheet ini.", "error");
-          return;
-      }
-
-      const dataToDelete = {};
-      dataToDelete[idKey] = id;
-
-      try {
-        showLoading();
-        const result = await sendData(sheetName, dataToDelete, "delete"); // sendData now handles cache invalidation
-        if (result.success) {
-          showToast(
-            `${sheetName} dengan ID ${id} berhasil dihapus!`,
-            "success"
-          );
-          await loadAdminTableData(sheetName); // Reload table after deletion
-          if (sheetName === "Siswa" || sheetName === "Tugas") {
-            await loadAdminDropdownData(); // Refresh dropdowns if relevant data is modified
-          }
-        } else {
-          showToast(
-            `Gagal menghapus ${sheetName} dengan ID ${id}: ${result.message}`,
-            "error"
-          );
-        }
-      } catch (error) {
-        console.error("Delete Entry Error:", error);
-        showToast("Terjadi kesalahan saat menghapus data.", "error");
-      } finally {
-        hideLoading();
-      }
-    }
-  );
-}
-
-// --- Admin Form Submissions ---
-async function handleAdminFormSubmit(
-  e,
-  sheetName,
-  idKeyName,
-  formModeElement,
-  editIdElement,
-  submitButtonElement
-) {
-  e.preventDefault();
-  showLoading();
-
-  try {
-    const formData = new FormData(e.target);
-    const data = Object.fromEntries(formData.entries());
-    let action = formModeElement.value;
-    let idInputElement = e.target.querySelector(`input[name="${idKeyName}"]`);
-
-    let result;
-
-    if (action === "create") {
-      if (
-        idKeyName === "ID_Tugas" &&
-        idInputElement.value === "Dihasilkan Otomatis"
-      ) {
-        showToast(
-          "Silakan pilih Mata Pelajaran untuk menghasilkan ID Tugas.",
-          "error"
-        );
-        hideLoading();
-        return;
-      } else if (
-        idKeyName === "ID_Nilai" &&
-        (!idInputElement.value || idInputElement.value.trim() === "")
-      ) {
-        showToast(
-          "NIS dan ID Tugas harus dipilih untuk menghasilkan ID Nilai.",
-          "error"
-        );
-        hideLoading();
-        return;
-      } else if (
-        idKeyName === "ID_Kehadiran" &&
-        (idInputElement.value === "Dihasilkan Otomatis" ||
-          idInputElement.value.trim() === "")
-      ) {
-        showToast(
-          "Silakan pilih NIS dan Tanggal untuk menghasilkan ID Kehadiran.",
-          "error"
-        );
-        hideLoading();
-        return;
-      } else if (
-        // Added validation for Catatan Guru
-        idKeyName === "ID_Catatan" &&
-        (idInputElement.value === "Dihasilkan Otomatis" ||
-          idInputElement.value.trim() === "")
-      ) {
-        showToast(
-          "Silakan pilih NIS dan Minggu ke- untuk menghasilkan ID Catatan.",
-          "error"
-        );
-        hideLoading();
-        return;
-      } else if (
-        idKeyName === "ID_Pengumuman" &&
-        idInputElement.value === "Dihasilkan Otomatis"
-      ) {
-        showToast("Silakan tunggu ID Pengumuman dihasilkan.", "error");
-        hideLoading();
-        return;
-      }
-
-      if (
-        idKeyName !== "ID_Nilai" &&
-        idKeyName !== "ID_Tugas" &&
-        idKeyName !== "ID_Pengumuman" &&
-        idKeyName !== "ID_Kehadiran" &&
-        idKeyName !== "ID_Catatan" && // Added condition for Catatan Guru
-        idInputElement &&
-        (idInputElement.value === "Dihasilkan Otomatis" ||
-          idInputElement.value.trim() === "")
-      ) {
-        data[idKeyName] = generateUniqueId(
-          idKeyName.split("_")[0].substring(0, 3).toUpperCase()
-        );
-      } else if (idInputElement && idInputElement.value.trim() !== "") {
-        data[idKeyName] = idInputElement.value;
-      }
-
-      result = await sendData(sheetName, data, "create");
-    } else if (action === "edit") {
-      data.originalId = editIdElement.value;
-      result = await sendData(sheetName, data, "update");
-    }
-
-    if (result.success) {
-      showToast(
-        `${sheetName} berhasil ${
-          action === "create" ? "disimpan" : "diperbarui"
-        }!`,
+        `Mata pelajaran "${newMapelName}" berhasil ditambahkan dan dipilih.`,
         "success"
       );
-      e.target.reset();
-
-      resetAdminForm(
-        e.target,
-        formModeElement,
-        idKeyName,
-        submitButtonElement,
-        `Simpan ${sheetName.replace("_", " ")}`,
-        idInputElement
-      );
-
-      await loadAdminTableData(sheetName); // Reload table after submission
-      await loadAdminDropdownData(); // Reload dropdowns just in case (e.g., new tasks added or subjects)
-      if (idKeyName === "ID_Nilai") {
-        configureNilaiFormBasedOnSelection(); // Re-trigger for Nilai to reset its field state
-      } else if (idKeyName === "ID_Tugas") {
-        updateTugasIdField(); // Re-trigger for Tugas to reset its field state
-      } else if (idKeyName === "ID_Kehadiran") {
-        updateKehadiranIdField(); // Re-trigger for Kehadiran to reset its field state
-      } else if (idKeyName === "ID_Catatan") {
-        // Added
-        updateCatatanIdField(); // Re-trigger for Catatan to reset its field state
-      } else if (idKeyName === "ID_Pengumuman") {
-        updatePengumumanIdField();
-      }
-    } else {
-      showToast(`Gagal ${action} ${sheetName}: ${result.message}`, "error");
     }
-  } catch (error) {
-    console.error("Admin Form Submit Error:", error);
-    showToast("Terjadi kesalahan saat submit data.", "error");
-  } finally {
-    hideLoading();
+    newMapelInput.value = ""; // Clear the input field
+    renderMapelSelection(); // Re-render to show the newly added subject as selected
+  } else {
+    showToast("Nama mata pelajaran tidak boleh kosong.", "warning");
   }
 }
 
-document.getElementById("form-input-tugas").addEventListener("submit", (e) => {
-  handleAdminFormSubmit(
-    e,
-    "Tugas",
-    "ID_Tugas",
-    tugasFormMode,
-    tugasEditId,
-    submitTugasBtn
-  );
-});
-
-document.getElementById("form-input-nilai").addEventListener("submit", (e) => {
-  handleAdminFormSubmit(
-    e,
-    "Nilai",
-    "ID_Nilai",
-    nilaiFormMode,
-    nilaiEditId,
-    submitNilaiBtn
-  );
-});
-
-document
-  .getElementById("form-input-kehadiran")
-  .addEventListener("submit", (e) => {
-    handleAdminFormSubmit(
-      e,
-      "Kehadiran",
-      "ID_Kehadiran",
-      kehadiranFormMode,
-      kehadiranEditId,
-      submitKehadiranBtn
-    );
-  });
-
-document
-  .getElementById("form-input-catatan")
-  .addEventListener("submit", (e) => {
-    handleAdminFormSubmit(
-      e,
-      "Catatan_Guru",
-      "ID_Catatan",
-      catatanFormMode,
-      catatanEditId,
-      submitCatatanBtn
-    );
-  });
-
-document.getElementById("form-input-jadwal").addEventListener("submit", (e) => {
-  handleAdminFormSubmit(
-    e,
-    "Jadwal_Pelajaran",
-    "ID_Jadwal",
-    jadwalFormMode,
-    jadwalEditId,
-    submitJadwalBtn
-  );
-});
-
-document
-  .getElementById("form-input-pengumuman")
-  .addEventListener("submit", (e) => {
-    handleAdminFormSubmit(
-      e,
-      "Pengumuman",
-      "ID_Pengumuman",
-      pengumumanFormMode,
-      pengumumanEditId,
-      submitPengumumanBtn
-    );
-  });
-
-// --- Tab Switching Logic for Admin Dashboard ---
-document.querySelectorAll(".admin-tab-button").forEach((button) => {
-  button.addEventListener("click", async () => {
-    const targetTab = button.dataset.tab;
-    switchTab(
-      targetTab,
-      document.querySelectorAll(".admin-tab-button"),
-      "admin-"
-    );
-    showLoading();
-    try {
-      // Reset forms to 'create' mode when switching tabs and clear old data
-      resetAdminForm(
-        document.getElementById("form-input-tugas"),
-        tugasFormMode,
-        "ID_Tugas",
-        submitTugasBtn,
-        "Simpan Tugas",
-        document.getElementById("tugas-id")
-      );
-      resetAdminForm(
-        document.getElementById("form-input-nilai"),
-        nilaiFormMode,
-        "ID_Nilai",
-        submitNilaiBtn,
-        "Simpan Nilai",
-        document.getElementById("nilai-id")
-      );
-      resetAdminForm(
-        document.getElementById("form-input-kehadiran"),
-        kehadiranFormMode,
-        "ID_Kehadiran",
-        submitKehadiranBtn,
-        "Simpan Kehadiran",
-        document.getElementById("kehadiran-id")
-      );
-      resetAdminForm(
-        document.getElementById("form-input-catatan"),
-        catatanFormMode,
-        "ID_Catatan",
-        submitCatatanBtn,
-        "Simpan Catatan",
-        document.getElementById("catatan-id")
-      );
-      resetAdminForm(
-        document.getElementById("form-input-jadwal"),
-        jadwalFormMode,
-        "ID_Jadwal",
-        submitJadwalBtn,
-        "Simpan Jadwal",
-        document.getElementById("jadwal-id")
-      );
-      resetAdminForm(
-        document.getElementById("form-input-pengumuman"),
-        pengumumanFormMode,
-        "ID_Pengumuman",
-        submitPengumumanBtn,
-        "Simpan Pengumuman",
-        document.getElementById("pengumuman-id")
-      );
-
-      // Reload dropdowns and tables if navigating to a form that uses them
-      if (
-        [
-          "input-nilai",
-          "input-kehadiran",
-          "input-catatan",
-          "input-tugas",
-          "input-jadwal",
-          "input-pengumuman",
-        ].includes(targetTab)
-      ) {
-        await loadAdminDropdownData(); // Ensure dropdowns are populated with latest data
-        if (targetTab === "input-nilai") {
-          configureNilaiFormBasedOnSelection(); // Trigger initial configuration for Nilai form
-        } else if (targetTab === "input-tugas") {
-          updateTugasIdField(); // Trigger initial ID generation for Tugas form
-        } else if (targetTab === "input-kehadiran") {
-          updateKehadiranIdField(); // Trigger initial ID generation for Kehadiran form
-        } else if (targetTab === "input-catatan") {
-          // Added
-          updateCatatanIdField(); // Trigger initial ID generation for Catatan form
-        } else if (targetTab === "input-pengumuman") {
-          updatePengumumanIdField();
-        }
-      }
-
-      let sheetNameForTable;
-      switch (targetTab) {
-        case "input-tugas":
-          sheetNameForTable = "Tugas";
-          break;
-        case "input-nilai":
-          sheetNameForTable = "Nilai";
-          break;
-        case "input-kehadiran":
-          sheetNameForTable = "Kehadiran";
-          break;
-        case "input-catatan":
-          sheetNameForTable = "Catatan_Guru";
-          break;
-        case "input-jadwal":
-          sheetNameForTable = "Jadwal_Pelajaran";
-          break;
-        case "input-pengumuman":
-          sheetNameForTable = "Pengumuman";
-          break;
-        default:
-          sheetNameForTable = "";
-      }
-      if (sheetNameForTable) {
-        await loadAdminTableData(sheetNameForTable); // Load table data for the current tab
-      }
-    } catch (error) {
-      console.error("Error loading admin tab data:", error);
-      showToast("Gagal memuat data untuk tab admin ini.", "error");
-    } finally {
-      hideLoading();
-    }
-  });
-});
-
-// Initialize admin view: show login by default, hide dashboard
-showSection("login-section");
-
-// Apply initial 'Dihasilkan Otomatis' and readonly state to admin ID fields
-// This part is modified slightly to rely on updateKehadiranIdField for initial state
-document.getElementById("tugas-id").readOnly = true;
-document.getElementById("tugas-id").value = "Dihasilkan Otomatis";
-document
-  .getElementById("tugas-id")
-  .classList.add("bg-gray-100", "cursor-not-allowed");
-
-document.getElementById("nilai-id").readOnly = true;
-document.getElementById("nilai-id").value = "";
-document.getElementById("nilai-id").placeholder = "Akan Dihasilkan Otomatis";
-document
-  .getElementById("nilai-id")
-  .classList.add("bg-gray-100", "cursor-not-allowed");
-
-document.getElementById("kehadiran-id").readOnly = true;
-// Initial call for kehadiran-id, will show "Dihasilkan Otomatis" if NIS/Tanggal are empty
-// This is now handled by resetAdminForm when tab is switched or login is complete
-// document.getElementById("kehadiran-id").value = "Dihasilkan Otomatis"; // Removed, handled by updateKehadiranIdField
-document
-  .getElementById("kehadiran-id")
-  .classList.add("bg-gray-100", "cursor-not-allowed");
-
-document.getElementById("catatan-id").readOnly = true;
-// document.getElementById("catatan-id").value = "Dihasilkan Otomatis"; // Removed, handled by updateCatatanIdField
-document
-  .getElementById("catatan-id")
-  .classList.add("bg-gray-100", "cursor-not-allowed");
-
-document.getElementById("jadwal-id").readOnly = true;
-document.getElementById("jadwal-id").value = "Dihasilkan Otomatis";
-document
-  .getElementById("jadwal-id")
-  .classList.add("bg-gray-100", "cursor-not-allowed");
-
-document.getElementById("pengumuman-id").readOnly = true;
-document.getElementById("pengumuman-id").value = "Dihasilkan Otomatis";
-document
-  .getElementById("pengumuman-id")
-  .classList.add("bg-gray-100", "cursor-not-allowed");
-
-// Initial call to update Kehadiran ID on page load, if elements are ready
+// --- Event Listeners ---
 document.addEventListener("DOMContentLoaded", () => {
-  // These calls are mainly for when the admin section is directly loaded.
-  // If navigated via login, the login process will handle initial ID generation.
-  // The presence of if (kehadiranNisSelect) / if (kehadiranTanggalInput) protects against errors
-  // if the dashboard is not yet visible or elements aren't populated.
-  if (
-    document
-      .getElementById("admin-dashboard-section")
-      .classList.contains("section-hidden")
-  ) {
-    // Only run if not already on dashboard, to avoid double updates on login redirect.
-    updateKehadiranIdField(); // Ensure initial state reflects empty dropdowns.
-    updateCatatanIdField(); // Ensure initial state reflects empty dropdowns for Catatan
+  const loginForm = document.getElementById("login-form");
+  if (loginForm) {
+    loginForm.addEventListener("submit", handleAdminLogin);
   }
+
+  const adminConfigForm = document.getElementById("admin-config-form");
+  if (adminConfigForm) {
+    adminConfigForm.addEventListener("submit", handleAdminConfigSubmit);
+  }
+
+  const logoutAdminBtn = document.getElementById("logout-admin-btn");
+  if (logoutAdminBtn) {
+    logoutAdminBtn.addEventListener("click", handleAdminLogout);
+  }
+
+  const addNewMapelBtn = document.getElementById("add-new-mapel-btn");
+  if (addNewMapelBtn) {
+    addNewMapelBtn.addEventListener("click", addCustomSubject);
+  }
+
+  const newMapelInput = document.getElementById("new-mapel-input");
+  if (newMapelInput) {
+    newMapelInput.addEventListener("keydown", (event) => {
+      if (event.key === "Enter") {
+        event.preventDefault(); // Prevent form submission
+        addCustomSubject();
+      }
+    });
+  }
+
+  // The initial rendering of mapel selection should happen when admin-config-section is shown.
+  // This is handled in `handleAdminLogin` when `showSection("admin-config-section")` is called.
 });
