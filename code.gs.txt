@@ -1,0 +1,203 @@
+// Ganti ini dengan ID Google Spreadsheet Anda
+const SPREADSHEET_ID = '1wm9YTU5iTZesfnBzX9NR2VGVva8qkRpTwf9JEt4YWMg';
+
+function doGet(e) {
+  const sheetName = e.parameter.sheet;
+  const filterEmail = e.parameter.email_guru; // Untuk filter Guru berdasarkan Email
+  const filterMataPelajaran = e.parameter.mata_pelajaran; // Untuk filter Tugas/Nilai
+  const filterKelasDiampu = e.parameter.kelas_diampu; // Untuk filter Pengumuman/Jadwal
+  const filterGuruNama = e.parameter.guru; // Untuk filter Jadwal Pelajaran berdasarkan Nama Guru
+  const filterNis = e.parameter.nis; // Untuk filter Nilai/Kehadiran/Catatan_Guru (jika diperlukan)
+
+  const spreadsheet = SpreadsheetApp.openById(SPREADSHEET_ID);
+  const sheet = spreadsheet.getSheetByName(sheetName);
+
+  if (!sheet) {
+    return ContentService.createTextOutput(JSON.stringify({ error: `Sheet '${sheetName}' tidak ditemukan.` }))
+      .setMimeType(ContentService.MimeType.JSON);
+  }
+
+  const range = sheet.getDataRange();
+  const values = range.getDisplayValues();
+
+  if (values.length < 1) {
+    return ContentService.createTextOutput(JSON.stringify([])).setMimeType(ContentService.MimeType.JSON);
+  }
+
+  const headers = values[0];
+  const data = [];
+
+  Logger.log('Headers for sheet %s: %s', sheetName, JSON.stringify(headers));
+
+  for (let i = 1; i < values.length; i++) {
+    const row = values[i];
+    const rowObject = {};
+    for (let j = 0; j < headers.length; j++) {
+      rowObject[headers[j]] = row[j];
+    }
+
+    Logger.log('Processing row for %s: %s', sheetName, JSON.stringify(rowObject)); // Log setiap baris
+
+    let includeRow = true; // Default: include row
+
+    // --- Filtering Logic based on sheetName and parameters ---
+    if (sheetName === 'Guru' && filterEmail) {
+      if (rowObject.Email !== filterEmail) {
+        includeRow = false;
+      }
+    } else if (sheetName === 'Tugas' && filterMataPelajaran) {
+        // Filter Tugas berdasarkan Mata_Pelajaran guru yang login
+        if (rowObject.Mata_Pelajaran !== filterMataPelajaran) {
+            includeRow = false;
+        }
+    } else if (sheetName === 'Nilai' && filterMataPelajaran) {
+        // Filter Nilai berdasarkan Mata_Pelajaran tugas yang diampu guru
+        // Ini lebih kompleks, biasanya perlu ID Tugas yang terkait dengan Mata Pelajaran guru
+        // Untuk sementara, kita akan anggap ada cara di sheet Nilai untuk memfilter berdasarkan mapel guru.
+        // Jika sheet Nilai tidak punya Mata_Pelajaran, perlu mengambil ID_Tugas dulu, lalu filter tugas berdasarkan mapel.
+        // Untuk simplifikasi awal, kita akan asumsikan bisa difilter langsung.
+        // Anda perlu menyesuaikan ini jika struktur sheet Nilai tidak mendukung filter Mata_Pelajaran.
+        if (rowObject.Mata_Pelajaran !== filterMataPelajaran) { // Asumsi ada kolom Mata_Pelajaran di sheet Nilai
+             includeRow = false;
+        }
+        // Jika tidak ada Mata_Pelajaran di sheet Nilai, Anda perlu strategi lain,
+        // misalnya ambil semua Nilai, lalu filter di sisi klien (guru.js) berdasarkan data Tugas yang relevan.
+    } else if (sheetName === 'Kehadiran' && filterNis) {
+        // Kehadiran bisa difilter per siswa
+        if (rowObject.NIS !== filterNis) {
+            includeRow = false;
+        }
+    } else if (sheetName === 'Catatan_Guru' && filterEmail) {
+        // Catatan Guru bisa difilter berdasarkan email guru pembuat catatan
+        if (rowObject.Guru_Email !== filterEmail) { // Asumsi ada kolom Guru_Email di sheet Catatan_Guru
+            includeRow = false;
+        }
+    } else if (sheetName === 'Jadwal_Pelajaran' && filterGuruNama) {
+        // Filter Jadwal Pelajaran berdasarkan nama guru
+        if (rowObject.Guru !== filterGuruNama) {
+            includeRow = false;
+        }
+    } else if (sheetName === 'Pengumuman' && filterKelasDiampu) {
+        // Filter Pengumuman berdasarkan kelas yang diampu guru
+        // Jika 'Untuk_Kelas' kosong di pengumuman, berarti untuk semua kelas.
+        // Jika 'Untuk_Kelas' tidak kosong, harus cocok dengan kelas diampu guru.
+        const pengumumanUntukKelas = rowObject.Untuk_Kelas ? rowObject.Untuk_Kelas.split(',').map(k => k.trim()) : [];
+        const guruKelasDiampuArray = filterKelasDiampu ? filterKelasDiampu.split(',').map(k => k.trim()) : [];
+
+        if (pengumumanUntukKelas.length > 0) { // Jika pengumuman spesifik untuk kelas tertentu
+            let matchFound = false;
+            for (const pKelas of pengumumanUntukKelas) {
+                if (guruKelasDiampuArray.includes(pKelas)) {
+                    matchFound = true;
+                    break;
+                }
+            }
+            if (!matchFound) {
+                includeRow = false;
+            }
+        }
+        // Jika pengumuman.Untuk_Kelas kosong, berarti untuk semua, jadi includeRow tetap true.
+    }
+    // Filter untuk `Siswa`, `Admin_Users` akan selalu di-include di sini jika tidak ada filter NIS
+    // atau jika Apps Script digunakan untuk mengambil semua siswa oleh admin di manajemensiswa.html
+
+    if (includeRow) {
+      data.push(rowObject);
+    }
+  }
+
+  return ContentService.createTextOutput(JSON.stringify(data)).setMimeType(ContentService.MimeType.JSON);
+}
+
+// Fungsi doPost tetap sama seperti sebelumnya (tidak perlu diubah)
+function doPost(e) {
+  const sheetName = e.parameter.sheet;
+  const action = e.parameter.action; // Ambil action (add, update, delete)
+  const payload = e.parameter.data ? JSON.parse(e.parameter.data) : {};
+  const idColumn = e.parameter.idColumn; // Kolom ID untuk update/delete
+  const idValue = e.parameter.idValue;   // Nilai ID untuk update/delete
+
+  const spreadsheet = SpreadsheetApp.openById(SPREADSHEET_ID);
+  const sheet = spreadsheet.getSheetByName(sheetName);
+
+  if (!sheet) {
+    return ContentService.createTextOutput(JSON.stringify({ success: false, message: `Sheet '${sheetName}' tidak ditemukan.` }))
+      .setMimeType(ContentService.MimeType.JSON);
+  }
+
+  const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+
+  try {
+    if (action === 'add') {
+      const newRow = [];
+      for (let i = 0; i < headers.length; i++) {
+        const header = headers[i];
+        newRow.push(payload[header] !== undefined ? payload[header] : '');
+      }
+      sheet.appendRow(newRow);
+      return ContentService.createTextOutput(JSON.stringify({ success: true, message: `Data berhasil ditambahkan ke sheet '${sheetName}'.` }))
+        .setMimeType(ContentService.MimeType.JSON);
+    } else if (action === 'update') {
+      if (!idColumn || !payload[idColumn]) {
+        throw new Error("ID Column atau ID Value tidak diberikan untuk update.");
+      }
+      const allData = sheet.getDataRange().getValues();
+      const headerRow = allData[0];
+      const idColumnIndex = headerRow.indexOf(idColumn);
+
+      if (idColumnIndex === -1) {
+        throw new Error(`Kolom ID '${idColumn}' tidak ditemukan di sheet '${sheetName}'.`);
+      }
+
+      for (let i = 1; i < allData.length; i++) {
+        if (allData[i][idColumnIndex] == payload[idColumn]) {
+          const updatedRow = [];
+          for (let j = 0; j < headerRow.length; j++) {
+            const header = headerRow[j];
+            updatedRow.push(payload[header] !== undefined ? payload[header] : allData[i][j]);
+          }
+          sheet.getRange(i + 1, 1, 1, updatedRow.length).setValues([updatedRow]);
+          return ContentService.createTextOutput(JSON.stringify({ success: true, message: `Data dengan ${idColumn} '${payload[idColumn]}' berhasil diperbarui di sheet '${sheetName}'.` }))
+            .setMimeType(ContentService.MimeType.JSON);
+        }
+      }
+      return ContentService.createTextOutput(JSON.stringify({ success: false, message: `Data dengan ${idColumn} '${payload[idColumn]}' tidak ditemukan untuk diperbarui di sheet '${sheetName}'.` }))
+        .setMimeType(ContentService.MimeType.JSON);
+    } else if (action === 'delete') {
+      if (!idColumn || !idValue) {
+        throw new Error("ID Column atau ID Value tidak diberikan untuk delete.");
+      }
+      const allData = sheet.getDataRange().getValues();
+      const headerRow = allData[0];
+      const idColumnIndex = headerRow.indexOf(idColumn);
+
+      if (idColumnIndex === -1) {
+        throw new Error(`Kolom ID '${idColumn}' tidak ditemukan di sheet '${sheetName}'.`);
+      }
+
+      let rowToDelete = -1;
+      for (let i = 1; i < allData.length; i++) {
+        if (allData[i][idColumnIndex] == idValue) {
+          rowToDelete = i + 1;
+          break;
+        }
+      }
+
+      if (rowToDelete !== -1) {
+        sheet.deleteRow(rowToDelete);
+        return ContentService.createTextOutput(JSON.stringify({ success: true, message: `Data dengan ${idColumn} '${idValue}' berhasil dihapus dari sheet '${sheetName}'.` }))
+          .setMimeType(ContentService.MimeType.JSON);
+      } else {
+        return ContentService.createTextOutput(JSON.stringify({ success: false, message: `Data dengan ${idColumn} '${idValue}' tidak ditemukan di sheet '${sheetName}'.` }))
+          .setMimeType(ContentService.MimeType.JSON);
+      }
+    } else {
+      return ContentService.createTextOutput(JSON.stringify({ success: false, message: "Aksi tidak valid." }))
+        .setMimeType(ContentService.MimeType.JSON);
+    }
+  } catch (error) {
+    Logger.log('Error in doPost for sheet %s: %s', sheetName, error.message);
+    return ContentService.createTextOutput(JSON.stringify({ success: false, message: `Terjadi kesalahan server: ${error.message}` }))
+      .setMimeType(ContentService.MimeType.JSON);
+  }
+}

@@ -1,0 +1,64 @@
+function createSpreadsheet() {
+  // Create a new spreadsheet
+  var spreadsheet = SpreadsheetApp.create("SchoolData");
+  
+  // Define sheet names and their headers
+  var sheetsData = [
+    {
+      sheetName: "Siswa",
+      headers: ["NIS", "Nama", "Kelas", "Wali_Murid"]
+    },
+    {
+      sheetName: "Tugas",
+      headers: ["ID_Tugas", "Nama_Tugas", "Mata_Pelajaran", "Batas_Waktu", "Untuk_Kelas"]
+    },
+    {
+      sheetName: "Nilai",
+      headers: ["ID_Nilai", "NIS", "ID_Tugas", "Nilai", "Status_Pengerjaan", "Tanggal_Input"]
+    },
+    {
+      sheetName: "Kehadiran",
+      headers: ["ID_Kehadiran", "NIS", "Tanggal", "Status"]
+    },
+    {
+      sheetName: "Pengumuman",
+      headers: ["ID_Pengumuman", "Judul", "Isi_Pengumuman", "Tanggal_Pengumuman", "Untuk_Kelas"]
+    },
+    {
+      sheetName: "Catatan_Guru",
+      headers: ["ID_Catatan", "NIS", "Minggu_Ke", "Catatan", "Tanggal_Input"]
+    },
+    {
+      sheetName: "Jadwal_Pelajaran",
+      headers: ["ID_Jadwal", "Kelas", "Hari", "Jam", "Mata_Pelajaran", "Guru"]
+    },
+    {
+      sheetName: "Admin_Users",
+      headers: ["Email"]
+    }
+  ];
+
+  // Loop through each sheet configuration
+  sheetsData.forEach(function(sheetInfo) {
+    // Create or get the sheet
+    var sheet = spreadsheet.getSheetByName(sheetInfo.sheetName);
+    if (!sheet) {
+      sheet = spreadsheet.insertSheet(sheetInfo.sheetName);
+    }
+    
+    // Set headers
+    sheet.getRange(1, 1, 1, sheetInfo.headers.length).setValues([sheetInfo.headers]);
+    
+    // Optional: Auto-resize columns for better readability
+    sheet.autoResizeColumns(1, sheetInfo.headers.length);
+  });
+
+  // Remove the default "Sheet1" if it exists
+  var defaultSheet = spreadsheet.getSheetByName("Sheet1");
+  if (defaultSheet) {
+    spreadsheet.deleteSheet(defaultSheet);
+  }
+
+  // Log the spreadsheet URL for reference
+  Logger.log("Spreadsheet created: " + spreadsheet.getUrl());
+}
