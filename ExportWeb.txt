@@ -1,0 +1,249 @@
+function createExportWebSheet() {
+  try {
+    var spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
+    var nilaiSheet = spreadsheet.getSheetByName("Nilai");
+    var tugasSheet = spreadsheet.getSheetByName("Tugas");
+    var kehadiranSheet = spreadsheet.getSheetByName("Kehadiran");
+    var catatanSheet = spreadsheet.getSheetByName("Catatan_Guru");
+    var jadwalSheet = spreadsheet.getSheetByName("Jadwal_Pelajaran");
+    var pengumumanSheet = spreadsheet.getSheetByName("Pengumuman");
+    
+    Logger.log("Cek sheet: Nilai=" + !!nilaiSheet + ", Tugas=" + !!tugasSheet + ", Kehadiran=" + !!kehadiranSheet + ", Catatan_Guru=" + !!catatanSheet + ", Jadwal_Pelajaran=" + !!jadwalSheet + ", Pengumuman=" + !!pengumumanSheet);
+    if (!nilaiSheet || !tugasSheet || !kehadiranSheet || !catatanSheet || !jadwalSheet || !pengumumanSheet) {
+      Logger.log("Error: Salah satu sheet tidak ditemukan.");
+      return;
+    }
+    
+    var exportSheet = spreadsheet.getSheetByName("ExportWeb");
+    if (exportSheet) {
+      exportSheet.clear();
+    } else {
+      exportSheet = spreadsheet.insertSheet("ExportWeb");
+    }
+    
+    var headers = [["statustugas", "kehadiran", "catatanguru", "jadwalpelajaran", "pengumuman"]];
+    exportSheet.getRange(1, 1, 1, 5).setValues(headers);
+    
+    var nilaiData = nilaiSheet.getDataRange().getValues();
+    var tugasData = tugasSheet.getDataRange().getValues();
+    var kehadiranData = kehadiranSheet.getDataRange().getValues();
+    var catatanData = catatanSheet.getDataRange().getValues();
+    var jadwalData = jadwalSheet.getDataRange().getValues();
+    var pengumumanData = pengumumanSheet.getDataRange().getValues();
+    
+    Logger.log("Jumlah baris data: Nilai=" + (nilaiData.length-1) + ", Tugas=" + (tugasData.length-1) + ", Kehadiran=" + (kehadiranData.length-1) + ", Catatan_Guru=" + (catatanData.length-1) + ", Jadwal_Pelajaran=" + (jadwalData.length-1) + ", Pengumuman=" + (pengumumanData.length-1));
+    
+    function escapeCommas(value) {
+      if (typeof value === "string" && (value.includes(",") || value.includes("\n"))) {
+        return `"${value.replace(/"/g, '""')}"`;
+      }
+      return value || "";
+    }
+    
+    var tugasMap = {};
+    for (var i = 1; i < tugasData.length; i++) {
+      tugasMap[tugasData[i][0]] = {
+        namaTugas: tugasData[i][1],
+        mataPelajaran: tugasData[i][2],
+        batasWaktu: tugasData[i][3]
+      };
+    }
+    
+    var statusTugasData = [];
+    for (var i = 1; i < nilaiData.length; i++) {
+      var idNilai = nilaiData[i][0] || "";
+      var nis = idNilai.split('_')[0] || "Unknown";
+      var idTugas = idNilai.split('_')[1] || "Unknown";
+      
+      var tugasInfo = tugasMap[idTugas] || {
+        namaTugas: "Unknown",
+        mataPelajaran: "Unknown",
+        batasWaktu: "Unknown"
+      };
+      
+      var status = nilaiData[i][4] || "Belum Dikerjakan";
+      var nilai = nilaiData[i][3] !== null ? nilaiData[i][3] : "";
+      
+      var formattedBatasWaktu = "Unknown";
+      if (tugasInfo.batasWaktu !== "Unknown" && !isNaN(Date.parse(tugasInfo.batasWaktu))) {
+        var date = new Date(tugasInfo.batasWaktu);
+        var days = ["Minggu", "Senin", "Selasa", "Rabu", "Kamis", "Jumat", "Sabtu"];
+        var months = ["Januari", "Februari", "Maret", "April", "Mei", "Juni", "Juli", "Agustus", "September", "Oktober", "November", "Desember"];
+        var day = days[date.getDay()];
+        var tanggal = date.getDate();
+        var bulan = months[date.getMonth()];
+        var tahun = date.getFullYear();
+        formattedBatasWaktu = `${day}, ${tanggal} ${bulan} ${tahun}`;
+      }
+      
+      var combinedTugas = [
+        escapeCommas(nis),
+        escapeCommas(tugasInfo.namaTugas),
+        escapeCommas(tugasInfo.mataPelajaran),
+        escapeCommas(formattedBatasWaktu),
+        escapeCommas(nilai),
+        escapeCommas(status)
+      ].join(',');
+      
+      statusTugasData.push([combinedTugas]);
+    }
+    
+    var kehadiranMap = {};
+    for (var i = 1; i < kehadiranData.length; i++) {
+      var nis = kehadiranData[i][1] ? kehadiranData[i][1].toString() : "Unknown";
+      var tanggal = kehadiranData[i][2] || "Unknown";
+      var status = kehadiranData[i][3] || "Unknown";
+      
+      if (!kehadiranMap[nis]) {
+        kehadiranMap[nis] = {
+          hadir: 0,
+          izin: 0,
+          sakit: 0,
+          alpha: 0,
+          tanggal: tanggal
+        };
+      }
+      
+      if (status === "Hadir") kehadiranMap[nis].hadir++;
+      else if (status === "Izin") kehadiranMap[nis].izin++;
+      else if (status === "Sakit") kehadiranMap[nis].sakit++;
+      else if (status === "Alpha") kehadiranMap[nis].alpha++;
+      
+      if (!kehadiranMap[nis].tanggal || new Date(tanggal) > new Date(kehadiranMap[nis].tanggal)) {
+        kehadiranMap[nis].tanggal = tanggal;
+      }
+    }
+    
+    var kehadiranOutput = [];
+    for (var nis in kehadiranMap) {
+      var data = kehadiranMap[nis];
+      
+      var formattedTanggal = "Unknown";
+      if (data.tanggal !== "Unknown" && !isNaN(Date.parse(data.tanggal))) {
+        var date = new Date(data.tanggal);
+        var month = ("0" + (date.getMonth() + 1)).slice(-2);
+        var day = ("0" + date.getDate()).slice(-2);
+        var year = date.getFullYear();
+        formattedTanggal = `${month}${day}${year}`;
+      }
+      
+      var combinedKehadiran = [
+        escapeCommas(nis),
+        data.hadir,
+        data.izin,
+        data.sakit,
+        data.alpha,
+        formattedTanggal
+      ].join(',');
+      
+      kehadiranOutput.push([combinedKehadiran]);
+    }
+    
+    var catatanOutput = [];
+    for (var i = 1; i < catatanData.length; i++) {
+      var nis = catatanData[i][1] || "Unknown";
+      var mingguKe = catatanData[i][2] || "Unknown";
+      var catatan = catatanData[i][3] || "Unknown";
+      var combinedCatatan = [
+        escapeCommas(nis),
+        escapeCommas(mingguKe),
+        escapeCommas(catatan)
+      ].join(',');
+      
+      catatanOutput.push([combinedCatatan]);
+    }
+    
+    var jadwalOutput = [];
+    for (var i = 1; i < jadwalData.length; i++) {
+      var idJadwal = jadwalData[i][0] || "Unknown";
+      var kelas = jadwalData[i][1] || "Unknown";
+      var hari = jadwalData[i][2] || "Unknown";
+      var jam = jadwalData[i][3] || "Unknown";
+      var mataPelajaran = jadwalData[i][4] || "Unknown";
+      
+      var combinedJadwal = [
+        escapeCommas(idJadwal),
+        escapeCommas(kelas),
+        escapeCommas(hari),
+        escapeCommas(jam),
+        escapeCommas(mataPelajaran)
+      ].join(',');
+      
+      jadwalOutput.push([combinedJadwal]);
+    }
+    
+    var pengumumanOutput = [];
+    for (var i = 1; i < pengumumanData.length; i++) {
+      var untukKelas = pengumumanData[i][4] || "Unknown";
+      var tanggalPengumuman = pengumumanData[i][3] || "Unknown";
+      var judul = pengumumanData[i][1] || "Unknown";
+      var isiPengumuman = pengumumanData[i][2] || "Unknown";
+      
+      var combinedPengumuman = [
+        escapeCommas(untukKelas),
+        escapeCommas(tanggalPengumuman),
+        escapeCommas(judul),
+        escapeCommas(isiPengumuman)
+      ].join(',');
+      
+      pengumumanOutput.push([combinedPengumuman]);
+    }
+    
+    if (statusTugasData.length > 0) {
+      exportSheet.getRange(2, 1, statusTugasData.length, 1).setValues(statusTugasData);
+      Logger.log("statustugas ditulis: " + statusTugasData.length + " baris");
+    } else {
+      Logger.log("statustugas: Tidak ada data untuk ditulis");
+    }
+    if (kehadiranOutput.length > 0) {
+      exportSheet.getRange(2, 2, kehadiranOutput.length, 1).setValues(kehadiranOutput);
+      Logger.log("kehadiran ditulis: " + kehadiranOutput.length + " baris");
+    } else {
+      Logger.log("kehadiran: Tidak ada data untuk ditulis");
+    }
+    if (catatanOutput.length > 0) {
+      exportSheet.getRange(2, 3, catatanOutput.length, 1).setValues(catatanOutput);
+      Logger.log("catatanguru ditulis: " + catatanOutput.length + " baris");
+    } else {
+      Logger.log("catatanguru: Tidak ada data untuk ditulis");
+    }
+    if (jadwalOutput.length > 0) {
+      exportSheet.getRange(2, 4, jadwalOutput.length, 1).setValues(jadwalOutput);
+      Logger.log("jadwalpelajaran ditulis: " + jadwalOutput.length + " baris");
+    } else {
+      Logger.log("jadwalpelajaran: Tidak ada data untuk ditulis");
+    }
+    if (pengumumanOutput.length > 0) {
+      exportSheet.getRange(2, 5, pengumumanOutput.length, 1).setValues(pengumumanOutput);
+      Logger.log("pengumuman ditulis: " + pengumumanOutput.length + " baris");
+    } else {
+      Logger.log("pengumuman: Tidak ada data untuk ditulis");
+    }
+    
+    exportSheet.autoResizeColumns(1, 5);
+    
+    Logger.log("Script selesai. Data ditulis: statustugas=" + statusTugasData.length + ", kehadiran=" + kehadiranOutput.length + ", catatanguru=" + catatanOutput.length + ", jadwalpelajaran=" + jadwalOutput.length + ", pengumuman=" + pengumumanOutput.length);
+  } catch (e) {
+    Logger.log("Error saat menjalankan createExportWebSheet: " + e.message + " | Stack: " + e.stack);
+  }
+}
+
+function installTimeDrivenTrigger() {
+  try {
+    // Delete existing triggers to avoid duplicates
+    var triggers = ScriptApp.getProjectTriggers();
+    for (var i = 0; i < triggers.length; i++) {
+      ScriptApp.deleteTrigger(triggers[i]);
+    }
+    
+    // Create a new time-driven trigger (every 1 minute)
+    ScriptApp.newTrigger('createExportWebSheet')
+      .timeBased()
+      .everyMinutes(1)
+      .create();
+    
+    Logger.log("Trigger berhasil diinstall.");
+  } catch (e) {
+    Logger.log("Error saat menginstall trigger: " + e.message);
+  }
+}

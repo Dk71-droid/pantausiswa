@@ -45,10 +45,16 @@ const dataCache = {
 let currentLoggedInEmail = null; // Menyimpan email guru yang sedang login
 // Menyimpan objek guru yang sedang login, dengan Kelas_Diampu sudah diparsing menjadi array
 let currentLoggedInTeacherData = null;
+// selectedTaskIdForNilai removed as individual input is removed
 
 let activeSectionId = "login-section"; // Initial active section
 
 let dashboardChartInstance = null; // To store the Chart.js instance for the dashboard
+
+// Global variables for massal table navigation
+let massalInputElements = [];
+let massalInputRows = 0;
+let massalInputCols = 0;
 
 // --- Utility Functions (shared) ---
 function showLoadingOverlay() {
@@ -57,6 +63,7 @@ function showLoadingOverlay() {
     overlay.classList.remove("section-hidden");
     overlay.style.opacity = "1";
     overlay.style.visibility = "visible";
+    overlay.style.display = "flex"; // Ensure it's displayed
   }
 }
 
@@ -67,6 +74,7 @@ function hideLoadingOverlay() {
     overlay.style.visibility = "hidden";
     setTimeout(() => {
       overlay.classList.add("section-hidden");
+      overlay.style.display = "none"; // Explicitly hide after transition
     }, 300);
   }
 }
@@ -109,35 +117,34 @@ async function preloadOperationalData() {
     populateSiswaDropdownsGuru();
     populateSiswaDropdownsInput();
 
-    setTimeout(async () => {
-      dataCache.tugas = await fetchSheetData("Tugas");
-      populateTugasDropdownsInput();
-      updateTugasIdField();
-    }, 50);
-
-    setTimeout(async () => {
-      dataCache.catatan_guru = await fetchSheetData("Catatan_Guru");
-      updateCatatanIdField();
-    }, 100);
-
-    setTimeout(async () => {
-      dataCache.jadwal_pelajaran = await fetchSheetData("Jadwal_Pelajaran");
-      updateJadwalIdField();
-    }, 150);
-
-    setTimeout(async () => {
-      dataCache.pengumuman = await fetchSheetData("Pengumuman");
-      updatePengumumanIdField();
-    }, 200);
-
-    setTimeout(async () => {
-      dataCache.kehadiran = await fetchSheetData("Kehadiran");
-      updateKehadiranIdField();
-    }, 250);
-
-    setTimeout(async () => {
-      dataCache.nilai = await fetchSheetData("Nilai");
-    }, 300);
+    // Fetch tugas, catatan, jadwal, pengumuman, kehadiran, dan nilai concurrently
+    await Promise.all([
+      (async () => {
+        dataCache.tugas = await fetchSheetData("Tugas");
+        populateTugasDropdownsInput();
+        // populateTugasSelectionDropdown(); // Removed as individual input is removed
+        updateTugasIdField();
+      })(),
+      (async () => {
+        dataCache.catatan_guru = await fetchSheetData("Catatan_Guru");
+        updateCatatanIdField();
+      })(),
+      (async () => {
+        dataCache.jadwal_pelajaran = await fetchSheetData("Jadwal_Pelajaran");
+        updateJadwalIdField();
+      })(),
+      (async () => {
+        dataCache.pengumuman = await fetchSheetData("Pengumuman");
+        updatePengumumanIdField();
+      })(),
+      (async () => {
+        dataCache.kehadiran = await fetchSheetData("Kehadiran");
+        updateKehadiranIdField();
+      })(),
+      (async () => {
+        dataCache.nilai = await fetchSheetData("Nilai");
+      })(),
+    ]);
 
     console.log("<-- Preloading data operasional selesai.");
   } catch (error) {
@@ -152,7 +159,7 @@ const toggleSidebar = (show = null) => {
   const mainContentWrapper = document.getElementById("main-content-wrapper");
 
   if (!sidebar || !sidebarOverlay || !mainContentWrapper) {
-    console.error("Sidebar elements not found.");
+    console.error("Sidebar elements not found!");
     return;
   }
 
@@ -188,6 +195,14 @@ async function showSection(sectionId) {
 
     // Otomatis tutup sidebar saat pindah section
     toggleSidebar(false); // Call with 'false' to explicitly close
+
+    // Hide any open selection areas when changing sections that are not the target
+    // These specific hides are for input-nilai-kehadiran-section to control its internal areas
+    hideSelectionArea("tugas-subject-selection-area");
+    // #input-mode-selection is now permanently hidden (or rather, no longer used for initial choice)
+    document
+      .getElementById("input-mode-selection")
+      ?.classList.add("section-hidden");
 
     try {
       if (sectionId === "guru-dashboard-section") {
@@ -255,6 +270,7 @@ async function showSection(sectionId) {
 
         populateSiswaDropdownsGuru();
         populateMapelDropdownsGuru();
+        // populateTugasSelectionDropdown(); // Removed as individual input is removed
 
         document
           .getElementById("no-tugas-data-message")
@@ -280,8 +296,18 @@ async function showSection(sectionId) {
         console.log("<-- Bagian Manajemen Data diaktifkan dan dirender.");
       } else if (sectionId === "input-nilai-kehadiran-section") {
         console.log(
-          "--> Mengaktifkan bagian Input Nilai. Menggunakan data cache atau mengambil jika kosong."
+          "--> Mengaktifkan bagian Input Nilai & Kehadiran. Menggunakan data cache atau mengambil jika kosong."
         );
+
+        // Pastikan tab container terlihat
+        document
+          .getElementById("tab-content-container-input")
+          ?.classList.remove("section-hidden");
+
+        // Panggil switchTab untuk mengaktifkan tab 'Input Nilai Massal' secara default
+        // Ini juga akan menangani penyembunyian tab lain.
+        switchTab("input-nilai-massal", "input-nilai-kehadiran-section");
+
         if (!dataCache.siswa || dataCache.siswa.length === 0) {
           dataCache.siswa = await fetchSheetData("Siswa");
           console.log("    Fallback: Data Siswa diambil untuk Input Nilai.");
@@ -296,9 +322,18 @@ async function showSection(sectionId) {
             "    Fallback: Data Kehadiran diambil untuk Input Nilai."
           );
         }
+        if (!dataCache.nilai || dataCache.nilai.length === 0) {
+          dataCache.nilai = await fetchSheetData("Nilai");
+          console.log(
+            "    Fallback: Data Nilai diambil untuk Input Nilai (Massal)."
+          );
+        }
 
         populateSiswaDropdownsInput();
         populateTugasDropdownsInput();
+        // populateTugasSelectionDropdown(); // Removed as individual input is removed
+        populateMassalNilaiFilters(); // Populate filters for massal input
+        // renderMassalNilaiTable(); // Initial render of the massal table when section is active - now triggered by button
         console.log(
           "<-- Bagian Input Nilai diaktifkan dan dirender dengan data terbaru."
         );
@@ -355,9 +390,14 @@ async function showSection(sectionId) {
                 ? JSON.parse(teacherData.Dashboard_Insights)
                 : {},
             };
+            console.log(
+              "Teacher data loaded for settings:",
+              currentLoggedInTeacherData
+            );
           } else {
             // If teacherData is not found, clear currentLoggedInTeacherData
             currentLoggedInTeacherData = null;
+            console.warn("Teacher data not found in cache for settings.");
           }
         }
         displayTeacherProfileSettings(currentLoggedInTeacherData);
@@ -371,22 +411,37 @@ async function showSection(sectionId) {
   }
 }
 
-// UPDATE: Memperbarui fungsi untuk mengelola visibilitas header dan padding main
+// UPDATE: Memperbarui fungsi untuk mengelola visibilitas header, sidebar, dan padding main
 function updateHeaderDisplay() {
   const header = document.querySelector("header");
   const mainContent = document.querySelector("main"); // Dapatkan referensi ke elemen main
+  const sidebar = document.getElementById("main-sidebar"); // Dapatkan referensi ke sidebar
+  const mainContentWrapper = document.getElementById("main-content-wrapper"); // Dapatkan referensi ke main content wrapper
 
-  if (!header || !mainContent) {
-    console.error("Header or main content not found.");
+  if (!header || !mainContent || !sidebar || !mainContentWrapper) {
+    console.error(
+      "Header, main content, sidebar, or main content wrapper not found."
+    );
     return;
   }
 
   if (activeSectionId === "login-section") {
     header.style.display = "none"; // Sembunyikan seluruh header
+    sidebar.style.display = "none"; // Sembunyikan sidebar
     mainContent.style.paddingTop = "0px"; // Hapus padding-top pada main
+    mainContentWrapper.style.marginLeft = "0px"; // Hapus margin-left pada main content wrapper
   } else {
     header.style.display = "flex"; // Tampilkan header (sesuai display flex yang ada)
-    mainContent.style.paddingTop = "64px"; // Set padding-top untuk konten di bawah header
+    sidebar.style.display = "block"; // Tampilkan sidebar (sesuai default display)
+    // Hitung tinggi sebenarnya dari header secara dinamis
+    const headerHeight = header.offsetHeight; // Mendapatkan tinggi yang dirender termasuk padding dan border
+    mainContent.style.paddingTop = `${headerHeight}px`; // Set padding-top berdasarkan tinggi header dinamis
+    // Di desktop, main-content-wrapper memiliki margin-left untuk memberi ruang sidebar
+    if (window.innerWidth >= 768) {
+      mainContentWrapper.style.marginLeft = "256px"; // Atur margin-left sesuai lebar sidebar
+    } else {
+      mainContentWrapper.style.marginLeft = "0px"; // Pastikan 0 di mobile
+    }
   }
   updateHeaderTitle(activeSectionId); // Set title berdasarkan section aktif
 }
@@ -398,7 +453,27 @@ function updateHeaderTitle(sectionId) {
   if (headerTitleElement) {
     // Hanya perbarui jika bukan halaman login, karena halaman login menyembunyikan header
     if (sectionId !== "login-section") {
-      headerTitleElement.textContent = ""; // Mengosongkan teks judul
+      let titleText = "";
+      switch (sectionId) {
+        case "guru-dashboard-section":
+          titleText = "Dashboard Guru";
+          break;
+        case "manajemen-data-section":
+          titleText = "Manajemen Data";
+          break;
+        case "input-nilai-kehadiran-section":
+          titleText = "Input Nilai & Kehadiran";
+          break;
+        case "rekap-data-section":
+          titleText = "Rekap Data";
+          break;
+        case "settings-section":
+          titleText = "Pengaturan";
+          break;
+        default:
+          titleText = "SiswaLink Dashboard"; // Default title
+      }
+      headerTitleElement.textContent = titleText;
     }
   }
 }
@@ -463,6 +538,29 @@ function switchTab(targetId, tabSectionId) {
   document
     .querySelector(`#${tabSectionId} .tab-button[data-target="${targetId}"]`)
     .classList.add("active");
+
+  // Specific logic for 'input-nilai-kehadiran-section'
+  if (tabSectionId === "input-nilai-kehadiran-section") {
+    // Hide specific input areas first.
+    // Removed individual input areas as per request
+    document
+      .getElementById("massal-nilai-area")
+      ?.classList.add("section-hidden");
+    document.getElementById("input-kehadiran")?.classList.add("section-hidden"); // Ensure kehadiran is hidden too
+
+    // Renamed "input-nilai-massal" to "input-nilai"
+    if (targetId === "input-nilai-massal") {
+      // This is now "Input Nilai"
+      document
+        .getElementById("massal-nilai-area")
+        ?.classList.remove("section-hidden");
+      renderMassalNilaiTable(); // Render ulang tabel massal
+    } else if (targetId === "input-kehadiran") {
+      document
+        .getElementById("input-kehadiran")
+        ?.classList.remove("section-hidden");
+    }
+  }
 }
 
 function showConfirmModal(title, message, onConfirm) {
@@ -652,6 +750,7 @@ async function handleLogin(event) {
   showLoadingOverlay();
 
   const email = document.getElementById("email-input").value;
+  console.log("Attempting login with email:", email);
 
   try {
     dataCache.guru = await fetchSheetData("Guru");
@@ -677,22 +776,38 @@ async function handleLogin(event) {
       };
       sessionStorage.setItem("loggedInAdminEmail", email);
 
+      console.log(
+        "Login successful! Teacher Data:",
+        currentLoggedInTeacherData
+      );
+
       // LANGSUNG UPDATE UI UNTUK NAMA DAN GELAR GURU SETELAH LOGIN
-      document.getElementById("guru-name-display").textContent =
-        currentLoggedInTeacherData.Nama_Guru || "";
-      let guruClassesText = "";
-      if (
-        Array.isArray(currentLoggedInTeacherData.Kelas_Diampu) && // Tambahkan pengecekan Array.isArray()
-        currentLoggedInTeacherData.Kelas_Diampu.length > 0
-      ) {
-        guruClassesText = `Guru Kelas ${currentLoggedInTeacherData.Kelas_Diampu.join(
-          ", "
-        )}`;
-      } else if (currentLoggedInTeacherData.Status) {
-        guruClassesText = currentLoggedInTeacherData.Status;
+      const guruNameDisplay = document.getElementById("guru-name-display");
+      const guruTitleDisplay = document.getElementById("guru-title-display");
+
+      if (guruNameDisplay) {
+        guruNameDisplay.textContent =
+          currentLoggedInTeacherData.Nama_Guru || "";
+      } else {
+        console.warn("Element #guru-name-display not found!");
       }
-      document.getElementById("guru-title-display").textContent =
-        guruClassesText;
+
+      if (guruTitleDisplay) {
+        let guruClassesText = "";
+        if (
+          Array.isArray(currentLoggedInTeacherData.Kelas_Diampu) && // Tambahkan pengecekan Array.isArray()
+          currentLoggedInTeacherData.Kelas_Diampu.length > 0
+        ) {
+          guruClassesText = `Guru Kelas ${currentLoggedInTeacherData.Kelas_Diampu.join(
+            ", "
+          )}`;
+        } else if (currentLoggedInTeacherData.Status) {
+          guruClassesText = currentLoggedInTeacherData.Status;
+        }
+        guruTitleDisplay.textContent = guruClassesText;
+      } else {
+        console.warn("Element #guru-title-display not found!");
+      }
 
       showToast("Login berhasil!", "success");
 
@@ -700,6 +815,7 @@ async function handleLogin(event) {
       showSection("guru-dashboard-section"); // This will now just reveal the section with pre-filled welcome text
     } else {
       showToast("Email tidak ditemukan. Silakan coba lagi.", "error");
+      console.log("Login failed: Email not found.");
     }
   } catch (error) {
     console.error("Login error:", error);
@@ -765,6 +881,12 @@ function displayTeacherProfileSettings(teacherData) {
     )
       ? teacherData.Kelas_Diampu.join(", ")
       : teacherData.Kelas_Diampu || "-"; // Fallback jika bukan array
+  } else {
+    // Clear profile settings if no teacher data
+    document.getElementById("profile-nama-guru").textContent = "-";
+    document.getElementById("profile-email-guru").textContent = "-";
+    document.getElementById("profile-kelas-diampu").textContent = "-";
+    document.getElementById("profile-status-guru").textContent = "-";
   }
 }
 
@@ -811,10 +933,8 @@ function generateTugasId(mapel) {
   return `${prefix}-${String(numTugas + 1).padStart(3, "0")}`;
 }
 
-function generateNilaiId(nis) {
-  const numNilai = dataCache.nilai ? dataCache.nilai.length : 0;
-  return `NIL-${nis}-${String(numNilai + 1).padStart(3, "0")}`;
-}
+// Removed generateNilaiId as individual input is removed.
+// The massal input handles ID generation internally during submission.
 
 function generateKehadiranId(nis, dateStr) {
   const formattedDate = dateStr.replace(/-/g, ""); //YYYYMMDD
@@ -884,12 +1004,13 @@ function populateSiswaDropdownsGuru() {
 }
 
 function populateSiswaDropdownsInput() {
-  const nisSelects = document.querySelectorAll("#nilai-nis, #kehadiran-nis");
+  // Only for Kehadiran now
+  const nisSelects = document.querySelectorAll("#kehadiran-nis");
   const siswaData = dataCache.siswa;
 
   if (!siswaData || siswaData.length === 0) {
     console.warn(
-      "Data siswa kosong, tidak dapat mengisi dropdown input nilai/kehadiran."
+      "Data siswa kosong, tidak dapat mengisi dropdown input kehadiran."
     );
     nisSelects.forEach((select) => {
       select.innerHTML = '<option value="">Tidak ada siswa</option>';
@@ -925,9 +1046,13 @@ function populateSiswaDropdownsInput() {
 }
 
 function populateTugasDropdownsInput() {
-  const idTugasSelect = document.getElementById("nilai-id_tugas");
-  const currentSelectedValue = idTugasSelect ? idTugasSelect.value : "";
+  // This function is now only called when populating dropdowns for tasks
+  // not directly used by the massal input table (which renders tasks dynamically).
+  // Kept for consistency if future individual task selection is re-added or for other forms.
+  const idTugasSelect = document.getElementById("nilai-id_tugas"); // This ID is likely removed from HTML
   if (idTugasSelect) {
+    // Defensive check
+    const currentSelectedValue = idTugasSelect ? idTugasSelect.value : "";
     idTugasSelect.innerHTML =
       '<option value="">Pilih Tugas (ID - Nama Tugas)</option>';
     if (dataCache.tugas) {
@@ -965,19 +1090,34 @@ function populateTugasDropdownsInput() {
   }
 }
 
+// populateTugasSelectionDropdown removed as individual input is removed
+
 function populateMapelDropdownsGuru() {
   const tugasMapelSelect = document.getElementById("tugas-mata_pelajaran");
   const jadwalMapelSelect = document.getElementById("jadwal-mata_pelajaran");
+  // tugasSelectionMapelSelect removed as individual input is removed
+  const tugasSelectionMapelSelect = document.getElementById(
+    "tugas-selection-mata_pelajaran"
+  ); // Keep this for add new tugas modal
 
   const currentTugasMapel = tugasMapelSelect ? tugasMapelSelect.value : "";
   const currentJadwalMapel = jadwalMapelSelect ? jadwalMapelSelect.value : "";
+  const currentTugasSelectionMapel = tugasSelectionMapelSelect
+    ? tugasSelectionMapelSelect.value
+    : "";
 
+  // Clear existing options
   if (tugasMapelSelect) {
     tugasMapelSelect.innerHTML =
       '<option value="">Pilih Mata Pelajaran</option>';
   }
   if (jadwalMapelSelect) {
     jadwalMapelSelect.innerHTML =
+      '<option value="">Pilih Mata Pelajaran</option>';
+  }
+  if (tugasSelectionMapelSelect) {
+    // NEW: clear for selection dropdown for adding new tasks
+    tugasSelectionMapelSelect.innerHTML =
       '<option value="">Pilih Mata Pelajaran</option>';
   }
 
@@ -995,6 +1135,13 @@ function populateMapelDropdownsGuru() {
       option2.textContent = subject;
       jadwalMapelSelect.appendChild(option2);
     }
+    if (tugasSelectionMapelSelect) {
+      // NEW: populate for selection dropdown for adding new tasks
+      const option3 = document.createElement("option");
+      option3.value = subject;
+      option3.textContent = subject;
+      tugasSelectionMapelSelect.appendChild(option3);
+    }
   });
 
   if (
@@ -1011,6 +1158,16 @@ function populateMapelDropdownsGuru() {
   ) {
     jadwalMapelSelect.value = currentJadwalMapel;
   }
+  if (
+    // NEW: set selected value for selection dropdown for adding new tasks
+    tugasSelectionMapelSelect &&
+    currentTugasSelectionMapel &&
+    tugasSelectionMapelSelect.querySelector(
+      `option[value="${currentTugasSelectionMapel}"]`
+    )
+  ) {
+    tugasSelectionMapelSelect.value = currentTugasSelectionMapel;
+  }
 }
 
 // --- Pembaruan Bidang ID (Digabungkan dan disesuaikan) ---
@@ -1022,17 +1179,8 @@ function updateTugasIdField() {
   }
 }
 
-function updateNilaiIdField() {
-  const nilaiNis = document.getElementById("nilai-nis")?.value;
-  const nilaiIdField = document.getElementById("nilai-id_nilai");
-  if (nilaiIdField) {
-    if (nilaiNis) {
-      nilaiIdField.value = generateNilaiId(nilaiNis);
-    } else {
-      nilaiIdField.value = "Pilih Siswa";
-    }
-  }
-}
+// updateNilaiIdField removed as individual input is removed.
+// The massal input handles ID generation internally during submission.
 
 function updateKehadiranIdField() {
   const kehadiranNis = document.getElementById("kehadiran-nis")?.value;
@@ -1084,7 +1232,8 @@ function updatePengumumanIdField() {
 }
 
 // --- Penangan Modal (Digabungkan untuk modal yang tersisa) ---
-function openModal(modalId, isEdit = false, data = null) {
+async function openModal(modalId, isEdit = false, data = null) {
+  // Added async here
   const modal = document.getElementById(modalId);
   if (!modal) {
     console.warn(
@@ -1093,11 +1242,16 @@ function openModal(modalId, isEdit = false, data = null) {
     return;
   }
 
+  // NOTE: 'nilai-modal' and 'nilai-massal-modal' are now directly integrated as sections.
+  // This function should only handle actual modals now.
   const validModalIds = [
     "student-modal",
-    "nilai-modal",
     "kehadiran-modal",
     "rekap-filter-modal",
+    "tugas-modal",
+    "catatan-modal",
+    "jadwal-modal",
+    "pengumuman-modal",
   ];
   if (!validModalIds.includes(modalId)) {
     console.error(
@@ -1119,20 +1273,32 @@ function openModal(modalId, isEdit = false, data = null) {
   const titleElement = modalContent.querySelector("h3");
   const form = modalContent.querySelector("form");
 
+  if (form) {
+    form.reset(); // Reset form when opening modal for new entry
+  }
+
   if (titleElement) {
     let defaultTitle = `Tambah ${modalId
       .replace("-modal", "")
       .replace("guru-data-", "")
-      .replace("input-", "")}`;
+      .replace("input-", "")
+      .replace("-", " ") // Added to make "tugas-modal" -> "tugas modal"
+      .replace(/\b\w/g, (char) => char.toUpperCase())} Baru`; // Capitalize first letter of each word
+    if (isEdit) {
+      defaultTitle = `Edit ${modalId
+        .replace("-modal", "")
+        .replace("guru-data-", "")
+        .replace("input-", "")
+        .replace("-", " ") // Added to make "tugas-modal" -> "tugas modal"
+        .replace(/\b\w/g, (char) => char.toUpperCase())}`;
+    }
     titleElement.textContent = defaultTitle;
   }
 
   switch (modalId) {
     case "student-modal":
-      if (form) form.reset();
       document.getElementById("student-nis").readOnly = false;
       if (isEdit && data) {
-        if (titleElement) titleElement.textContent = "Edit Data Siswa";
         document.getElementById("student-nis").value = data.NIS;
         document.getElementById("student-nis").readOnly = true;
         document.getElementById("student-nama").value = data.Nama;
@@ -1140,20 +1306,54 @@ function openModal(modalId, isEdit = false, data = null) {
         document.getElementById("student-wali_murid").value = data.Wali_Murid;
       }
       break;
-    case "nilai-modal":
-      if (form) form.reset();
-      updateNilaiIdField();
-      populateSiswaDropdownsInput();
-      populateTugasDropdownsInput();
-      break;
     case "kehadiran-modal":
-      if (form) form.reset();
       updateKehadiranIdField();
       populateSiswaDropdownsInput();
+      // Optionally pre-fill date with today's date if empty
+      const kehadiranTanggalInput =
+        document.getElementById("kehadiran-tanggal");
+      if (kehadiranTanggalInput && !kehadiranTanggalInput.value) {
+        kehadiranTanggalInput.valueAsDate = new Date();
+      }
       break;
     case "rekap-filter-modal":
-      if (titleElement) titleElement.textContent = "Filter Rekap Data Nilai";
       populateRekapFilters();
+      break;
+    case "tugas-modal": // Handle Tugas Modal
+      const tugasMataPelajaranSelect = document.getElementById(
+        "tugas-mata_pelajaran"
+      );
+      if (data && data.mataPelajaran) {
+        tugasMataPelajaranSelect.value = data.mataPelajaran;
+        // Make it readonly and disabled
+        tugasMataPelajaranSelect.readOnly = true;
+        tugasMataPelajaranSelect.disabled = true;
+      } else {
+        // Ensure it's editable if no subject is passed (e.e.g., for edit mode later)
+        tugasMataPelajaranSelect.readOnly = false;
+        tugasMataPelajaranSelect.disabled = false;
+      }
+      updateTugasIdField(); // This will use the pre-filled subject
+      populateMapelDropdownsGuru(); // This will ensure options are available
+      break;
+    case "catatan-modal": // Handle Catatan Guru Modal
+      updateCatatanIdField();
+      populateSiswaDropdownsGuru();
+      break;
+    case "jadwal-modal": // Handle Jadwal Pelajaran Modal
+      updateJadwalIdField();
+      if (currentLoggedInTeacherData) {
+        document.getElementById("jadwal-guru").value =
+          currentLoggedInTeacherData.Nama_Guru || "";
+        document.getElementById("jadwal-guru").readOnly = true;
+        document
+          .getElementById("jadwal-guru")
+          .classList.add("bg-gray-100", "cursor-not-allowed");
+      }
+      populateMapelDropdownsGuru();
+      break;
+    case "pengumuman-modal": // Handle Pengumuman Modal
+      updatePengumumanIdField();
       break;
   }
   modal.classList.add("active");
@@ -1165,17 +1365,44 @@ function closeModal(modalId) {
 
   modal.classList.remove("active");
 
+  // Reset form when closing the modal, regardless of how it was opened
+  const form = modal.querySelector("form");
+  if (form) {
+    form.reset();
+  }
+
+  // Clear specific fields or re-populate dropdowns if needed after closing
   switch (modalId) {
-    case "student-modal":
-      break;
-    case "nilai-modal":
-      populateSiswaDropdownsInput();
-      populateTugasDropdownsInput();
-      break;
     case "kehadiran-modal":
       populateSiswaDropdownsInput();
       break;
     case "rekap-filter-modal":
+      break;
+    case "tugas-modal":
+      // Ensure the Mata Pelajaran field is re-enabled and not readonly after closing
+      const tugasMataPelajaranSelect = document.getElementById(
+        "tugas-mata_pelajaran"
+      );
+      if (tugasMataPelajaranSelect) {
+        tugasMataPelajaranSelect.readOnly = false;
+        tugasMataPelajaranSelect.disabled = false;
+      }
+      break;
+    case "catatan-modal":
+      populateSiswaDropdownsGuru();
+      break;
+    case "jadwal-modal":
+      // Reset guru field to allow manual entry if needed or clear pre-filled
+      const jadwalGuruInput = document.getElementById("jadwal-guru");
+      if (jadwalGuruInput) {
+        // Fixed variable name from jadwalInput to jadwalGuruInput
+        jadwalGuruInput.value = "";
+        jadwalGuruInput.readOnly = false;
+        jadwalGuruInput.classList.remove("bg-gray-100", "cursor-not-allowed");
+      }
+      populateMapelDropdownsGuru();
+      break;
+    case "pengumuman-modal":
       break;
     default:
       console.warn(
@@ -1185,81 +1412,562 @@ function closeModal(modalId) {
   }
 }
 
-function toggleInlineForm(formContainerId, show = null) {
-  const formContainer = document.getElementById(formContainerId);
-  if (!formContainer) {
-    console.error(
-      `Kontainer formulir dengan ID '${formContainerId}' tidak ditemukan.`
+// NEW: Generic function to show/hide selection areas
+function showSelectionArea(areaId) {
+  const area = document.getElementById(areaId);
+  if (area) {
+    area.classList.remove("section-hidden");
+  }
+}
+
+function hideSelectionArea(areaId) {
+  const area = document.getElementById(areaId);
+  if (area) {
+    area.classList.add("section-hidden");
+    // Optionally reset dropdowns in the area
+    const selectElement = area.querySelector("select");
+    if (selectElement) {
+      selectElement.value = "";
+    }
+  }
+}
+
+// Helper to determine completion status
+function getCompletionStatus(nilai) {
+  const parsedNilai = parseInt(nilai);
+  if (isNaN(parsedNilai)) return "Belum Input";
+  return parsedNilai >= PASS_MARK ? "Tuntas" : "Belum Tuntas";
+}
+
+// NEW: Populate filters for massal nilai input table
+function populateMassalNilaiFilters() {
+  const massalFilterMapel = document.getElementById("massal-filter-mapel");
+  const massalFilterTugas = document.getElementById("massal-filter-tugas");
+  const massalFilterNamaSiswa = document.getElementById(
+    "massal-filter-nama-siswa"
+  ); // Get the new student name select
+
+  if (!massalFilterMapel || !massalFilterTugas || !massalFilterNamaSiswa)
+    return;
+
+  // Populate Mata Pelajaran Filter
+  massalFilterMapel.innerHTML =
+    '<option value="">Pilih Mata Pelajaran</option>';
+  HARDCODED_SUBJECTS.forEach((subject) => {
+    const option = document.createElement("option");
+    option.value = subject;
+    option.textContent = subject;
+    massalFilterMapel.appendChild(option);
+  });
+
+  // Populate Nama Siswa Filter
+  const currentSelectedStudent = massalFilterNamaSiswa.value; // Preserve current selection
+  massalFilterNamaSiswa.innerHTML = '<option value="">Semua Siswa</option>';
+
+  if (dataCache.siswa && dataCache.siswa.length > 0) {
+    const teacherClasses = currentLoggedInTeacherData?.Kelas_Diampu || [];
+    const filteredSiswaForDropdown = dataCache.siswa.filter((siswa) =>
+      teacherClasses.includes(siswa.Kelas)
+    );
+    filteredSiswaForDropdown.sort((a, b) => a.Nama.localeCompare(b.Nama)); // Sort alphabetically
+
+    filteredSiswaForDropdown.forEach((siswa) => {
+      const option = document.createElement("option");
+      option.value = siswa.NIS; // Use NIS as value
+      option.textContent = `${siswa.Nama} (${siswa.Kelas})`; // Display Name (Class)
+      massalFilterNamaSiswa.appendChild(option);
+    });
+  }
+
+  // Restore previous selection for student filter
+  if (
+    currentSelectedStudent &&
+    massalFilterNamaSiswa.querySelector(
+      `option[value="${currentSelectedStudent}"]`
+    )
+  ) {
+    massalFilterNamaSiswa.value = currentSelectedStudent;
+  }
+
+  // Call updateMassalTugasFilter initially with the current selected mapel (or empty if none)
+  updateMassalTugasFilter(massalFilterMapel.value);
+}
+
+// NEW FUNCTION: Updates the "Filter Tugas" dropdown based on selected "Mata Pelajaran"
+function updateMassalTugasFilter(selectedMapel) {
+  const massalFilterTugas = document.getElementById("massal-filter-tugas");
+  if (!massalFilterTugas) return;
+
+  // Preserve current selection if it's still valid, otherwise reset
+  const currentSelectedTugas = massalFilterTugas.value;
+
+  // Clear and add default option
+  massalFilterTugas.innerHTML = '<option value="">Semua Tugas</option>'; // Changed to "Semua Tugas"
+
+  if (!dataCache.tugas || dataCache.tugas.length === 0) {
+    console.warn(
+      "Data tugas kosong, tidak dapat mengisi dropdown tugas massal."
     );
     return;
   }
 
-  if (show === true) {
-    formContainer.classList.remove("section-hidden");
-  } else if (show === false) {
-    formContainer.classList.add("section-hidden");
-    formContainer.querySelector("form").reset();
-  } else {
-    formContainer.classList.toggle("section-hidden");
-    if (formContainer.classList.contains("section-hidden")) {
-      formContainer.querySelector("form").reset();
+  const teacherClasses = currentLoggedInTeacherData?.Kelas_Diampu || [];
+  let filteredTugas = dataCache.tugas.filter((tugas) => {
+    // Filter by teacher's classes
+    const tugasUntukKelas = tugas.Untuk_Kelas
+      ? tugas.Untuk_Kelas.split(",").map((k) => k.trim())
+      : [];
+    const matchesTeacherClass =
+      tugasUntukKelas.length === 0 ||
+      tugasUntukKelas.includes("Semua") ||
+      tugasUntukKelas.some((tKelas) => teacherClasses.includes(tKelas));
+
+    // Filter by selected subject (if not "all" or empty)
+    // If no subject is selected, do not filter by subject (i.e., return all tasks matching teacher's class)
+    // If a subject is selected, filter by that subject.
+    const matchesSubject =
+      selectedMapel === "" ||
+      selectedMapel === "all" ||
+      tugas.Mata_Pelajaran === selectedMapel;
+
+    return matchesTeacherClass && matchesSubject;
+  });
+
+  filteredTugas.sort((a, b) => a.Nama_Tugas.localeCompare(b.Nama_Tugas));
+
+  filteredTugas.forEach((tugas) => {
+    const option = document.createElement("option");
+    option.value = tugas.ID_Tugas;
+    option.textContent = `${tugas.Nama_Tugas} (${tugas.Mata_Pelajaran})`;
+    massalFilterTugas.appendChild(option);
+  });
+
+  // Restore previous selection if it's still in the filtered list
+  if (
+    currentSelectedTugas &&
+    massalFilterTugas.querySelector(`option[value="${currentSelectedTugas}"]`)
+  ) {
+    massalFilterTugas.value = currentSelectedTugas;
+  }
+}
+
+// NEW: Function to render the massal nilai input table
+async function renderMassalNilaiTable() {
+  const massalInputsContainer = document.getElementById("massal-nilai-inputs");
+  const filterMapel =
+    document.getElementById("massal-filter-mapel")?.value || ""; // Default to empty string for "Pilih..."
+  const filterTugas =
+    document.getElementById("massal-filter-tugas")?.value || ""; // Default to empty string for "Pilih..."
+  const filterNISSiswa = // Renamed from filterNamaSiswa to filterNISSiswa
+    document.getElementById("massal-filter-nama-siswa")?.value || ""; // Value will be NIS, or "" for "Semua Siswa"
+
+  // Check if both mapel and tugas filters are selected (nama siswa filter is optional)
+  if (!filterMapel || !filterTugas) {
+    massalInputsContainer.innerHTML = `
+      <p class="text-gray-500 text-center p-4">
+        Pilih Mata Pelajaran dan Tugas, lalu klik "Terapkan Filter"
+        untuk menampilkan data.
+      </p>
+    `;
+    // Clear navigation data as no table is rendered
+    massalInputElements = [];
+    massalInputRows = 0;
+    massalInputCols = 0;
+    return; // Exit function if mapel or tugas filters are not selected
+  }
+
+  massalInputsContainer.innerHTML =
+    '<p class="text-gray-500 text-center p-4">Memuat daftar siswa...</p>'; // Show loading
+
+  if (!dataCache.siswa || dataCache.siswa.length === 0) {
+    massalInputsContainer.innerHTML =
+      '<p class="text-red-500 text-center p-4">Data siswa tidak tersedia.</p>';
+    return;
+  }
+  if (!dataCache.tugas || dataCache.tugas.length === 0) {
+    massalInputsContainer.innerHTML =
+      '<p class="text-red-500 text-center p-4">Data tugas tidak tersedia.</p>';
+    return;
+  }
+  if (!dataCache.nilai || dataCache.nilai.length === 0) {
+    // Ensure nilai data is available
+    dataCache.nilai = await fetchSheetData("Nilai");
+    console.log("DEBUG: Data Nilai diambil untuk render massal table.");
+  }
+
+  const teacherClasses = currentLoggedInTeacherData?.Kelas_Diampu || [];
+  let relevantStudents = dataCache.siswa.filter(
+    (siswa) =>
+      teacherClasses.includes(siswa.Kelas) &&
+      (filterNISSiswa === "" || String(siswa.NIS) === filterNISSiswa) // Use NIS for filtering
+  );
+
+  let relevantTasks = dataCache.tugas.filter((tugas) => {
+    const tugasUntukKelas = tugas.Untuk_Kelas
+      ? tugas.Untuk_Kelas.split(",").map((k) => k.trim())
+      : [];
+    const matchesTeacherClass =
+      tugasUntukKelas.length === 0 ||
+      tugasUntukKelas.includes("Semua") ||
+      tugasUntukKelas.some((tKelas) => teacherClasses.includes(tKelas));
+
+    // Filter by selected subject
+    const matchesSubject =
+      filterMapel === "" ||
+      filterMapel === "all" ||
+      tugas.Mata_Pelajaran === filterMapel;
+
+    return matchesTeacherClass && matchesSubject;
+  });
+
+  // Apply specific task filter only if a specific task is selected (not "Semua Tugas" which has value="")
+  // This is the crucial part for "Semua Tugas" functionality.
+  if (filterTugas !== "") {
+    relevantTasks = relevantTasks.filter((t) => t.ID_Tugas === filterTugas);
+  }
+
+  if (relevantStudents.length === 0 || relevantTasks.length === 0) {
+    massalInputsContainer.innerHTML =
+      '<p class="text-gray-500 text-center p-4">Tidak ada siswa atau tugas yang cocok dengan filter yang dipilih.</p>';
+    // Clear navigation data
+    massalInputElements = [];
+    massalInputRows = 0;
+    massalInputCols = 0;
+    return;
+  }
+
+  relevantStudents.sort((a, b) => a.Nama.localeCompare(b.Nama)); // Sort students alphabetically
+
+  let tableHtml = `
+    <table class="min-w-full divide-y divide-gray-200">
+      <thead class="bg-gray-50">
+        <tr>
+          <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Nama Siswa</th>
+  `;
+
+  // Add task headers dynamically
+  relevantTasks.forEach((task) => {
+    tableHtml += `
+      <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">
+        ${task.Nama_Tugas} <span class="text-gray-400">(${task.Mata_Pelajaran})</span>
+      </th>
+    `;
+  });
+
+  tableHtml += `
+        </tr>
+      </thead>
+      <tbody class="bg-white divide-y divide-gray-200">
+  `;
+
+  relevantStudents.forEach((siswa, rowIndex) => {
+    tableHtml += `
+      <tr>
+        <td class="px-3 py-2 whitespace-nowrap text-sm font-medium text-gray-900">${siswa.Nama} (${siswa.NIS})</td>
+    `;
+
+    relevantTasks.forEach((task, colIndex) => {
+      const existingNilai = dataCache.nilai.find(
+        (n) =>
+          String(n.NIS) === String(siswa.NIS) &&
+          String(n.ID_Tugas) === String(task.ID_Tugas)
+      );
+
+      const nilaiValue = existingNilai ? existingNilai.Nilai : "";
+      const statusText = getCompletionStatus(nilaiValue);
+      const statusClass =
+        statusText === "Tuntas"
+          ? "text-green-600"
+          : statusText === "Belum Tuntas"
+          ? "text-red-600"
+          : "text-gray-500";
+
+      tableHtml += `
+        <td class="px-3 py-2 whitespace-nowrap text-sm text-gray-900">
+          <input
+            type="number"
+            name="nilai-${siswa.NIS}-${task.ID_Tugas}"
+            class="massal-nilai-input shadow appearance-none border rounded w-24 py-1 px-2 text-gray-700 leading-tight focus:outline-none focus:shadow-outline text-sm"
+            placeholder="Nilai"
+            min="0"
+            max="100"
+            value="${nilaiValue}"
+            data-nis="${siswa.NIS}"
+            data-id-tugas="${task.ID_Tugas}"
+            data-row-index="${rowIndex}"
+            data-col-index="${colIndex}"
+            oninput="updateMassalStatus(this)"
+          />
+          <span id="status-${siswa.NIS}-${task.ID_Tugas}" class="ml-2 text-xs font-semibold ${statusClass}">
+            ${statusText}
+          </span>
+        </td>
+      `;
+    });
+
+    tableHtml += `
+      </tr>
+    `;
+  });
+
+  tableHtml += `
+      </tbody>
+    </table>
+  `;
+  massalInputsContainer.innerHTML = tableHtml;
+
+  // After rendering, update navigation data
+  updateMassalNavigationData();
+}
+
+// Function to update status text automatically on input change
+function updateMassalStatus(inputElement) {
+  const nilai = inputElement.value;
+  const nis = inputElement.dataset.nis;
+  const idTugas = inputElement.dataset.idTugas;
+  const statusSpan = document.getElementById(`status-${nis}-${idTugas}`);
+
+  if (statusSpan) {
+    if (nilai === "") {
+      statusSpan.textContent = "Belum Input";
+      statusSpan.className = "ml-2 text-xs font-semibold text-gray-500";
+    } else {
+      const status = getCompletionStatus(nilai);
+      statusSpan.textContent = status;
+      statusSpan.className = `ml-2 text-xs font-semibold ${
+        status === "Tuntas" ? "text-green-600" : "text-red-600"
+      }`;
     }
+  }
+}
+
+// Global variables and helper to update their values after table render
+function updateMassalNavigationData() {
+  massalInputElements = Array.from(
+    document.querySelectorAll(".massal-nilai-input")
+  );
+  if (massalInputElements.length > 0) {
+    // Find max row and col indices to determine dimensions
+    const maxRow = Math.max(
+      ...massalInputElements.map((input) => parseInt(input.dataset.rowIndex))
+    );
+    const maxCol = Math.max(
+      ...massalInputElements.map((input) => parseInt(input.dataset.colIndex))
+    );
+    massalInputRows = maxRow + 1;
+    massalInputCols = maxCol + 1;
+  } else {
+    massalInputRows = 0;
+    massalInputCols = 0;
+  }
+}
+
+function handleMassalInputNavigation(event) {
+  const target = event.target;
+  if (!target.classList.contains("massal-nilai-input")) {
+    return;
+  }
+
+  const currentRow = parseInt(target.dataset.rowIndex);
+  const currentCol = parseInt(target.dataset.colIndex);
+
+  let nextInput = null;
+
+  if (event.key === "Enter") {
+    event.preventDefault(); // Prevent form submission
+    const nextRow = currentRow + 1;
+    if (nextRow < massalInputRows) {
+      nextInput = document.querySelector(
+        `input[data-row-index="${nextRow}"][data-col-index="${currentCol}"]`
+      );
+    } else {
+      // If at the end of the current column, move to the next column's first row, or simply blur
+      // For now, let's keep it simple and just blur
+      target.blur();
+    }
+  } else if (event.key === "Tab") {
+    event.preventDefault(); // Prevent default tab behavior
+    const nextCol = currentCol + 1;
+    if (nextCol < massalInputCols) {
+      nextInput = document.querySelector(
+        `input[data-row-index="${currentRow}"][data-col-index="${nextCol}"]`
+      );
+    } else {
+      // End of row, move to next row, first column
+      const nextRow = currentRow + 1;
+      if (nextRow < massalInputRows) {
+        nextInput = document.querySelector(
+          `input[data-row-index="${nextRow}"][data-col-index="0"]`
+        );
+      } else {
+        // If at the very last input, allow normal tab behavior to move out of the table
+        // For now, let's just blur
+        target.blur();
+      }
+    }
+  }
+
+  if (nextInput) {
+    nextInput.focus();
   }
 }
 
 async function handleSubmitForm(event, sheetName, formType = "add") {
   event.preventDefault();
   const form = event.target;
-  const formData = new FormData(form);
-  const data = {};
 
-  const inputs = form.querySelectorAll(
-    "input[id^='" +
-      sheetName.toLowerCase().replace(/_/, "-") +
-      "-'], select[id^='" +
-      sheetName.toLowerCase().replace(/_/, "-") +
-      "-'], textarea[id^='" +
-      sheetName.toLowerCase().replace(/_/, "-") +
-      "-']"
-  );
+  // Get current modal ID to close it after submission (only for actual modals)
+  // Note: Nilai form is now inline, so currentModal will be null for it.
+  const currentModal = form.closest(".modal");
+  const currentModalId = currentModal ? currentModal.id : null;
 
-  inputs.forEach((input) => {
-    const headerKey = input.id
-      .replace(sheetName.toLowerCase().replace(/_/, "-") + "-", "")
-      .replace(/-/g, "_")
-      .split("_")
-      .map((word, index) =>
-        index === 0
-          ? word.charAt(0).toUpperCase() + word.slice(1)
-          : word.charAt(0).toUpperCase() + word.slice(1)
-      )
-      .join("_");
-
-    data[headerKey] = input.value;
-  });
+  showLoadingOverlay();
 
   let result;
-  showLoadingOverlay();
-  try {
-    if (formType === "add") {
-      result = await postSheetData(sheetName, data);
-    } else if (formType === "edit") {
-      result = await updateSheetData(sheetName, "NIS", data);
+  if (sheetName === "Nilai" && form.id === "nilai-massal-form") {
+    // Handle massal nilai submission
+    const nilaiDataArray = [];
+    const massalInputs = document.querySelectorAll(
+      "#massal-nilai-inputs input[type='number']"
+    );
+
+    massalInputs.forEach((inputElement) => {
+      const nis = inputElement.dataset.nis;
+      const idTugas = inputElement.dataset.idTugas;
+      const nilai = inputElement.value;
+
+      // Only process if nilai is provided
+      if (nilai !== "") {
+        const parsedNilai = parseInt(nilai);
+        const status = getCompletionStatus(parsedNilai);
+        const tanggalInput = new Date().toISOString().split("T")[0]; // Current date
+
+        const existingNilai = dataCache.nilai.find(
+          (n) =>
+            String(n.NIS) === String(nis) &&
+            String(n.ID_Tugas) === String(idTugas)
+        );
+
+        const dataEntry = {
+          ID_Nilai: existingNilai
+            ? existingNilai.ID_Nilai
+            : `NIL-${nis}-${Date.now()}-${Math.random()
+                .toString(36)
+                .substring(2, 8)}`, // More robust unique ID
+          NIS: nis,
+          ID_Tugas: idTugas,
+          Nilai: parsedNilai,
+          Status_Pengerjaan: status,
+          Tanggal_Input: tanggalInput,
+        };
+        nilaiDataArray.push(dataEntry);
+      }
+    });
+
+    if (nilaiDataArray.length === 0) {
+      showToast("Tidak ada nilai yang diinputkan untuk disimpan.", "info");
+      hideLoadingOverlay();
+      return;
     }
-  } finally {
+
+    try {
+      let allSuccess = true;
+      for (const dataEntry of nilaiDataArray) {
+        const operation = dataCache.nilai.some(
+          (n) => n.ID_Nilai === dataEntry.ID_Nilai
+        )
+          ? "update"
+          : "add";
+        const batchResult =
+          operation === "add"
+            ? await postSheetData(sheetName, dataEntry)
+            : await updateSheetData(sheetName, "ID_Nilai", dataEntry);
+
+        if (!batchResult.success) {
+          allSuccess = false;
+          console.error(
+            `Failed to save data for NIS ${dataEntry.NIS} and Tugas ${dataEntry.ID_Tugas}: ${batchResult.message}`
+          );
+        }
+      }
+
+      if (allSuccess) {
+        showToast("Semua nilai berhasil disimpan.", "success");
+        result = { success: true };
+      } else {
+        showToast(
+          "Beberapa nilai gagal disimpan. Periksa konsol untuk detail.",
+          "error"
+        );
+        result = { success: false };
+      }
+    } catch (error) {
+      console.error("Error submitting massal nilai:", error);
+      showToast("Terjadi kesalahan saat menyimpan nilai massal.", "error");
+      result = { success: false, message: "Kesalahan saat menyimpan massal." };
+    }
+  } else {
+    // Handle single form submission (only for other modals now)
+    const formData = new FormData(form);
+    const data = {};
+
+    const inputs = form.querySelectorAll(
+      "input[id^='" +
+        sheetName.toLowerCase().replace(/_/, "-") +
+        "-'], select[id^='" +
+        sheetName.toLowerCase().replace(/_/, "-") +
+        "-'], textarea[id^='" +
+        sheetName.toLowerCase().replace(/_/, "-") +
+        "-']"
+    );
+
+    inputs.forEach((input) => {
+      // Exclude disabled inputs from data submission unless specifically needed
+      if (input.disabled) return;
+
+      const headerKey = input.id
+        .replace(sheetName.toLowerCase().replace(/_/, "-") + "-", "")
+        .replace(/-/g, "_")
+        .split("_")
+        .map((word, index) =>
+          index === 0
+            ? word.charAt(0).toUpperCase() + word.slice(1)
+            : word.charAt(0).toUpperCase() + word.slice(1)
+        )
+        .join("_");
+
+      data[headerKey] = input.value; // For other forms, direct value is fine
+    });
+
+    try {
+      if (formType === "add") {
+        result = await postSheetData(sheetName, data);
+      } else if (formType === "edit") {
+        let idColumn;
+        if (sheetName === "Siswa") idColumn = "NIS";
+        else if (sheetName === "Tugas") idColumn = "ID_Tugas";
+        // Nilai is no longer edited individually
+        else if (sheetName === "Kehadiran") idColumn = "ID_Kehadiran";
+        else if (sheetName === "Catatan_Guru") idColumn = "ID_Catatan";
+        else if (sheetName === "Jadwal_Pelajaran") idColumn = "ID_Jadwal";
+        else if (sheetName === "Pengumuman") idColumn = "ID_Pengumuman";
+        else idColumn = "ID"; // Fallback, though better to be explicit
+
+        result = await updateSheetData(sheetName, idColumn, data);
+      }
+    } catch (error) {
+      console.error(`Error submitting single form to ${sheetName}:`, error);
+      showToast(`Terjadi kesalahan saat menyimpan data ${sheetName}.`, "error");
+      result = { success: false, message: "Terjadi kesalahan jaringan." };
+    }
   }
 
   if (result.success) {
-    const parentContainer =
-      form.closest(".modal") ||
-      form.closest("div[id$='-inline-form-container']");
-    if (parentContainer) {
-      if (parentContainer.classList.contains("modal")) {
-        closeModal(parentContainer.id);
-      } else {
-        toggleInlineForm(parentContainer.id, false);
-      }
+    // Close the modal AFTER successful submission, only if it was a modal
+    if (currentModalId) {
+      closeModal(currentModalId);
     }
+    // No specific handling for individual nilai form as it's removed
 
     try {
       // Setelah ada perubahan data yang mempengaruhi insight dashboard,
@@ -1283,13 +1991,34 @@ async function handleSubmitForm(event, sheetName, formType = "add") {
           dataCache.tugas = await fetchSheetData("Tugas");
           populateTugasDropdownsInput();
           populateMapelDropdownsGuru();
+          // populateTugasSelectionDropdown(); // Removed as individual input is removed
+          populateMassalNilaiFilters(); // NEW: Refresh massal filters
           // renderDashboardInsights(); // Tidak perlu render di sini
           break;
         case "Nilai":
           dataCache.nilai = await fetchSheetData("Nilai");
-          updateNilaiIdField();
+          // updateNilaiIdField(); // Removed as individual input is removed
           if (activeSectionId === "rekap-data-section") {
             renderRekapNilaiTable();
+          }
+          // Jika kita di area input massal, refresh tabelnya, TAPI HANYA JIKA FILTER SUDAH TERISI
+          const currentMassalMapelFilter = document.getElementById(
+            "massal-filter-mapel"
+          )?.value;
+          const currentMassalTugasFilter = document.getElementById(
+            "massal-filter-tugas"
+          )?.value;
+          if (currentMassalMapelFilter && currentMassalTugasFilter) {
+            renderMassalNilaiTable();
+          } else {
+            // If filters are not set, ensure the message is displayed correctly
+            document.getElementById("massal-nilai-inputs").innerHTML = `
+                  <p class="text-gray-500 text-center p-4">
+                      Pilih Mata Pelajaran dan Tugas, lalu klik "Terapkan Filter"
+                      untuk menampilkan data.
+                  </p>
+              `;
+            updateMassalNavigationData(); // Clear navigation data
           }
           // renderDashboardInsights(); // Tidak perlu render di sini
           break;
@@ -1763,6 +2492,8 @@ async function handleGlobalRefresh() {
         dataCache.pengumuman = await fetchSheetData("Pengumuman");
         populateSiswaDropdownsGuru();
         populateMapelDropdownsGuru();
+        // populateTugasSelectionDropdown(); // Removed as individual input is removed
+        populateMassalNilaiFilters(); // NEW: refresh massal filters
         // Assuming current tab will re-render its table, no specific table render needed here
         showToast("Data manajemen berhasil diperbarui.", "success");
         break;
@@ -1773,8 +2504,31 @@ async function handleGlobalRefresh() {
         dataCache.siswa = await fetchSheetData("Siswa");
         dataCache.tugas = await fetchSheetData("Tugas");
         dataCache.kehadiran = await fetchSheetData("Kehadiran");
+        dataCache.nilai = await fetchSheetData("Nilai"); // Ensure nilai data is refreshed
         populateSiswaDropdownsInput();
         populateTugasDropdownsInput();
+        // populateTugasSelectionDropdown(); // Removed as individual input is removed
+        populateMassalNilaiFilters(); // NEW: refresh massal filters
+        // Re-render massal table if it's the active view, and filters are already selected.
+        // Otherwise, it will just show the "select filters" message.
+        const currentMassalMapelFilter = document.getElementById(
+          "massal-filter-mapel"
+        )?.value;
+        const currentMassalTugasFilter = document.getElementById(
+          "massal-filter-tugas"
+        )?.value;
+        if (currentMassalMapelFilter && currentMassalTugasFilter) {
+          renderMassalNilaiTable();
+        } else {
+          // If filters are not set, ensure the message is displayed correctly
+          document.getElementById("massal-nilai-inputs").innerHTML = `
+                <p class="text-gray-500 text-center p-4">
+                    Pilih Mata Pelajaran dan Tugas, lalu klik "Terapkan Filter"
+                    untuk menampilkan data.
+                </p>
+            `;
+          updateMassalNavigationData(); // Clear navigation data
+        }
         showToast("Data input berhasil diperbarui.", "success");
         break;
       case "rekap-data-section":
@@ -1858,175 +2612,14 @@ function addAllEventListeners() {
     .getElementById("logout-admin-btn")
     ?.addEventListener("click", handleAdminLogout);
 
-  document
-    .getElementById("close-sidebar-btn")
-    ?.addEventListener("click", () => {
+  const closeSidebarBtn = document.getElementById("close-sidebar-btn");
+  if (closeSidebarBtn) {
+    closeSidebarBtn.addEventListener("click", () => {
       toggleSidebar(false); // Explicitly close the sidebar
     });
-
-  document
-    .getElementById("student-form")
-    ?.addEventListener("submit", (e) =>
-      handleSubmitForm(
-        e,
-        "Siswa",
-        e.target.querySelector("#student-nis").readOnly ? "edit" : "add"
-      )
-    );
-
-  // Removed individual refresh buttons, replaced by global one
-  // document.getElementById("refresh-guru-data-btn")?.addEventListener("click", async () => { ... });
-  // document.getElementById("refresh-manajemen-data-btn")?.addEventListener("click", () => { ... });
-  // document.getElementById("refresh-input-data-btn")?.addEventListener("click", () => { ... });
-  // document.getElementById("refresh-rekap-btn")?.addEventListener("click", async () => { ... });
-  // document.getElementById("refresh-settings-data-btn")?.addEventListener("click", async () => { ... });
-
-  const manajemenTabButtons = document.querySelectorAll(
-    "#manajemen-data-section .tab-button"
-  );
-  manajemenTabButtons.forEach((button) => {
-    button.addEventListener("click", (event) => {
-      switchTab(event.target.dataset.target, "manajemen-data-section");
-    });
-  });
-
-  document.getElementById("add-tugas-btn")?.addEventListener("click", () => {
-    toggleInlineForm("tugas-inline-form-container", true);
-    updateTugasIdField();
-    populateMapelDropdownsGuru();
-  });
-  document
-    .getElementById("cancel-tugas-btn")
-    ?.addEventListener("click", () =>
-      toggleInlineForm("tugas-inline-form-container", false)
-    );
-  document
-    .getElementById("tugas-form")
-    ?.addEventListener("submit", (e) => handleSubmitForm(e, "Tugas"));
-  document
-    .getElementById("tugas-mata_pelajaran")
-    ?.addEventListener("change", updateTugasIdField);
-
-  document
-    .getElementById("add-catatan-guru-btn")
-    ?.addEventListener("click", () => {
-      toggleInlineForm("catatan-inline-form-container", true);
-      updateCatatanIdField();
-      populateSiswaDropdownsGuru();
-    });
-  document
-    .getElementById("cancel-catatan-btn")
-    ?.addEventListener("click", () =>
-      toggleInlineForm("catatan-inline-form-container", false)
-    );
-  document
-    .getElementById("catatan-form")
-    ?.addEventListener("submit", (e) => handleSubmitForm(e, "Catatan_Guru"));
-  document
-    .getElementById("catatan-nis")
-    ?.addEventListener("change", updateCatatanIdField);
-  document
-    .getElementById("catatan-minggu_ke")
-    ?.addEventListener("input", updateCatatanIdField);
-
-  document
-    .getElementById("add-jadwal-pelajaran-btn")
-    ?.addEventListener("click", () => {
-      toggleInlineForm("jadwal-inline-form-container", true);
-      updateJadwalIdField();
-      if (currentLoggedInTeacherData) {
-        document.getElementById("jadwal-guru").value =
-          currentLoggedInTeacherData.Nama_Guru || "";
-        document.getElementById("jadwal-guru").readOnly = true;
-        document
-          .getElementById("jadwal-guru")
-          .classList.add("bg-gray-100", "cursor-not-allowed");
-      }
-      populateMapelDropdownsGuru();
-    });
-  document
-    .getElementById("cancel-jadwal-btn")
-    ?.addEventListener("click", () =>
-      toggleInlineForm("jadwal-inline-form-container", false)
-    );
-  document
-    .getElementById("jadwal-form")
-    ?.addEventListener("submit", (e) =>
-      handleSubmitForm(e, "Jadwal_Pelajaran")
-    );
-  document
-    .getElementById("jadwal-kelas")
-    ?.addEventListener("input", updateJadwalIdField);
-  document
-    .getElementById("jadwal-hari")
-    ?.addEventListener("change", updateJadwalIdField);
-
-  document
-    .getElementById("add-pengumuman-btn")
-    ?.addEventListener("click", () => {
-      toggleInlineForm("pengumuman-inline-form-container", true);
-      updatePengumumanIdField();
-    });
-  document
-    .getElementById("cancel-pengumuman-btn")
-    ?.addEventListener("click", () =>
-      toggleInlineForm("pengumuman-inline-form-container", false)
-    );
-  document
-    .getElementById("pengumuman-form")
-    ?.addEventListener("submit", (e) => handleSubmitForm(e, "Pengumuman"));
-
-  const inputTabButtons = document.querySelectorAll(
-    "#input-nilai-kehadiran-section .tab-button"
-  );
-  inputTabButtons.forEach((button) => {
-    button.addEventListener("click", (event) => {
-      switchTab(event.target.dataset.target, "input-nilai-kehadiran-section");
-    });
-  });
-  document
-    .getElementById("open-nilai-modal-btn")
-    ?.addEventListener("click", () => openModal("nilai-modal"));
-  document
-    .getElementById("nilai-form")
-    ?.addEventListener("submit", (e) => handleSubmitForm(e, "Nilai"));
-  document
-    .getElementById("nilai-nis")
-    ?.addEventListener("change", updateNilaiIdField);
-  document
-    .getElementById("nilai-id_tugas")
-    ?.addEventListener("change", updateNilaiIdField);
-  document
-    .getElementById("open-kehadiran-modal-btn")
-    ?.addEventListener("click", () => openModal("kehadiran-modal"));
-  document
-    .getElementById("kehadiran-form")
-    ?.addEventListener("submit", (e) => handleSubmitForm(e, "Kehadiran"));
-  document
-    .getElementById("kehadiran-nis")
-    ?.addEventListener("change", updateKehadiranIdField);
-  document
-    .getElementById("kehadiran-tanggal")
-    ?.addEventListener("change", updateKehadiranIdField);
-
-  document
-    .getElementById("open-rekap-filter-modal-btn")
-    ?.addEventListener("click", () => {
-      openModal("rekap-filter-modal");
-    });
-
-  document
-    .getElementById("apply-rekap-filter-modal-btn")
-    ?.addEventListener("click", () => {
-      closeModal("rekap-filter-modal");
-      renderRekapNilaiTable();
-    });
-
-  document
-    .getElementById("cancel-rekap-filter-btn")
-    ?.addEventListener("click", () => {
-      closeModal("rekap-filter-modal");
-    });
+  } else {
+    console.warn("Element #close-sidebar-btn not found!");
+  }
 
   document.querySelectorAll(".modal-close-button").forEach((button) => {
     button.addEventListener("click", (e) => {
@@ -2039,11 +2632,185 @@ function addAllEventListeners() {
 
   document.querySelectorAll(".modal").forEach((modal) => {
     modal.addEventListener("click", (e) => {
+      // Only close if the click is directly on the modal backdrop, not its content
       if (e.target === modal) {
         closeModal(modal.id);
       }
     });
   });
+
+  document
+    .getElementById("student-form")
+    ?.addEventListener("submit", (e) =>
+      handleSubmitForm(
+        e,
+        "Siswa",
+        e.target.querySelector("#student-nis").readOnly ? "edit" : "add"
+      )
+    );
+
+  const manajemenTabButtons = document.querySelectorAll(
+    "#manajemen-data-section .tab-button"
+  );
+  manajemenTabButtons.forEach((button) => {
+    button.addEventListener("click", (event) => {
+      switchTab(event.target.dataset.target, "manajemen-data-section");
+    });
+  });
+
+  // NEW: Tugas selection area logic
+  document.getElementById("add-tugas-btn")?.addEventListener("click", () => {
+    populateMapelDropdownsGuru(); // Ensure the dropdown is fresh
+    showSelectionArea("tugas-subject-selection-area");
+  });
+
+  document
+    .getElementById("continue-add-tugas-btn")
+    ?.addEventListener("click", () => {
+      const selectedSubject = document.getElementById(
+        "tugas-selection-mata_pelajaran"
+      ).value;
+      if (selectedSubject) {
+        hideSelectionArea("tugas-subject-selection-area");
+        openModal("tugas-modal", false, { mataPelajaran: selectedSubject });
+      } else {
+        showToast("Pilih Mata Pelajaran terlebih dahulu!", "error");
+      }
+    });
+
+  document
+    .getElementById("cancel-tugas-selection-btn")
+    ?.addEventListener("click", () => {
+      hideSelectionArea("tugas-subject-selection-area");
+    });
+
+  document
+    .getElementById("tugas-form")
+    ?.addEventListener("submit", (e) => handleSubmitForm(e, "Tugas"));
+  document
+    .getElementById("tugas-mata_pelajaran")
+    ?.addEventListener("change", updateTugasIdField);
+
+  // Updated to submit form, not just toggle. The modal is opened via onclick in HTML.
+  document
+    .getElementById("catatan-form")
+    ?.addEventListener("submit", (e) => handleSubmitForm(e, "Catatan_Guru"));
+  document
+    .getElementById("catatan-nis")
+    ?.addEventListener("change", updateCatatanIdField);
+  document
+    .getElementById("catatan-minggu_ke")
+    ?.addEventListener("input", updateCatatanIdField);
+
+  // Updated to submit form, not just toggle. The modal is opened via onclick in HTML.
+  document
+    .getElementById("jadwal-form")
+    ?.addEventListener("submit", (e) =>
+      handleSubmitForm(e, "Jadwal_Pelajaran")
+    );
+  document
+    .getElementById("jadwal-kelas")
+    ?.addEventListener("input", updateJadwalIdField);
+  document
+    .getElementById("jadwal-hari")
+    ?.addEventListener("change", updateJadwalIdField);
+
+  // Updated to submit form, not just toggle. The modal is opened via onclick in HTML.
+  document
+    .getElementById("pengumuman-form")
+    ?.addEventListener("submit", (e) => handleSubmitForm(e, "Pengumuman"));
+
+  const inputTabButtons = document.querySelectorAll(
+    "#input-nilai-kehadiran-section .tab-button"
+  );
+  inputTabButtons.forEach((button) => {
+    button.addEventListener("click", (event) => {
+      switchTab(event.target.dataset.target, "input-nilai-kehadiran-section");
+    });
+  });
+
+  // Removed all individual input logic as per request:
+  // - continue-nilai-input-btn
+  // - cancel-nilai-selection-btn
+  // - cancel-individual-nilai-input-btn
+  // - nilai-form submit listener
+  // - nilai-nis change listener
+  // - nilai-id_tugas change listener (was already less critical)
+
+  // NEW: Nilai massal form submission and filter events
+  document
+    .getElementById("nilai-massal-form")
+    ?.addEventListener("submit", (e) => handleSubmitForm(e, "Nilai", "add"));
+  // These filter changes no longer auto-render, only populate filters
+  document
+    .getElementById("massal-filter-mapel")
+    ?.addEventListener("change", (event) => {
+      updateMassalTugasFilter(event.target.value); // Update tugas filter based on mapel selection
+      // Clear massal table content and show instruction message
+      document.getElementById("massal-nilai-inputs").innerHTML = `
+      <p class="text-gray-500 text-center p-4">
+          Pilih Mata Pelajaran dan Tugas, lalu klik "Terapkan Filter"
+          untuk menampilkan data.
+      </p>
+    `;
+      updateMassalNavigationData(); // Clear navigation data
+    });
+  // document.getElementById("massal-filter-tugas")?.addEventListener("change", renderMassalNilaiTable);
+  document
+    .getElementById("apply-massal-filter-btn")
+    ?.addEventListener("click", renderMassalNilaiTable); // Only this button renders
+
+  document
+    .getElementById("cancel-massal-input-btn")
+    ?.addEventListener("click", () => {
+      const massalInputsContainer = document.getElementById(
+        "massal-nilai-inputs"
+      );
+      if (massalInputsContainer) {
+        massalInputsContainer.innerHTML = `
+                <p class="text-gray-500 text-center p-4">
+                    Pilih Mata Pelajaran dan Tugas, lalu klik "Terapkan Filter"
+                    untuk menampilkan data.
+                </p>
+            `;
+        // Clear filters
+        document.getElementById("massal-filter-mapel").value = "";
+        document.getElementById("massal-filter-tugas").value = "";
+        document.getElementById("massal-filter-nama-siswa").value = ""; // NEW: Clear nama siswa filter
+        updateMassalNavigationData(); // Clear navigation data
+      }
+    });
+
+  // NEW: Add keydown listener for massal input navigation
+  const massalInputsContainer = document.getElementById("massal-nilai-inputs");
+  if (massalInputsContainer) {
+    massalInputsContainer.addEventListener(
+      "keydown",
+      handleMassalInputNavigation
+    );
+  }
+
+  // NEW: Add event listener for massal student name filter (now a select dropdown)
+  document
+    .getElementById("massal-filter-nama-siswa")
+    ?.addEventListener("change", renderMassalNilaiTable);
+
+  document
+    .getElementById("kehadiran-form")
+    ?.addEventListener("submit", (e) => handleSubmitForm(e, "Kehadiran"));
+  document
+    .getElementById("kehadiran-nis")
+    ?.addEventListener("change", updateKehadiranIdField);
+  document
+    .getElementById("kehadiran-tanggal")
+    ?.addEventListener("change", updateKehadiranIdField);
+
+  document
+    .getElementById("apply-rekap-filter-modal-btn")
+    ?.addEventListener("click", () => {
+      closeModal("rekap-filter-modal");
+      renderRekapNilaiTable();
+    });
 
   const settingsTabButtons = document.querySelectorAll(
     "#settings-section .tab-button"
@@ -2059,22 +2826,30 @@ function addAllEventListeners() {
 
   if (sidebarToggleBtn) {
     sidebarToggleBtn.addEventListener("click", () => toggleSidebar(null)); // Toggle on click
+  } else {
+    console.warn("Element #sidebar-toggle-btn not found!");
   }
+
   if (sidebarOverlay) {
     sidebarOverlay.addEventListener("click", () => toggleSidebar(false)); // Close on overlay click
+  } else {
+    console.warn("Element #sidebar-overlay not found!");
   }
 
   window.addEventListener("resize", () => {
     const sidebar = document.getElementById("main-sidebar");
     const mainContentWrapper = document.getElementById("main-content-wrapper");
-    if (sidebar.classList.contains("active")) {
-      if (window.innerWidth >= 768) {
-        mainContentWrapper.classList.add("sidebar-active-desktop");
+    if (sidebar && mainContentWrapper) {
+      // Add null checks
+      if (sidebar.classList.contains("active")) {
+        if (window.innerWidth >= 768) {
+          mainContentWrapper.classList.add("sidebar-active-desktop");
+        } else {
+          mainContentWrapper.classList.remove("sidebar-active-desktop");
+        }
       } else {
         mainContentWrapper.classList.remove("sidebar-active-desktop");
       }
-    } else {
-      mainContentWrapper.classList.remove("sidebar-active-desktop");
     }
   });
 }
@@ -2108,23 +2883,42 @@ document.addEventListener("DOMContentLoaded", async () => {
             ? JSON.parse(teacherFound.Dashboard_Insights)
             : {},
         };
+        console.log(
+          "Session restored. Teacher Data:",
+          currentLoggedInTeacherData
+        );
 
         // LANGSUNG UPDATE UI UNTUK NAMA DAN GELAR GURU SAAT SESI DIPULIHKAN
-        document.getElementById("guru-name-display").textContent =
-          currentLoggedInTeacherData.Nama_Guru || "";
-        let guruClassesText = "";
-        if (
-          Array.isArray(currentLoggedInTeacherData.Kelas_Diampu) && // Tambahkan pengecekan Array.isArray()
-          currentLoggedInTeacherData.Kelas_Diampu.length > 0
-        ) {
-          guruClassesText = `Guru Kelas ${currentLoggedInTeacherData.Kelas_Diampu.join(
-            ", "
-          )}`;
-        } else if (currentLoggedInTeacherData.Status) {
-          guruClassesText = currentLoggedInTeacherData.Status;
+        const guruNameDisplay = document.getElementById("guru-name-display");
+        const guruTitleDisplay = document.getElementById("guru-title-display");
+
+        if (guruNameDisplay) {
+          guruNameDisplay.textContent =
+            currentLoggedInTeacherData.Nama_Guru || "";
+        } else {
+          console.warn(
+            "Element #guru-name-display not found during session restore!"
+          );
         }
-        document.getElementById("guru-title-display").textContent =
-          guruClassesText;
+
+        if (guruTitleDisplay) {
+          let guruClassesText = "";
+          if (
+            Array.isArray(currentLoggedInTeacherData.Kelas_Diampu) &&
+            currentLoggedInTeacherData.Kelas_Diampu.length > 0
+          ) {
+            guruClassesText = `Guru Kelas ${currentLoggedInTeacherData.Kelas_Diampu.join(
+              ", "
+            )}`;
+          } else if (currentLoggedInTeacherData.Status) {
+            guruClassesText = currentLoggedInTeacherData.Status;
+          }
+          guruTitleDisplay.textContent = guruClassesText;
+        } else {
+          console.warn(
+            "Element #guru-title-display not found during session restore!"
+          );
+        }
 
         showToast("Sesi dipulihkan. Selamat datang kembali!", "info");
         // await fetchInitialDashboardData(); // No longer needed here as dashboard insights are pre-calculated
@@ -2161,6 +2955,9 @@ document.addEventListener("DOMContentLoaded", async () => {
         preloadOperationalData();
       } else {
         handleAdminLogout();
+        console.log(
+          "Session restore failed: Teacher data not found for email."
+        );
       }
     } catch (error) {
       console.error("Error memulihkan sesi:", error);
@@ -2174,6 +2971,8 @@ document.addEventListener("DOMContentLoaded", async () => {
     history.replaceState(null, "", window.location.pathname);
   }
 
+  // Initial tab switching logic for sections that are not the login section
+  // This is a fallback to ensure tabs are correctly displayed on load/refresh
   setTimeout(() => {
     const manajemenTabsContainer = document.getElementById(
       "tab-content-container-manajemen"
@@ -2188,11 +2987,13 @@ document.addEventListener("DOMContentLoaded", async () => {
     const inputTabsContainer = document.getElementById(
       "tab-content-container-input"
     );
+    // This part now correctly calls switchTab, which handles the default view for input-nilai-massal
     if (
       inputTabsContainer &&
       !inputTabsContainer.classList.contains("section-hidden")
     ) {
-      switchTab("input-nilai", "input-nilai-kehadiran-section");
+      // Initialize with massal input view, which will show "select filters" message
+      switchTab("input-nilai-massal", "input-nilai-kehadiran-section");
     }
 
     const settingsTabsContainer = document.getElementById(

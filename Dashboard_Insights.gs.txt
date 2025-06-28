@@ -1,0 +1,199 @@
+const SPREADSHEET_ID_DASHBOARD = '1wm9YTU5iTZesfnBzX9NR2VGVva8qkRpTwf9JEt4YWMg'; // Ganti dengan ID Google Spreadsheet Anda
+
+/**
+ * Fungsi utama untuk mengagregasi data dashboard dan menyimpannya di sheet Guru.
+ * Fungsi ini akan dijalankan secara terjadwal.
+ */
+function generateDashboardInsights() {
+  const spreadsheet = SpreadsheetApp.openById(SPREADSHEET_ID_DASHBOARD);
+  
+  const guruSheet = spreadsheet.getSheetByName("Guru");
+  const siswaSheet = spreadsheet.getSheetByName("Siswa");
+  const tugasSheet = spreadsheet.getSheetByName("Tugas");
+  const nilaiSheet = spreadsheet.getSheetByName("Nilai");
+
+  if (!guruSheet || !siswaSheet || !tugasSheet || !nilaiSheet) {
+    Logger.log("Error: Satu atau lebih sheet tidak ditemukan.");
+    return;
+  }
+
+  const guruData = getDataFromSheet(guruSheet);
+  const siswaData = getDataFromSheet(siswaSheet);
+  const tugasData = getDataFromSheet(tugasSheet);
+  const nilaiData = getDataFromSheet(nilaiSheet);
+
+  if (!guruData || !siswaData || !tugasData || !nilaiData) {
+    Logger.log("Error: Gagal mendapatkan data dari sheet.");
+    return;
+  }
+  
+  Logger.log("Memulai agregasi data dashboard...");
+
+  // Array guruUpdateData tidak lagi diperlukan karena pembaruan dilakukan in-place pada guruValues
+  // const guruUpdateData = []; 
+
+  // Temukan header dan indeks kolom yang diperlukan
+  const guruHeaders = guruSheet.getRange(1, 1, 1, guruSheet.getLastColumn()).getValues()[0];
+  const emailColumnIndex = guruHeaders.indexOf("Email");
+  const dashboardInsightsColumnIndex = guruHeaders.indexOf("Dashboard_Insights"); // Pastikan nama kolom ini sama
+
+  if (emailColumnIndex === -1 || dashboardInsightsColumnIndex === -1) {
+    Logger.log("Error: Kolom 'Email' atau 'Dashboard_Insights' tidak ditemukan di sheet Guru.");
+    return;
+  }
+
+  const guruRange = guruSheet.getDataRange();
+  const guruValues = guruRange.getValues(); // Dapatkan semua nilai dari sheet Guru
+
+  // Iterasi setiap guru dari data yang sudah diparsing
+  guruData.forEach(guru => {
+    const teacherEmail = guru.Email;
+    const teacherClasses = guru.Kelas_Diampu ? guru.Kelas_Diampu.split(',').map(c => c.trim()) : [];
+    const teacherName = guru.Nama_Guru || "Guru";
+
+    // Hitung Total Siswa Diampu
+    const studentsInTeacherClasses = siswaData.filter(siswa =>
+      teacherClasses.includes(siswa.Kelas)
+    );
+    const totalSiswaDiampu = studentsInTeacherClasses.length;
+
+    // Hitung Total Tugas Belum Selesai
+    let countUnfinished = 0;
+    const relevantStudents = siswaData.filter(siswa => teacherClasses.includes(siswa.Kelas));
+    const relevantTasks = tugasData.filter(tugas => {
+      const tugasUntukKelas = tugas.Untuk_Kelas ? tugas.Untuk_Kelas.split(',').map(k => k.trim()) : [];
+      if (tugasUntukKelas.length === 0 || tugasUntukKelas.includes("Semua")) {
+        return true;
+      }
+      return tugasUntukKelas.some(tKelas => teacherClasses.includes(tKelas));
+    });
+
+    const submittedGradesMap = new Map();
+    nilaiData.forEach(nilai => {
+      if (nilai.Status_Pengerjaan === "Tuntas") {
+        submittedGradesMap.set(`${nilai.NIS}-${nilai.ID_Tugas}`, "Tuntas");
+      } else if (nilai.Status_Pengerjaan === "Belum Tuntas") {
+        submittedGradesMap.set(`${nilai.NIS}-${nilai.ID_Tugas}`, "Belum Tuntas");
+      }
+    });
+
+    relevantStudents.forEach(student => {
+      relevantTasks.forEach(task => {
+        const key = `${student.NIS}-${task.ID_Tugas}`;
+        const status = submittedGradesMap.get(key);
+        if (!status || status === "Belum Tuntas") {
+          countUnfinished++;
+        }
+      });
+    });
+    const totalTugasBelumSelesai = countUnfinished;
+
+    // Hitung Rata-rata Nilai Global dan Nilai per Mata Pelajaran
+    let totalNilai = 0;
+    let countNilai = 0;
+    const nilaiPerMataPelajaran = {};
+
+    const relevantNilai = nilaiData.filter(nilai => {
+      const student = siswaData.find(s => String(s.NIS) === String(nilai.NIS));
+      const tugas = tugasData.find(t => String(t.ID_Tugas) === String(nilai.ID_Tugas));
+      
+      if (!student || !tugas) return false;
+
+      const isStudentInTeacherClass = teacherClasses.includes(student.Kelas);
+      const isAssignmentForTeacherClass = (tugas.Untuk_Kelas.split(',').map(k => k.trim()).includes("Semua") || tugas.Untuk_Kelas.split(',').map(k => k.trim()).some(tKelas => teacherClasses.includes(tKelas)));
+
+      return isStudentInTeacherClass && isAssignmentForTeacherClass && !isNaN(parseFloat(nilai.Nilai));
+    });
+
+    relevantNilai.forEach(nilai => {
+        const value = parseFloat(nilai.Nilai);
+        const tugas = tugasData.find(t => String(t.ID_Tugas) === String(nilai.ID_Tugas));
+        const mataPelajaran = tugas ? tugas.Mata_Pelajaran : 'Tidak Diketahui';
+
+        totalNilai += value;
+        countNilai++;
+
+        if (!nilaiPerMataPelajaran[mataPelajaran]) {
+            nilaiPerMataPelajaran[mataPelajaran] = { sum: 0, count: 0 };
+        }
+        nilaiPerMataPelajaran[mataPelajaran].sum += value;
+        nilaiPerMataPelajaran[mataPelajaran].count++;
+    });
+
+    const rataRataNilaiGlobal = countNilai > 0 ? parseFloat((totalNilai / countNilai).toFixed(2)) : 0.00;
+
+    // Format nilaiPerMataPelajaran untuk grafik (labels dan data)
+    const chartLabels = [];
+    const chartData = [];
+    for (const mapel in nilaiPerMataPelajaran) {
+        chartLabels.push(mapel);
+        const avg = nilaiPerMataPelajaran[mapel].sum / nilaiPerMataPelajaran[mapel].count;
+        chartData.push(parseFloat(avg.toFixed(2)));
+    }
+
+    const insights = {
+      totalSiswaDiampu: totalSiswaDiampu,
+      totalTugasBelumSelesai: totalTugasBelumSelesai,
+      rataRataNilaiGlobal: rataRataNilaiGlobal,
+      nilaiPerMapelChart: {
+        labels: chartLabels,
+        data: chartData
+      }
+    };
+    
+    // Temukan baris guru di array guruValues (data mentah dari sheet)
+    // dan perbarui kolom Dashboard_Insights secara in-place.
+    for (let i = 1; i < guruValues.length; i++) { // Mulai dari baris ke-2 (setelah header)
+      if (guruValues[i][emailColumnIndex] === teacherEmail) {
+        // Perbarui data insight untuk guru ini
+        guruValues[i][dashboardInsightsColumnIndex] = JSON.stringify(insights);
+        break; // Keluar dari loop setelah guru ditemukan dan diperbarui
+      }
+    }
+    // guruUpdateData.push(guruValues[i]); // BARIS INI YANG MENYEBABKAN ERROR DAN TELAH DIHAPUS
+  });
+  
+  // Tulis kembali semua data guru yang telah diperbarui ke sheet dalam satu operasi
+  const guruRangeToUpdate = guruSheet.getRange(1, 1, guruValues.length, guruValues[0].length);
+  guruRangeToUpdate.setValues(guruValues);
+
+  Logger.log("Agregasi dan pembaruan data dashboard selesai.");
+}
+
+/**
+ * Fungsi pembantu untuk mendapatkan data dari sheet dengan header sebagai kunci.
+ */
+function getDataFromSheet(sheet) {
+  const range = sheet.getDataRange();
+  const values = range.getValues();
+
+  if (values.length < 1) {
+    return []; // Return empty array if no data
+  }
+
+  const headers = values[0];
+  const data = [];
+
+  for (let i = 1; i < values.length; i++) {
+    const row = {};
+    for (let j = 0; j < headers.length; j++) {
+      // Pastikan untuk menangani Kelas_Diampu yang mungkin berupa string
+      if (headers[j] === "Kelas_Diampu") {
+        row[headers[j]] = values[i][j] ? String(values[i][j]) : "";
+      } else {
+        row[headers[j]] = values[i][j];
+      }
+    }
+    data.push(row);
+  }
+  return data;
+}
+
+// Catatan: Untuk menjalankan fungsi generateDashboardInsights() secara terjadwal:
+// 1. Buka proyek Google Apps Script ini.
+// 2. Klik ikon jam di sidebar kiri (Triggers).
+// 3. Tambahkan trigger baru.
+// 4. Pilih fungsi yang akan dijalankan: `generateDashboardInsights`.
+// 5. Pilih sumber event: "Time-driven".
+// 6. Pilih tipe interval waktu: Misal, "Every 15 minutes" atau "Every hour".
+// 7. Simpan trigger.

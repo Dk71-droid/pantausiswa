@@ -1,12 +1,20 @@
-function createSpreadsheet() {
+function createPantausiswaSheets() {
   // Create a new spreadsheet
-  var spreadsheet = SpreadsheetApp.create("SchoolData");
+  const spreadsheet = SpreadsheetApp.create("Pantausiswa App");
   
-  // Define sheet names and their headers
-  var sheetsData = [
+  // Define sheet names and their headers based on the provided file structure
+  const sheetsData = [
     {
       sheetName: "Siswa",
       headers: ["NIS", "Nama", "Kelas", "Wali_Murid"]
+    },
+    {
+      sheetName: "Guru",
+      headers: ["ID_Guru", "Nama_Guru", "Status", "Email", "Kelas_Diampu", "Login", "Dashboard_Insights"]
+    },
+    {
+      sheetName: "ExportWeb",
+      headers: ["statustugas", "kehadiran", "catatanguru", "jadwalpelajaran", "pengumuman"]
     },
     {
       sheetName: "Tugas",
@@ -21,10 +29,6 @@ function createSpreadsheet() {
       headers: ["ID_Kehadiran", "NIS", "Tanggal", "Status"]
     },
     {
-      sheetName: "Pengumuman",
-      headers: ["ID_Pengumuman", "Judul", "Isi_Pengumuman", "Tanggal_Pengumuman", "Untuk_Kelas"]
-    },
-    {
       sheetName: "Catatan_Guru",
       headers: ["ID_Catatan", "NIS", "Minggu_Ke", "Catatan", "Tanggal_Input"]
     },
@@ -33,28 +37,26 @@ function createSpreadsheet() {
       headers: ["ID_Jadwal", "Kelas", "Hari", "Jam", "Mata_Pelajaran", "Guru"]
     },
     {
-      sheetName: "Admin_Users",
-      headers: ["Email"]
+      sheetName: "Pengumuman",
+      headers: ["ID_Pengumuman", "Judul", "Isi_Pengumuman", "Tanggal_Pengumuman", "Untuk_Kelas"]
     }
   ];
 
-  // Loop through each sheet configuration
-  sheetsData.forEach(function(sheetInfo) {
-    // Create or get the sheet
-    var sheet = spreadsheet.getSheetByName(sheetInfo.sheetName);
-    if (!sheet) {
-      sheet = spreadsheet.insertSheet(sheetInfo.sheetName);
-    }
+  // Loop through each sheet definition
+  sheetsData.forEach(sheetInfo => {
+    // Create a new sheet
+    const sheet = spreadsheet.insertSheet(sheetInfo.sheetName);
     
-    // Set headers
+    // Set headers in the first row
     sheet.getRange(1, 1, 1, sheetInfo.headers.length).setValues([sheetInfo.headers]);
     
-    // Optional: Auto-resize columns for better readability
+    // Optionally, freeze the first row and auto-resize columns for better readability
+    sheet.setFrozenRows(1);
     sheet.autoResizeColumns(1, sheetInfo.headers.length);
   });
 
   // Remove the default "Sheet1" if it exists
-  var defaultSheet = spreadsheet.getSheetByName("Sheet1");
+  const defaultSheet = spreadsheet.getSheetByName("Sheet1");
   if (defaultSheet) {
     spreadsheet.deleteSheet(defaultSheet);
   }
