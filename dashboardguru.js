@@ -45,7 +45,6 @@ const dataCache = {
 let currentLoggedInEmail = null; // Menyimpan email guru yang sedang login
 // Menyimpan objek guru yang sedang login, dengan Kelas_Diampu sudah diparsing menjadi array
 let currentLoggedInTeacherData = null;
-// selectedTaskIdForNilai removed as individual input is removed
 
 let activeSectionId = "login-section"; // Initial active section
 
@@ -57,16 +56,19 @@ let massalInputRows = 0;
 let massalInputCols = 0;
 
 // --- Utility Functions (shared) ---
+
+// Fungsi untuk menampilkan overlay pemuatan penuh (hanya untuk login/pengiriman form)
 function showLoadingOverlay() {
   const overlay = document.getElementById("loading-overlay");
   if (overlay) {
     overlay.classList.remove("section-hidden");
     overlay.style.opacity = "1";
     overlay.style.visibility = "visible";
-    overlay.style.display = "flex"; // Ensure it's displayed
+    overlay.style.display = "flex"; // Pastikan ditampilkan sebagai flex
   }
 }
 
+// Fungsi untuk menyembunyikan overlay pemuatan penuh (hanya untuk login/pengiriman form)
 function hideLoadingOverlay() {
   const overlay = document.getElementById("loading-overlay");
   if (overlay) {
@@ -74,8 +76,40 @@ function hideLoadingOverlay() {
     overlay.style.visibility = "hidden";
     setTimeout(() => {
       overlay.classList.add("section-hidden");
-      overlay.style.display = "none"; // Explicitly hide after transition
+      overlay.style.display = "none"; // Sembunyikan secara eksplisit setelah transisi
     }, 300);
+  }
+}
+
+// Fungsi untuk memulai animasi putaran ikon refresh
+function startGlobalRefreshAnimation() {
+  const refreshIconMobile = document.querySelector(
+    "#global-refresh-btn-mobile i"
+  );
+  const refreshIconDesktop = document.querySelector(
+    "#global-refresh-btn-desktop i"
+  );
+  if (refreshIconMobile) {
+    refreshIconMobile.classList.add("fa-spin");
+  }
+  if (refreshIconDesktop) {
+    refreshIconDesktop.classList.add("fa-spin");
+  }
+}
+
+// Fungsi untuk menghentikan animasi putaran ikon refresh
+function stopGlobalRefreshAnimation() {
+  const refreshIconMobile = document.querySelector(
+    "#global-refresh-btn-mobile i"
+  );
+  const refreshIconDesktop = document.querySelector(
+    "#global-refresh-btn-desktop i"
+  );
+  if (refreshIconMobile) {
+    refreshIconMobile.classList.remove("fa-spin");
+  }
+  if (refreshIconDesktop) {
+    refreshIconDesktop.classList.remove("fa-spin");
   }
 }
 
@@ -103,6 +137,36 @@ function showToast(message, type = "info") {
   }, 3000);
 }
 
+function showMessageBox(title, message) {
+  const messageBoxOverlay = document.getElementById("message-box-overlay");
+  const messageBoxTitle = document.getElementById("message-box-title");
+  const messageBoxMessage = document.getElementById("message-box-message");
+  const messageBoxCloseBtn = document.getElementById("message-box-close-btn");
+
+  if (
+    !messageBoxOverlay ||
+    !messageBoxTitle ||
+    !messageBoxMessage ||
+    !messageBoxCloseBtn
+  ) {
+    console.error("Message box elements not found!");
+    return;
+  }
+
+  messageBoxTitle.textContent = title;
+  messageBoxMessage.innerHTML = message; // Use innerHTML to allow <br> tags
+  messageBoxOverlay.classList.remove("hidden");
+  messageBoxOverlay.classList.add("flex"); // Pastikan ditampilkan sebagai flex
+
+  // Add event listener for the close button
+  const closeHandler = () => {
+    messageBoxOverlay.classList.add("hidden");
+    messageBoxOverlay.classList.remove("flex");
+    messageBoxCloseBtn.removeEventListener("click", closeHandler);
+  };
+  messageBoxCloseBtn.addEventListener("click", closeHandler);
+}
+
 function updateUrlHash(sectionId) {
   // Update URL hash without causing a full page reload
   // This helps maintain history and allows direct linking to sections
@@ -112,17 +176,18 @@ function updateUrlHash(sectionId) {
 // NEW FUNCTION: Preloads all operational data in the background
 async function preloadOperationalData() {
   console.log("--> Memulai preloading data operasional di latar belakang...");
+  startGlobalRefreshAnimation(); // Mulai animasi ikon refresh
+
   try {
     dataCache.siswa = await fetchSheetData("Siswa");
     populateSiswaDropdownsGuru();
-    populateSiswaDropdownsInput();
+    populateSiswaDropdownsInput(); // Updated to handle massal-filter-nama-siswa
 
     // Fetch tugas, catatan, jadwal, pengumuman, kehadiran, dan nilai concurrently
     await Promise.all([
       (async () => {
         dataCache.tugas = await fetchSheetData("Tugas");
         populateTugasDropdownsInput();
-        // populateTugasSelectionDropdown(); // Removed as individual input is removed
         updateTugasIdField();
       })(),
       (async () => {
@@ -138,10 +203,6 @@ async function preloadOperationalData() {
         updatePengumumanIdField();
       })(),
       (async () => {
-        dataCache.kehadiran = await fetchSheetData("Kehadiran");
-        updateKehadiranIdField();
-      })(),
-      (async () => {
         dataCache.nilai = await fetchSheetData("Nilai");
       })(),
     ]);
@@ -149,6 +210,8 @@ async function preloadOperationalData() {
     console.log("<-- Preloading data operasional selesai.");
   } catch (error) {
     console.error("Error selama preloading data operasional:", error);
+  } finally {
+    stopGlobalRefreshAnimation(); // Hentikan animasi ikon refresh
   }
 }
 
@@ -156,27 +219,30 @@ async function preloadOperationalData() {
 const toggleSidebar = (show = null) => {
   const sidebar = document.getElementById("main-sidebar");
   const sidebarOverlay = document.getElementById("sidebar-overlay");
-  const mainContentWrapper = document.getElementById("main-content-wrapper");
+  // const mainContentWrapper = document.getElementById("main-content-wrapper"); // Dihapus karena konten utama tidak lagi digeser
+  // const header = document.querySelector("header"); // Dihapus karena header tidak lagi digeser
+  const sidebarWidth = 256; // Lebar sidebar dalam piksel (w-64)
 
-  if (!sidebar || !sidebarOverlay || !mainContentWrapper) {
-    console.error("Sidebar elements not found!");
+  if (!sidebar || !sidebarOverlay) {
+    // Hanya periksa sidebar dan overlay
+    console.error("Sidebar or related elements not found!");
     return;
   }
 
   const isActive = sidebar.classList.contains("active");
 
   if (show === true || (show === null && !isActive)) {
-    // Show sidebar
+    // Tampilkan sidebar
     sidebar.classList.add("active");
     sidebarOverlay.classList.add("active");
-    if (window.innerWidth >= 768) {
-      mainContentWrapper.classList.add("sidebar-active-desktop");
-    }
+    // Di desktop, margin-left dan lebar header sudah diatur di CSS `@media (min-width: 768px)`.
+    // Di mobile, sidebar hanya akan meluncur di atas konten.
   } else if (show === false || (show === null && isActive)) {
-    // Hide sidebar
+    // Sembunyikan sidebar
     sidebar.classList.remove("active");
     sidebarOverlay.classList.remove("active");
-    mainContentWrapper.classList.remove("sidebar-active-desktop");
+    // Di desktop, margin-left dan lebar header sudah diatur di CSS `@media (min-width: 768px)`.
+    // Di mobile, sidebar hanya akan meluncur kembali.
   }
 };
 
@@ -193,16 +259,16 @@ async function showSection(sectionId) {
     updateSidebarActiveState(sectionId);
     updateUrlHash(sectionId);
 
-    // Otomatis tutup sidebar saat pindah section
-    toggleSidebar(false); // Call with 'false' to explicitly close
+    // Otomatis tutup sidebar saat pindah section di mobile
+    if (window.innerWidth < 768) {
+      toggleSidebar(false); // Call with 'false' to explicitly close
+    }
 
-    // Hide any open selection areas when changing sections that are not the target
-    // These specific hides are for input-nilai-kehadiran-section to control its internal areas
+    // Hide any open selection areas that might be visible
     hideSelectionArea("tugas-subject-selection-area");
-    // #input-mode-selection is now permanently hidden (or rather, no longer used for initial choice)
     document
       .getElementById("input-mode-selection")
-      ?.classList.add("section-hidden");
+      ?.classList.add("section-hidden"); // This element is likely gone but keep defensive check
 
     try {
       if (sectionId === "guru-dashboard-section") {
@@ -270,7 +336,6 @@ async function showSection(sectionId) {
 
         populateSiswaDropdownsGuru();
         populateMapelDropdownsGuru();
-        // populateTugasSelectionDropdown(); // Removed as individual input is removed
 
         document
           .getElementById("no-tugas-data-message")
@@ -294,49 +359,71 @@ async function showSection(sectionId) {
           "Tidak ada data pengumuman.";
 
         console.log("<-- Bagian Manajemen Data diaktifkan dan dirender.");
-      } else if (sectionId === "input-nilai-kehadiran-section") {
-        console.log(
-          "--> Mengaktifkan bagian Input Nilai & Kehadiran. Menggunakan data cache atau mengambil jika kosong."
-        );
+      } else if (sectionId === "input-nilai-massal-section") {
+        // NEW Section ID for Input Nilai Massal
+        console.log("--> Mengaktifkan bagian Input Nilai Massal.");
 
-        // Pastikan tab container terlihat
-        document
-          .getElementById("tab-content-container-input")
-          ?.classList.remove("section-hidden");
-
-        // Panggil switchTab untuk mengaktifkan tab 'Input Nilai Massal' secara default
-        // Ini juga akan menangani penyembunyian tab lain.
-        switchTab("input-nilai-massal", "input-nilai-kehadiran-section");
-
+        // Ensure necessary data is loaded
         if (!dataCache.siswa || dataCache.siswa.length === 0) {
           dataCache.siswa = await fetchSheetData("Siswa");
-          console.log("    Fallback: Data Siswa diambil untuk Input Nilai.");
+          console.log(
+            "    Fallback: Data Siswa diambil untuk Input Nilai Massal."
+          );
         }
         if (!dataCache.tugas || dataCache.tugas.length === 0) {
           dataCache.tugas = await fetchSheetData("Tugas");
-          console.log("    Fallback: Data Tugas diambil untuk Input Nilai.");
-        }
-        if (!dataCache.kehadiran || dataCache.kehadiran.length === 0) {
-          dataCache.kehadiran = await fetchSheetData("Kehadiran");
           console.log(
-            "    Fallback: Data Kehadiran diambil untuk Input Nilai."
+            "    Fallback: Data Tugas diambil untuk Input Nilai Massal."
           );
         }
         if (!dataCache.nilai || dataCache.nilai.length === 0) {
           dataCache.nilai = await fetchSheetData("Nilai");
           console.log(
-            "    Fallback: Data Nilai diambil untuk Input Nilai (Massal)."
+            "    Fallback: Data Nilai diambil untuk Input Nilai Massal."
           );
         }
+        populateMassalNilaiFilters();
+        // Initial message for massal input
+        document.getElementById("massal-nilai-inputs").innerHTML = `
+          <p class="text-gray-500 text-center p-4">
+              Pilih Mata Pelajaran dan Tugas untuk menampilkan data.
+          </p>
+        `;
+        updateMassalNavigationData(); // Clear navigation data
+        // Hide save/cancel buttons initially for massal input
+        document
+          .getElementById("save-massal-nilai-btn")
+          ?.classList.add("section-hidden");
+        document
+          .getElementById("cancel-massal-input-btn")
+          ?.classList.add("section-hidden");
+        console.log("<-- Bagian Input Nilai Massal diaktifkan.");
+      } else if (sectionId === "input-kehadiran-section") {
+        // NEW Section ID for Input Kehadiran
+        console.log("--> Mengaktifkan bagian Input Kehadiran.");
 
-        populateSiswaDropdownsInput();
-        populateTugasDropdownsInput();
-        // populateTugasSelectionDropdown(); // Removed as individual input is removed
-        populateMassalNilaiFilters(); // Populate filters for massal input
-        // renderMassalNilaiTable(); // Initial render of the massal table when section is active - now triggered by button
-        console.log(
-          "<-- Bagian Input Nilai diaktifkan dan dirender dengan data terbaru."
-        );
+        // Ensure necessary data is loaded
+        if (!dataCache.siswa || dataCache.siswa.length === 0) {
+          dataCache.siswa = await fetchSheetData("Siswa");
+          console.log(
+            "    Fallback: Data Siswa diambil untuk Input Kehadiran."
+          );
+        }
+        if (!dataCache.kehadiran || dataCache.kehadiran.length === 0) {
+          dataCache.kehadiran = await fetchSheetData("Kehadiran");
+          console.log(
+            "    Fallback: Data Kehadiran diambil untuk Input Kehadiran."
+          );
+        }
+        updateKehadiranIdField(); // Make sure ID is generated
+        populateSiswaDropdownsInput(); // Ensure dropdown is populated
+        // Optionally pre-fill date with today's date if empty
+        const kehadiranTanggalInput =
+          document.getElementById("kehadiran-tanggal");
+        if (kehadiranTanggalInput && !kehadiranTanggalInput.value) {
+          kehadiranTanggalInput.valueAsDate = new Date();
+        }
+        console.log("<-- Bagian Input Kehadiran diaktifkan.");
       } else if (sectionId === "rekap-data-section") {
         console.log(
           "--> Mengaktifkan bagian Rekap Data. Menggunakan data cache atau mengambil jika kosong."
@@ -378,7 +465,7 @@ async function showSection(sectionId) {
             // Check if teacherData is found
             currentLoggedInTeacherData = {
               ...teacherData,
-              // Memastikan Kelas_Diampu adalah string sebelum split, jika tidak, default ke array kosong
+              // Memastikan Kelas_Diampu adalah string sebelum memanggil join(), jika tidak, default ke array kosong
               Kelas_Diampu:
                 typeof teacherData.Kelas_Diampu === "string" &&
                 teacherData.Kelas_Diampu
@@ -417,6 +504,7 @@ function updateHeaderDisplay() {
   const mainContent = document.querySelector("main"); // Dapatkan referensi ke elemen main
   const sidebar = document.getElementById("main-sidebar"); // Dapatkan referensi ke sidebar
   const mainContentWrapper = document.getElementById("main-content-wrapper"); // Dapatkan referensi ke main content wrapper
+  const sidebarWidth = 256; // Lebar sidebar dalam piksel (w-64)
 
   if (!header || !mainContent || !sidebar || !mainContentWrapper) {
     console.error(
@@ -425,22 +513,50 @@ function updateHeaderDisplay() {
     return;
   }
 
+  // Atur ulang gaya CSS inline terlebih dahulu untuk menghindari penumpukan
+  header.style.display = "";
+  header.style.left = "";
+  header.style.width = "";
+  header.style.transform = ""; // Reset transform
+  sidebar.style.display = "";
+  sidebar.style.transform = ""; // Reset sidebar transform
+  mainContent.style.paddingTop = "";
+  mainContentWrapper.style.marginLeft = "";
+  mainContentWrapper.style.transform = ""; // Reset transform
+
   if (activeSectionId === "login-section") {
-    header.style.display = "none"; // Sembunyikan seluruh header
-    sidebar.style.display = "none"; // Sembunyikan sidebar
+    header.classList.add("hidden"); // Sembunyikan seluruh header dengan Tailwind
+    sidebar.classList.add("hidden"); // Sembunyikan sidebar dengan Tailwind
     mainContent.style.paddingTop = "0px"; // Hapus padding-top pada main
     mainContentWrapper.style.marginLeft = "0px"; // Hapus margin-left pada main content wrapper
   } else {
-    header.style.display = "flex"; // Tampilkan header (sesuai display flex yang ada)
-    sidebar.style.display = "block"; // Tampilkan sidebar (sesuai default display)
+    header.classList.remove("hidden"); // Tampilkan header
+    sidebar.classList.remove("hidden"); // Tampilkan sidebar
+
     // Hitung tinggi sebenarnya dari header secara dinamis
     const headerHeight = header.offsetHeight; // Mendapatkan tinggi yang dirender termasuk padding dan border
     mainContent.style.paddingTop = `${headerHeight}px`; // Set padding-top berdasarkan tinggi header dinamis
-    // Di desktop, main-content-wrapper memiliki margin-left untuk memberi ruang sidebar
+
+    // Terapkan gaya desktop jika ukuran layar memenuhi breakpoint md
     if (window.innerWidth >= 768) {
-      mainContentWrapper.style.marginLeft = "256px"; // Atur margin-left sesuai lebar sidebar
+      // Pastikan sidebar selalu terlihat di desktop
+      sidebar.style.transform = "translateX(0%)";
+
+      // Atur margin-left untuk main content wrapper
+      mainContentWrapper.style.marginLeft = `${sidebarWidth}px`;
+
+      // Atur posisi dan lebar header
+      header.style.left = `${sidebarWidth}px`;
+      header.style.width = `calc(100% - ${sidebarWidth}px)`;
     } else {
-      mainContentWrapper.style.marginLeft = "0px"; // Pastikan 0 di mobile
+      // Hapus gaya desktop saat di mobile
+      mainContentWrapper.style.marginLeft = "0px";
+      header.style.left = "0px";
+      header.style.width = "100%";
+      // Pada mobile, main content tidak lagi digeser
+      // sidebar.style.transform diatur oleh toggleSidebar()
+      // mainContentWrapper.style.transform = "translateX(0%)"; // Pastikan transform selalu 0 di mobile
+      // header.style.transform = "translateX(0%)"; // Pastikan transform selalu 0 di mobile
     }
   }
   updateHeaderTitle(activeSectionId); // Set title berdasarkan section aktif
@@ -461,8 +577,11 @@ function updateHeaderTitle(sectionId) {
         case "manajemen-data-section":
           titleText = "Manajemen Data";
           break;
-        case "input-nilai-kehadiran-section":
-          titleText = "Input Nilai & Kehadiran";
+        case "input-nilai-massal-section": // NEW title
+          titleText = "Input Nilai Massal";
+          break;
+        case "input-kehadiran-section": // NEW title
+          titleText = "Input Kehadiran";
           break;
         case "rekap-data-section":
           titleText = "Rekap Data";
@@ -481,15 +600,19 @@ function updateHeaderTitle(sectionId) {
 function updateSidebarActiveState(activeSectionId) {
   const sidebarButtons = document.querySelectorAll(".sidebar-button");
   sidebarButtons.forEach((button) => {
+    // Menghapus kelas font-semibold saat tidak aktif
     button.classList.remove("text-blue-600", "bg-blue-100", "font-semibold");
     button.classList.add("text-gray-700", "hover:bg-gray-100");
     if (button.dataset.targetSection === activeSectionId) {
-      button.classList.add("text-blue-600", "bg-blue-100", "font-semibold");
+      // Menambahkan kelas tanpa font-semibold saat aktif
+      button.classList.add("text-blue-600", "bg-blue-100");
       button.classList.remove("text-gray-700", "hover:bg-gray-100");
     }
   });
 }
 
+// switchTab function is now only for internal tabs within sections like 'Manajemen Data' or 'Settings'.
+// The 'Input Nilai & Kehadiran' section no longer uses internal tabs, so its logic is removed here.
 function switchTab(targetId, tabSectionId) {
   let tabButtons;
   let tabContentsContainer;
@@ -500,27 +623,22 @@ function switchTab(targetId, tabSectionId) {
     tabContentsContainer = document.getElementById(
       "tab-content-container-manajemen"
     );
-  } else if (tabSectionId === "input-nilai-kehadiran-section") {
-    tabButtons = document.querySelectorAll(`#${tabSectionId} .tab-button`);
-    tabContentsContainer = document.getElementById(
-      "tab-content-container-input"
-    );
   } else if (tabSectionId === "settings-section") {
-    // NEW: Handle settings section tabs
     tabButtons = document.querySelectorAll(`#${tabSectionId} .tab-button`);
     tabContentsContainer = document.getElementById(
       "tab-content-container-settings"
     );
   } else {
+    // This case should ideally not be hit if sidebar directly targets new sections
     console.error(
-      `Tab content container not found for unknown section: ${tabSectionId}`
+      `switchTab: Tab content container not found for unknown section: ${tabSectionId}`
     );
     return;
   }
 
   if (!tabContentsContainer || !tabButtons) {
     console.error(
-      `Tab content elements not found for section ${tabSectionId}.`
+      `switchTab: Tab content elements not found for section ${tabSectionId}.`
     );
     return;
   }
@@ -538,29 +656,6 @@ function switchTab(targetId, tabSectionId) {
   document
     .querySelector(`#${tabSectionId} .tab-button[data-target="${targetId}"]`)
     .classList.add("active");
-
-  // Specific logic for 'input-nilai-kehadiran-section'
-  if (tabSectionId === "input-nilai-kehadiran-section") {
-    // Hide specific input areas first.
-    // Removed individual input areas as per request
-    document
-      .getElementById("massal-nilai-area")
-      ?.classList.add("section-hidden");
-    document.getElementById("input-kehadiran")?.classList.add("section-hidden"); // Ensure kehadiran is hidden too
-
-    // Renamed "input-nilai-massal" to "input-nilai"
-    if (targetId === "input-nilai-massal") {
-      // This is now "Input Nilai"
-      document
-        .getElementById("massal-nilai-area")
-        ?.classList.remove("section-hidden");
-      renderMassalNilaiTable(); // Render ulang tabel massal
-    } else if (targetId === "input-kehadiran") {
-      document
-        .getElementById("input-kehadiran")
-        ?.classList.remove("section-hidden");
-    }
-  }
 }
 
 function showConfirmModal(title, message, onConfirm) {
@@ -747,7 +842,7 @@ function openStudentModal(isEdit = false, nis = null) {
 // --- Login Handler Guru ---
 async function handleLogin(event) {
   event.preventDefault();
-  showLoadingOverlay();
+  showLoadingOverlay(); // Tampilkan overlay saat login
 
   const email = document.getElementById("email-input").value;
   console.log("Attempting login with email:", email);
@@ -811,8 +906,9 @@ async function handleLogin(event) {
 
       showToast("Login berhasil!", "success");
 
-      // await fetchInitialDashboardData(); // No longer needed here as dashboard insights are pre-calculated
       showSection("guru-dashboard-section"); // This will now just reveal the section with pre-filled welcome text
+      // NEW: Mulai preloading data operasional setelah login berhasil
+      preloadOperationalData();
     } else {
       showToast("Email tidak ditemukan. Silakan coba lagi.", "error");
       console.log("Login failed: Email not found.");
@@ -821,20 +917,20 @@ async function handleLogin(event) {
     console.error("Login error:", error);
     showToast("Terjadi kesalahan saat login. Silakan coba lagi.", "error");
   } finally {
-    hideLoadingOverlay();
+    hideLoadingOverlay(); // Sembunyikan overlay setelah login (berhasil/gagal)
   }
 }
 
 // --- Handle NIS Search (for redirect to index.html) ---
 async function handleNisSearch(event) {
   event.preventDefault();
-  showLoadingOverlay();
+  showLoadingOverlay(); // Tampilkan overlay saat pencarian NIS
 
   const nis = document.getElementById("nis-search-input").value.trim();
 
   if (!nis) {
     showToast("Mohon masukkan NIS siswa.", "error");
-    hideLoadingOverlay();
+    hideLoadingOverlay(); // Sembunyikan overlay jika input kosong
     return;
   }
 
@@ -862,7 +958,7 @@ async function handleNisSearch(event) {
     console.error("Error searching NIS:", error);
     showToast("Terjadi kesalahan saat mencari NIS.", "error");
   } finally {
-    hideLoadingOverlay();
+    hideLoadingOverlay(); // Sembunyikan overlay setelah pencarian NIS (berhasil/gagal)
   }
 }
 
@@ -1004,17 +1100,26 @@ function populateSiswaDropdownsGuru() {
 }
 
 function populateSiswaDropdownsInput() {
-  // Only for Kehadiran now
-  const nisSelects = document.querySelectorAll("#kehadiran-nis");
+  // Only for Kehadiran now and massal-filter-nama-siswa
+  const kehadiranNisSelect = document.getElementById("kehadiran-nis");
+  const massalFilterNamaSiswaSelect = document.getElementById(
+    "massal-filter-nama-siswa"
+  ); // New element
+
   const siswaData = dataCache.siswa;
 
   if (!siswaData || siswaData.length === 0) {
     console.warn(
-      "Data siswa kosong, tidak dapat mengisi dropdown input kehadiran."
+      "Data siswa kosong, tidak dapat mengisi dropdown input kehadiran atau filter nama siswa."
     );
-    nisSelects.forEach((select) => {
-      select.innerHTML = '<option value="">Tidak ada siswa</option>';
-    });
+    if (kehadiranNisSelect) {
+      kehadiranNisSelect.innerHTML =
+        '<option value="">Tidak ada siswa</option>';
+    }
+    if (massalFilterNamaSiswaSelect) {
+      massalFilterNamaSiswaSelect.innerHTML =
+        '<option value="">Tidak ada siswa</option>';
+    }
     return;
   }
 
@@ -1022,27 +1127,50 @@ function populateSiswaDropdownsInput() {
   const filteredSiswa = siswaData.filter((siswa) =>
     teacherClasses.includes(siswa.Kelas)
   );
+  filteredSiswa.sort((a, b) => a.Nama.localeCompare(b.Nama));
 
-  nisSelects.forEach((select) => {
-    const currentSelectedValue = select.value;
-    select.innerHTML = '<option value="">Pilih Siswa (NIS - Nama)</option>';
-
-    filteredSiswa.sort((a, b) => a.Nama.localeCompare(b.Nama));
-
+  // Populate Kehadiran NIS dropdown
+  if (kehadiranNisSelect) {
+    const currentSelectedValue = kehadiranNisSelect.value;
+    kehadiranNisSelect.innerHTML =
+      '<option value="">Pilih Siswa (NIS - Nama)</option>';
     filteredSiswa.forEach((siswa) => {
       const option = document.createElement("option");
       option.value = siswa.NIS;
       option.textContent = `${siswa.NIS} - ${siswa.Nama} (${siswa.Kelas})`;
-      select.appendChild(option);
+      kehadiranNisSelect.appendChild(option);
     });
-
     if (
       currentSelectedValue &&
-      select.querySelector(`option[value="${currentSelectedValue}"]`)
+      kehadiranNisSelect.querySelector(
+        `option[value="${currentSelectedValue}"]`
+      )
     ) {
-      select.value = currentSelectedValue;
+      kehadiranNisSelect.value = currentSelectedValue;
     }
-  });
+  }
+
+  // Populate Massal Filter Nama Siswa dropdown
+  if (massalFilterNamaSiswaSelect) {
+    // This check ensures massalFilterNamaSiswaSelect is not null
+    const currentSelectedValue = massalFilterNamaSiswaSelect.value;
+    massalFilterNamaSiswaSelect.innerHTML =
+      '<option value="">Semua Siswa</option>'; // Changed default text
+    filteredSiswa.forEach((siswa) => {
+      const option = document.createElement("option");
+      option.value = siswa.NIS; // Use NIS as value
+      option.textContent = `${siswa.Nama} (${siswa.Kelas})`; // Display Name (Class)
+      massalFilterNamaSiswaSelect.appendChild(option); // Corrected: Used massalFilterNamaSiswaSelect
+    });
+    if (
+      currentSelectedValue &&
+      massalFilterNamaSiswaSelect.querySelector(
+        `option[value="${currentSelectedValue}"]`
+      )
+    ) {
+      massalFilterNamaSiswaSelect.value = currentSelectedValue;
+    }
+  }
 }
 
 function populateTugasDropdownsInput() {
@@ -1090,12 +1218,9 @@ function populateTugasDropdownsInput() {
   }
 }
 
-// populateTugasSelectionDropdown removed as individual input is removed
-
 function populateMapelDropdownsGuru() {
   const tugasMapelSelect = document.getElementById("tugas-mata_pelajaran");
   const jadwalMapelSelect = document.getElementById("jadwal-mata_pelajaran");
-  // tugasSelectionMapelSelect removed as individual input is removed
   const tugasSelectionMapelSelect = document.getElementById(
     "tugas-selection-mata_pelajaran"
   ); // Keep this for add new tugas modal
@@ -1179,7 +1304,7 @@ function updateTugasIdField() {
   }
 }
 
-// updateNilaiIdField removed as individual input is removed.
+// Removed generateNilaiId as individual input is removed.
 // The massal input handles ID generation internally during submission.
 
 function updateKehadiranIdField() {
@@ -1280,15 +1405,11 @@ async function openModal(modalId, isEdit = false, data = null) {
   if (titleElement) {
     let defaultTitle = `Tambah ${modalId
       .replace("-modal", "")
-      .replace("guru-data-", "")
-      .replace("input-", "")
       .replace("-", " ") // Added to make "tugas-modal" -> "tugas modal"
       .replace(/\b\w/g, (char) => char.toUpperCase())} Baru`; // Capitalize first letter of each word
     if (isEdit) {
       defaultTitle = `Edit ${modalId
         .replace("-modal", "")
-        .replace("guru-data-", "")
-        .replace("input-", "")
         .replace("-", " ") // Added to make "tugas-modal" -> "tugas modal"
         .replace(/\b\w/g, (char) => char.toUpperCase())}`;
     }
@@ -1308,7 +1429,7 @@ async function openModal(modalId, isEdit = false, data = null) {
       break;
     case "kehadiran-modal":
       updateKehadiranIdField();
-      populateSiswaDropdownsInput();
+      populateSiswaDropdownsInput(); // Ensure this populates correctly
       // Optionally pre-fill date with today's date if empty
       const kehadiranTanggalInput =
         document.getElementById("kehadiran-tanggal");
@@ -1445,12 +1566,13 @@ function populateMassalNilaiFilters() {
   const massalFilterTugas = document.getElementById("massal-filter-tugas");
   const massalFilterNamaSiswa = document.getElementById(
     "massal-filter-nama-siswa"
-  ); // Get the new student name select
+  );
 
   if (!massalFilterMapel || !massalFilterTugas || !massalFilterNamaSiswa)
     return;
 
   // Populate Mata Pelajaran Filter
+  const currentSelectedMapel = massalFilterMapel.value; // Preserve current selection
   massalFilterMapel.innerHTML =
     '<option value="">Pilih Mata Pelajaran</option>';
   HARDCODED_SUBJECTS.forEach((subject) => {
@@ -1459,6 +1581,12 @@ function populateMassalNilaiFilters() {
     option.textContent = subject;
     massalFilterMapel.appendChild(option);
   });
+  if (
+    currentSelectedMapel &&
+    massalFilterMapel.querySelector(`option[value="${currentSelectedMapel}"]`)
+  ) {
+    massalFilterMapel.value = currentSelectedMapel;
+  }
 
   // Populate Nama Siswa Filter
   const currentSelectedStudent = massalFilterNamaSiswa.value; // Preserve current selection
@@ -1513,7 +1641,6 @@ function updateMassalTugasFilter(selectedMapel) {
 
   const teacherClasses = currentLoggedInTeacherData?.Kelas_Diampu || [];
   let filteredTugas = dataCache.tugas.filter((tugas) => {
-    // Filter by teacher's classes
     const tugasUntukKelas = tugas.Untuk_Kelas
       ? tugas.Untuk_Kelas.split(",").map((k) => k.trim())
       : [];
@@ -1551,9 +1678,29 @@ function updateMassalTugasFilter(selectedMapel) {
   }
 }
 
+// Function to toggle student name column width
+function toggleStudentNameColumn(element) {
+  element.classList.toggle("student-name-expanded");
+  // Toggle `w-32` and `truncate` with `w-auto` and `whitespace-normal`
+  if (element.classList.contains("student-name-expanded")) {
+    element.classList.remove("w-32", "truncate", "whitespace-nowrap");
+    element.classList.add("w-auto", "whitespace-normal");
+  } else {
+    element.classList.add("w-32", "truncate", "whitespace-nowrap");
+    element.classList.remove("w-auto", "whitespace-normal");
+  }
+}
+
 // NEW: Function to render the massal nilai input table
 async function renderMassalNilaiTable() {
   const massalInputsContainer = document.getElementById("massal-nilai-inputs");
+  const saveMassalBtn = document.getElementById("save-massal-nilai-btn");
+  const cancelMassalBtn = document.getElementById("cancel-massal-input-btn");
+
+  // Pastikan tombol tersembunyi secara default
+  if (saveMassalBtn) saveMassalBtn.classList.add("section-hidden");
+  if (cancelMassalBtn) cancelMassalBtn.classList.add("section-hidden");
+
   const filterMapel =
     document.getElementById("massal-filter-mapel")?.value || ""; // Default to empty string for "Pilih..."
   const filterTugas =
@@ -1562,11 +1709,11 @@ async function renderMassalNilaiTable() {
     document.getElementById("massal-filter-nama-siswa")?.value || ""; // Value will be NIS, or "" for "Semua Siswa"
 
   // Check if both mapel and tugas filters are selected (nama siswa filter is optional)
-  if (!filterMapel || !filterTugas) {
+  if (!filterMapel || (!filterTugas && filterTugas !== "")) {
+    // Ensure "" is treated as valid for "Semua Tugas"
     massalInputsContainer.innerHTML = `
       <p class="text-gray-500 text-center p-4">
-        Pilih Mata Pelajaran dan Tugas, lalu klik "Terapkan Filter"
-        untuk menampilkan data.
+        Pilih Mata Pelajaran dan Tugas untuk menampilkan data.
       </p>
     `;
     // Clear navigation data as no table is rendered
@@ -1576,168 +1723,194 @@ async function renderMassalNilaiTable() {
     return; // Exit function if mapel or tugas filters are not selected
   }
 
+  startGlobalRefreshAnimation(); // Tampilkan ikon refresh berputar saat me-render tabel
+
   massalInputsContainer.innerHTML =
     '<p class="text-gray-500 text-center p-4">Memuat daftar siswa...</p>'; // Show loading
 
-  if (!dataCache.siswa || dataCache.siswa.length === 0) {
-    massalInputsContainer.innerHTML =
-      '<p class="text-red-500 text-center p-4">Data siswa tidak tersedia.</p>';
-    return;
-  }
-  if (!dataCache.tugas || dataCache.tugas.length === 0) {
-    massalInputsContainer.innerHTML =
-      '<p class="text-red-500 text-center p-4">Data tugas tidak tersedia.</p>';
-    return;
-  }
-  if (!dataCache.nilai || dataCache.nilai.length === 0) {
-    // Ensure nilai data is available
-    dataCache.nilai = await fetchSheetData("Nilai");
-    console.log("DEBUG: Data Nilai diambil untuk render massal table.");
-  }
+  try {
+    if (!dataCache.siswa || dataCache.siswa.length === 0) {
+      dataCache.siswa = await fetchSheetData("Siswa"); // Fetch if not available
+      console.log("DEBUG: Data Siswa diambil untuk render massal table.");
+    }
+    if (!dataCache.tugas || dataCache.tugas.length === 0) {
+      dataCache.tugas = await fetchSheetData("Tugas"); // Fetch if not available
+      console.log("DEBUG: Data Tugas diambil untuk render massal table.");
+    }
+    if (!dataCache.nilai || dataCache.nilai.length === 0) {
+      dataCache.nilai = await fetchSheetData("Nilai"); // Ensure nilai data is available
+      console.log("DEBUG: Data Nilai diambil untuk render massal table.");
+    }
 
-  const teacherClasses = currentLoggedInTeacherData?.Kelas_Diampu || [];
-  let relevantStudents = dataCache.siswa.filter(
-    (siswa) =>
-      teacherClasses.includes(siswa.Kelas) &&
-      (filterNISSiswa === "" || String(siswa.NIS) === filterNISSiswa) // Use NIS for filtering
-  );
+    const teacherClasses = currentLoggedInTeacherData?.Kelas_Diampu || [];
+    let relevantStudents = dataCache.siswa.filter(
+      (siswa) =>
+        teacherClasses.includes(siswa.Kelas) &&
+        (filterNISSiswa === "" || String(siswa.NIS) === filterNISSiswa) // Use NIS for filtering
+    );
 
-  let relevantTasks = dataCache.tugas.filter((tugas) => {
-    const tugasUntukKelas = tugas.Untuk_Kelas
-      ? tugas.Untuk_Kelas.split(",").map((k) => k.trim())
-      : [];
-    const matchesTeacherClass =
-      tugasUntukKelas.length === 0 ||
-      tugasUntukKelas.includes("Semua") ||
-      tugasUntukKelas.some((tKelas) => teacherClasses.includes(tKelas));
+    let relevantTasks = dataCache.tugas.filter((tugas) => {
+      const tugasUntukKelas = tugas.Untuk_Kelas
+        ? tugas.Untuk_Kelas.split(",").map((k) => k.trim())
+        : [];
+      const matchesTeacherClass =
+        tugasUntukKelas.length === 0 ||
+        tugasUntukKelas.includes("Semua") ||
+        tugasUntukKelas.some((tKelas) => teacherClasses.includes(tKelas));
 
-    // Filter by selected subject
-    const matchesSubject =
-      filterMapel === "" ||
-      filterMapel === "all" ||
-      tugas.Mata_Pelajaran === filterMapel;
+      // Filter by selected subject
+      const matchesSubject =
+        filterMapel === "" || tugas.Mata_Pelajaran === filterMapel;
 
-    return matchesTeacherClass && matchesSubject;
-  });
+      return matchesTeacherClass && matchesSubject;
+    });
 
-  // Apply specific task filter only if a specific task is selected (not "Semua Tugas" which has value="")
-  // This is the crucial part for "Semua Tugas" functionality.
-  if (filterTugas !== "") {
-    relevantTasks = relevantTasks.filter((t) => t.ID_Tugas === filterTugas);
-  }
+    // Apply specific task filter only if a specific task is selected (not "Semua Tugas" which has value="")
+    // This is the crucial part for "Semua Tugas" functionality.
+    if (filterTugas !== "") {
+      relevantTasks = relevantTasks.filter((t) => t.ID_Tugas === filterTugas);
+    }
 
-  if (relevantStudents.length === 0 || relevantTasks.length === 0) {
-    massalInputsContainer.innerHTML =
-      '<p class="text-gray-500 text-center p-4">Tidak ada siswa atau tugas yang cocok dengan filter yang dipilih.</p>';
-    // Clear navigation data
-    massalInputElements = [];
-    massalInputRows = 0;
-    massalInputCols = 0;
-    return;
-  }
+    if (relevantStudents.length === 0 || relevantTasks.length === 0) {
+      massalInputsContainer.innerHTML =
+        '<p class="text-gray-500 text-center p-4">Tidak ada siswa atau tugas yang cocok dengan filter yang dipilih.</p>';
+      // Clear navigation data
+      massalInputElements = [];
+      massalInputRows = 0;
+      massalInputCols = 0;
+      return;
+    }
 
-  relevantStudents.sort((a, b) => a.Nama.localeCompare(b.Nama)); // Sort students alphabetically
+    relevantStudents.sort((a, b) => a.Nama.localeCompare(b.Nama)); // Sort students alphabetically
 
-  let tableHtml = `
-    <table class="min-w-full divide-y divide-gray-200">
-      <thead class="bg-gray-50">
-        <tr>
-          <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Nama Siswa</th>
-  `;
-
-  // Add task headers dynamically
-  relevantTasks.forEach((task) => {
-    tableHtml += `
-      <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">
-        ${task.Nama_Tugas} <span class="text-gray-400">(${task.Mata_Pelajaran})</span>
-      </th>
-    `;
-  });
-
-  tableHtml += `
-        </tr>
-      </thead>
-      <tbody class="bg-white divide-y divide-gray-200">
-  `;
-
-  relevantStudents.forEach((siswa, rowIndex) => {
-    tableHtml += `
-      <tr>
-        <td class="px-3 py-2 whitespace-nowrap text-sm font-medium text-gray-900">${siswa.Nama} (${siswa.NIS})</td>
+    let tableHtml = `
+      <table class="min-w-full divide-y divide-gray-200 massal-nilai-input-table">
+        <thead class="bg-gray-50">
+          <tr>
+            <th class="px-3 py-2 text-center text-xs font-medium text-gray-500 uppercase tracking-wider sticky-col-no">No.</th>
+            <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Nama Siswa</th>
     `;
 
-    relevantTasks.forEach((task, colIndex) => {
-      const existingNilai = dataCache.nilai.find(
-        (n) =>
-          String(n.NIS) === String(siswa.NIS) &&
-          String(n.ID_Tugas) === String(task.ID_Tugas)
-      );
-
-      const nilaiValue = existingNilai ? existingNilai.Nilai : "";
-      const statusText = getCompletionStatus(nilaiValue);
-      const statusClass =
-        statusText === "Tuntas"
-          ? "text-green-600"
-          : statusText === "Belum Tuntas"
-          ? "text-red-600"
-          : "text-gray-500";
-
+    // Add task headers dynamically
+    relevantTasks.forEach((task) => {
+      // Apply w-24 to match input width, and remove whitespace-nowrap for wrapping
+      // Add text-center for horizontal alignment
       tableHtml += `
-        <td class="px-3 py-2 whitespace-nowrap text-sm text-gray-900">
-          <input
-            type="number"
-            name="nilai-${siswa.NIS}-${task.ID_Tugas}"
-            class="massal-nilai-input shadow appearance-none border rounded w-24 py-1 px-2 text-gray-700 leading-tight focus:outline-none focus:shadow-outline text-sm"
-            placeholder="Nilai"
-            min="0"
-            max="100"
-            value="${nilaiValue}"
-            data-nis="${siswa.NIS}"
-            data-id-tugas="${task.ID_Tugas}"
-            data-row-index="${rowIndex}"
-            data-col-index="${colIndex}"
-            oninput="updateMassalStatus(this)"
-          />
-          <span id="status-${siswa.NIS}-${task.ID_Tugas}" class="ml-2 text-xs font-semibold ${statusClass}">
-            ${statusText}
-          </span>
-        </td>
+        <th class="px-3 py-2 text-center text-xs font-medium text-gray-500 uppercase tracking-wider w-24">
+          ${task.Nama_Tugas} <span class="text-gray-400">(${task.Mata_Pelajaran})</span>
+        </th>
       `;
     });
 
     tableHtml += `
-      </tr>
+          </tr>
+        </thead>
+        <tbody class="bg-white divide-y divide-gray-200">
     `;
-  });
 
-  tableHtml += `
-      </tbody>
-    </table>
-  `;
-  massalInputsContainer.innerHTML = tableHtml;
+    relevantStudents.forEach((siswa, rowIndex) => {
+      // Initial shortened display with ellipsis and fixed width
+      const displayedNama = siswa.Nama; // Keep full name for initial display, let CSS handle ellipsis
 
-  // After rendering, update navigation data
-  updateMassalNavigationData();
+      tableHtml += `
+          <tr>
+            <td class="px-3 py-2 whitespace-nowrap text-sm font-medium text-gray-900 sticky-col-no">${
+              rowIndex + 1
+            }.</td>
+            <td class="px-3 py-2 text-sm font-medium text-gray-900 cursor-pointer hover:underline w-32 truncate whitespace-nowrap"
+                title="${siswa.Nama} (NIS: ${siswa.NIS})"
+                onclick="toggleStudentNameColumn(this)">
+                ${displayedNama}
+            </td>
+        `;
+
+      relevantTasks.forEach((task, colIndex) => {
+        const existingNilai = dataCache.nilai.find(
+          (n) =>
+            String(n.NIS) === String(siswa.NIS) &&
+            String(n.ID_Tugas) === String(task.ID_Tugas)
+        );
+
+        const nilaiValue = existingNilai ? existingNilai.Nilai : "";
+        const status = getCompletionStatus(nilaiValue);
+        let inputBgClass = "";
+
+        if (status === "Tuntas") {
+          inputBgClass = "bg-green-100 border-green-300";
+        } else if (status === "Belum Tuntas") {
+          inputBgClass = "bg-red-100 border-red-300";
+        } else {
+          inputBgClass = "bg-gray-100 border-gray-300";
+        }
+
+        tableHtml += `
+                <td class="px-3 py-2 whitespace-nowrap text-sm text-gray-900">
+                    <input
+                    type="number"
+                    name="nilai-${siswa.NIS}-${task.ID_Tugas}"
+                    class="massal-nilai-input shadow appearance-none border rounded w-24 py-1 px-2 text-gray-700 leading-tight focus:outline-none focus:shadow-outline text-sm ${inputBgClass}"
+                    placeholder="Nilai"
+                    min="0"
+                    max="100"
+                    value="${nilaiValue}"
+                    data-nis="${siswa.NIS}"
+                    data-id-tugas="${task.ID_Tugas}"
+                    data-row-index="${rowIndex}"
+                    data-col-index="${colIndex}"
+                    oninput="updateMassalStatus(this)"
+                    />
+                    <!-- Keterangan status dihapus dan diganti dengan warna kotak input -->
+                </td>
+            `;
+      });
+
+      tableHtml += `
+          </tr>
+        `;
+    });
+
+    tableHtml += `
+        </tbody>
+      </table>
+    `;
+    massalInputsContainer.innerHTML = tableHtml;
+
+    // Tampilkan tombol "Batal" dan "Simpan Nilai Massal"
+    if (saveMassalBtn) saveMassalBtn.classList.remove("section-hidden");
+    if (cancelMassalBtn) cancelMassalBtn.classList.remove("section-hidden");
+
+    // After rendering, update navigation data
+    updateMassalNavigationData();
+  } catch (error) {
+    console.error("Error rendering massal nilai table:", error);
+    massalInputsContainer.innerHTML = `<p class="text-red-500 text-center p-4">Terjadi kesalahan saat memuat data tabel: ${error.message}</p>`;
+  } finally {
+    stopGlobalRefreshAnimation(); // Hentikan animasi ikon refresh
+  }
 }
 
 // Function to update status text automatically on input change
 function updateMassalStatus(inputElement) {
   const nilai = inputElement.value;
-  const nis = inputElement.dataset.nis;
-  const idTugas = inputElement.dataset.idTugas;
-  const statusSpan = document.getElementById(`status-${nis}-${idTugas}`);
+  const status = getCompletionStatus(nilai);
 
-  if (statusSpan) {
-    if (nilai === "") {
-      statusSpan.textContent = "Belum Input";
-      statusSpan.className = "ml-2 text-xs font-semibold text-gray-500";
-    } else {
-      const status = getCompletionStatus(nilai);
-      statusSpan.textContent = status;
-      statusSpan.className = `ml-2 text-xs font-semibold ${
-        status === "Tuntas" ? "text-green-600" : "text-red-600"
-      }`;
-    }
+  // Hapus kelas warna latar belakang yang ada
+  inputElement.classList.remove(
+    "bg-green-100",
+    "border-green-300",
+    "bg-red-100",
+    "border-red-300",
+    "bg-gray-100",
+    "border-gray-300"
+  );
+
+  // Tambahkan kelas warna latar belakang yang sesuai
+  if (status === "Tuntas") {
+    inputElement.classList.add("bg-green-100", "border-green-300");
+  } else if (status === "Belum Tuntas") {
+    inputElement.classList.add("bg-red-100", "border-red-300");
+  } else {
+    inputElement.classList.add("bg-gray-100", "border-gray-300");
   }
 }
 
@@ -1821,7 +1994,7 @@ async function handleSubmitForm(event, sheetName, formType = "add") {
   const currentModal = form.closest(".modal");
   const currentModalId = currentModal ? currentModal.id : null;
 
-  showLoadingOverlay();
+  showLoadingOverlay(); // Tampilkan overlay untuk pengiriman form
 
   let result;
   if (sheetName === "Nilai" && form.id === "nilai-massal-form") {
@@ -1957,7 +2130,7 @@ async function handleSubmitForm(event, sheetName, formType = "add") {
       }
     } catch (error) {
       console.error(`Error submitting single form to ${sheetName}:`, error);
-      showToast(`Terjadi kesalahan saat menyimpan data ${sheetName}.`, "error");
+      showToast(`Gagal menyimpan data ${sheetName}.`, "error");
       result = { success: false, message: "Terjadi kesalahan jaringan." };
     }
   }
@@ -1985,19 +2158,15 @@ async function handleSubmitForm(event, sheetName, formType = "add") {
           dataCache.siswa = await fetchSheetData("Siswa");
           populateSiswaDropdownsInput();
           populateSiswaDropdownsGuru();
-          // renderDashboardInsights(); // Tidak perlu render di sini, menunggu update dari Apps Script
           break;
         case "Tugas":
           dataCache.tugas = await fetchSheetData("Tugas");
           populateTugasDropdownsInput();
           populateMapelDropdownsGuru();
-          // populateTugasSelectionDropdown(); // Removed as individual input is removed
           populateMassalNilaiFilters(); // NEW: Refresh massal filters
-          // renderDashboardInsights(); // Tidak perlu render di sini
           break;
         case "Nilai":
           dataCache.nilai = await fetchSheetData("Nilai");
-          // updateNilaiIdField(); // Removed as individual input is removed
           if (activeSectionId === "rekap-data-section") {
             renderRekapNilaiTable();
           }
@@ -2008,19 +2177,28 @@ async function handleSubmitForm(event, sheetName, formType = "add") {
           const currentMassalTugasFilter = document.getElementById(
             "massal-filter-tugas"
           )?.value;
-          if (currentMassalMapelFilter && currentMassalTugasFilter) {
+          if (currentMassalMapelFilter && currentMassalTugasFilter !== "") {
+            // Check for empty string for "Semua Tugas"
             renderMassalNilaiTable();
           } else {
             // If filters are not set, ensure the message is displayed correctly
             document.getElementById("massal-nilai-inputs").innerHTML = `
                   <p class="text-gray-500 text-center p-4">
-                      Pilih Mata Pelajaran dan Tugas, lalu klik "Terapkan Filter"
-                      untuk menampilkan data.
+                      Pilih Mata Pelajaran dan Tugas untuk menampilkan data.
                   </p>
               `;
             updateMassalNavigationData(); // Clear navigation data
+            // Sembunyikan tombol "Batal" dan "Simpan Nilai Massal" jika data tidak dirender
+            const saveMassalBtn = document.getElementById(
+              "save-massal-nilai-btn"
+            );
+            const cancelMassalBtn = document.getElementById(
+              "cancel-massal-input-btn"
+            );
+            if (saveMassalBtn) saveMassalBtn.classList.add("section-hidden");
+            if (cancelMassalBtn)
+              cancelMassalBtn.classList.add("section-hidden");
           }
-          // renderDashboardInsights(); // Tidak perlu render di sini
           break;
         case "Kehadiran":
           dataCache.kehadiran = await fetchSheetData("Kehadiran");
@@ -2051,10 +2229,10 @@ async function handleSubmitForm(event, sheetName, formType = "add") {
         "error"
       );
     } finally {
-      hideLoadingOverlay();
+      hideLoadingOverlay(); // Sembunyikan overlay setelah pengiriman form
     }
   } else {
-    hideLoadingOverlay();
+    hideLoadingOverlay(); // Sembunyikan overlay jika result.success false
   }
 }
 
@@ -2158,106 +2336,116 @@ function populateRekapFilters() {
 
 function renderRekapNilaiTable() {
   rekapNilaiTableBody.innerHTML = "";
-  if (!dataCache.nilai || dataCache.nilai.length === 0) {
-    noRekapDataMessage.classList.remove("section-hidden");
-    noRekapDataMessage.textContent =
-      "Data nilai belum dimuat atau tidak ada data.";
-    return;
-  }
+  startGlobalRefreshAnimation(); // Tambahkan kelas fa-spin ke ikon refresh saat me-render tabel rekap
 
-  let filteredData = dataCache.nilai;
-
-  if (rekapNisFilter && rekapNisFilter.value === "")
-    rekapNisFilter.value = "all";
-  if (rekapMapelFilter && rekapMapelFilter.value === "")
-    rekapMapelFilter.value = "all";
-  if (rekapStatusFilter && rekapStatusFilter.value === "")
-    rekapStatusFilter.value = "all";
-  if (rekapIdTugasFilter && rekapIdTugasFilter.value === "")
-    rekapIdTugasFilter.value = "all";
-
-  const nisFilter = rekapNisFilter.value || "all";
-  const mapelFilter = rekapMapelFilter.value || "all";
-  const statusFilter = rekapStatusFilter.value || "all";
-  const idTugasFilter = rekapIdTugasFilter
-    ? rekapIdTugasFilter.value || "all"
-    : "all";
-
-  const teacherClasses = currentLoggedInTeacherData?.Kelas_Diampu || [];
-
-  filteredData = filteredData.filter((nilai) => {
-    const student = dataCache.siswa.find(
-      (s) => String(s.NIS) === String(nilai.NIS)
-    );
-    const tugas = dataCache.tugas.find(
-      (t) => String(t.ID_Tugas) === String(nilai.ID_Tugas)
-    );
-
-    if (!student || !tugas) {
-      console.warn(
-        `Melewati entri nilai karena data siswa atau tugas tidak ditemukan: ${JSON.stringify(
-          nilai
-        )}`
-      );
-      return false;
+  try {
+    if (!dataCache.nilai || dataCache.nilai.length === 0) {
+      noRekapDataMessage.classList.remove("section-hidden");
+      noRekapDataMessage.textContent =
+        "Data nilai belum dimuat atau tidak ada data.";
+      return;
     }
 
-    const matchesTeacherClass = teacherClasses.includes(student.Kelas);
-    if (!matchesTeacherClass) return false;
+    let filteredData = dataCache.nilai;
 
-    const matchesNis = nisFilter === "all" || String(nilai.NIS) === nisFilter;
-    const matchesMapel =
-      mapelFilter === "all" || tugas.Mata_Pelajaran === mapelFilter;
-    const matchesStatus =
-      statusFilter === "all" || nilai.Status_Pengerjaan === statusFilter;
-    const matchesIdTugas =
-      idTugasFilter === "all" || String(nilai.ID_Tugas) === idTugasFilter;
+    if (rekapNisFilter && rekapNisFilter.value === "")
+      rekapNisFilter.value = "all";
+    if (rekapMapelFilter && rekapMapelFilter.value === "")
+      rekapMapelFilter.value = "all";
+    if (rekapStatusFilter && rekapStatusFilter.value === "")
+      rekapStatusFilter.value = "all";
+    if (rekapIdTugasFilter && rekapIdTugasFilter.value === "")
+      rekapIdTugasFilter.value = "all";
 
-    return matchesNis && matchesMapel && matchesStatus && matchesIdTugas;
-  });
+    const nisFilter = rekapNisFilter.value || "all";
+    const mapelFilter = rekapMapelFilter.value || "all";
+    const statusFilter = rekapStatusFilter.value || "all";
+    const idTugasFilter = rekapIdTugasFilter
+      ? rekapIdTugasFilter.value || "all"
+      : "all";
 
-  if (filteredData.length === 0) {
+    const teacherClasses = currentLoggedInTeacherData?.Kelas_Diampu || [];
+
+    filteredData = filteredData.filter((nilai) => {
+      const student = dataCache.siswa.find(
+        (s) => String(s.NIS) === String(nilai.NIS)
+      );
+      const tugas = dataCache.tugas.find(
+        (t) => String(t.ID_Tugas) === String(nilai.ID_Tugas)
+      );
+
+      if (!student || !tugas) {
+        console.warn(
+          `Melewati entri nilai karena data siswa atau tugas tidak ditemukan: ${JSON.stringify(
+            nilai
+          )}`
+        );
+        return false;
+      }
+
+      const matchesTeacherClass = teacherClasses.includes(student.Kelas);
+      if (!matchesTeacherClass) return false;
+
+      const matchesNis = nisFilter === "all" || String(nilai.NIS) === nisFilter;
+      const matchesMapel =
+        mapelFilter === "all" || tugas.Mata_Pelajaran === mapelFilter;
+      const matchesStatus =
+        statusFilter === "all" || nilai.Status_Pengerjaan === statusFilter;
+      const matchesIdTugas =
+        idTugasFilter === "all" || String(nilai.ID_Tugas) === idTugasFilter;
+
+      return matchesNis && matchesMapel && matchesStatus && matchesIdTugas;
+    });
+
+    if (filteredData.length === 0) {
+      noRekapDataMessage.classList.remove("section-hidden");
+      noRekapDataMessage.textContent =
+        "Tidak ada data nilai ditemukan dengan filter ini.";
+      return;
+    }
+    noRekapDataMessage.classList.add("section-hidden");
+
+    filteredData.forEach((nilai) => {
+      const student = dataCache.siswa.find(
+        (s) => String(s.NIS) === String(nilai.NIS)
+      );
+      const tugas = dataCache.tugas.find(
+        (t) => String(t.ID_Tugas) === String(nilai.ID_Tugas)
+      );
+
+      const row = rekapNilaiTableBody.insertRow();
+      row.className = "hover:bg-gray-50";
+      row.innerHTML = `
+        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">${
+          nilai.NIS
+        }</td>
+        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">${
+          student ? student.Nama : "N/A"
+        }</td>
+        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">${
+          tugas ? tugas.Mata_Pelajaran : "N/A"
+        }</td>
+        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">${
+          tugas ? tugas.Nama_Tugas : "N/A"
+        }</td>
+        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">${
+          nilai.Nilai
+        }</td>
+        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">${
+          nilai.Status_Pengerjaan
+        }</td>
+        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">${
+          nilai.Tanggal_Input
+        }</td>
+      `;
+    });
+  } catch (error) {
+    console.error("Error rendering rekap nilai table:", error);
     noRekapDataMessage.classList.remove("section-hidden");
-    noRekapDataMessage.textContent =
-      "Tidak ada data nilai ditemukan dengan filter ini.";
-    return;
+    noRekapDataMessage.textContent = `Terjadi kesalahan saat memuat data rekap: ${error.message}`;
+  } finally {
+    stopGlobalRefreshAnimation(); // Hapus kelas fa-spin dari ikon refresh setelah selesai me-render tabel rekap
   }
-  noRekapDataMessage.classList.add("section-hidden");
-
-  filteredData.forEach((nilai) => {
-    const student = dataCache.siswa.find(
-      (s) => String(s.NIS) === String(nilai.NIS)
-    );
-    const tugas = dataCache.tugas.find(
-      (t) => String(t.ID_Tugas) === String(nilai.ID_Tugas)
-    );
-
-    const row = rekapNilaiTableBody.insertRow();
-    row.className = "hover:bg-gray-50";
-    row.innerHTML = `
-      <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">${
-        nilai.NIS
-      }</td>
-      <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">${
-        student ? student.Nama : "N/A"
-      }</td>
-      <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">${
-        tugas ? tugas.Mata_Pelajaran : "N/A"
-      }</td>
-      <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">${
-        tugas ? tugas.Nama_Tugas : "N/A"
-      }</td>
-      <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">${
-        nilai.Nilai
-      }</td>
-      <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">${
-        nilai.Status_Pengerjaan
-      }</td>
-      <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">${
-        nilai.Tanggal_Input
-      }</td>
-    `;
-  });
 }
 
 // Fungsi calculateUnfinishedTasks tidak lagi dibutuhkan di sisi klien untuk dashboard insights
@@ -2452,7 +2640,8 @@ function renderDashboardInsights() {
 
 // Function to handle global refresh button click
 async function handleGlobalRefresh() {
-  showLoadingOverlay();
+  startGlobalRefreshAnimation(); // Mulai animasi ikon refresh
+
   try {
     switch (activeSectionId) {
       case "guru-dashboard-section":
@@ -2492,44 +2681,52 @@ async function handleGlobalRefresh() {
         dataCache.pengumuman = await fetchSheetData("Pengumuman");
         populateSiswaDropdownsGuru();
         populateMapelDropdownsGuru();
-        // populateTugasSelectionDropdown(); // Removed as individual input is removed
         populateMassalNilaiFilters(); // NEW: refresh massal filters
         // Assuming current tab will re-render its table, no specific table render needed here
         showToast("Data manajemen berhasil diperbarui.", "success");
         break;
-      case "input-nilai-kehadiran-section":
+      case "input-nilai-massal-section": // NEW Case for massal input
         console.log(
-          "--> Global Refresh: Refreshing Input Nilai & Kehadiran data..."
+          "--> Global Refresh: Refreshing Input Nilai Massal data..."
         );
         dataCache.siswa = await fetchSheetData("Siswa");
         dataCache.tugas = await fetchSheetData("Tugas");
-        dataCache.kehadiran = await fetchSheetData("Kehadiran");
-        dataCache.nilai = await fetchSheetData("Nilai"); // Ensure nilai data is refreshed
+        dataCache.nilai = await fetchSheetData("Nilai");
         populateSiswaDropdownsInput();
         populateTugasDropdownsInput();
-        // populateTugasSelectionDropdown(); // Removed as individual input is removed
-        populateMassalNilaiFilters(); // NEW: refresh massal filters
-        // Re-render massal table if it's the active view, and filters are already selected.
-        // Otherwise, it will just show the "select filters" message.
-        const currentMassalMapelFilter = document.getElementById(
+        populateMassalNilaiFilters();
+        const currentMassalMapelFilterMassal = document.getElementById(
           "massal-filter-mapel"
         )?.value;
-        const currentMassalTugasFilter = document.getElementById(
+        const currentMassalTugasFilterMassal = document.getElementById(
           "massal-filter-tugas"
         )?.value;
-        if (currentMassalMapelFilter && currentMassalTugasFilter) {
+        if (
+          currentMassalMapelFilterMassal &&
+          currentMassalTugasFilterMassal !== ""
+        ) {
           renderMassalNilaiTable();
         } else {
-          // If filters are not set, ensure the message is displayed correctly
-          document.getElementById("massal-nilai-inputs").innerHTML = `
-                <p class="text-gray-500 text-center p-4">
-                    Pilih Mata Pelajaran dan Tugas, lalu klik "Terapkan Filter"
-                    untuk menampilkan data.
-                </p>
-            `;
-          updateMassalNavigationData(); // Clear navigation data
+          document.getElementById(
+            "massal-nilai-inputs"
+          ).innerHTML = `<p class="text-gray-500 text-center p-4">Pilih Mata Pelajaran dan Tugas untuk menampilkan data.</p>`;
+          updateMassalNavigationData();
+          document
+            .getElementById("save-massal-nilai-btn")
+            ?.classList.add("section-hidden");
+          document
+            .getElementById("cancel-massal-input-btn")
+            ?.classList.add("section-hidden");
         }
-        showToast("Data input berhasil diperbarui.", "success");
+        showToast("Data input nilai massal berhasil diperbarui.", "success");
+        break;
+      case "input-kehadiran-section": // NEW Case for attendance input
+        console.log("--> Global Refresh: Refreshing Input Kehadiran data...");
+        dataCache.siswa = await fetchSheetData("Siswa");
+        dataCache.kehadiran = await fetchSheetData("Kehadiran");
+        updateKehadiranIdField();
+        populateSiswaDropdownsInput();
+        showToast("Data kehadiran berhasil diperbarui.", "success");
         break;
       case "rekap-data-section":
         console.log("--> Global Refresh: Refreshing Rekap Data Nilai...");
@@ -2581,7 +2778,7 @@ async function handleGlobalRefresh() {
     console.error("Error selama refresh global:", error);
     showToast("Gagal memperbarui data.", "error");
   } finally {
-    hideLoadingOverlay();
+    stopGlobalRefreshAnimation(); // Hentikan animasi ikon refresh
   }
 }
 
@@ -2597,19 +2794,44 @@ function addAllEventListeners() {
 
   // Global Refresh Button
   document
-    .getElementById("global-refresh-btn")
+    .getElementById("global-refresh-btn-mobile")
+    ?.addEventListener("click", handleGlobalRefresh);
+  document
+    .getElementById("global-refresh-btn-desktop")
     ?.addEventListener("click", handleGlobalRefresh);
 
-  // Sidebar Buttons
-  document.querySelectorAll(".sidebar-button").forEach((button) => {
+  // Sidebar Toggle Menus (for sub-menus like Input Nilai & Kehadiran)
+  document.querySelectorAll(".submenu-toggle").forEach((button) => {
     button.addEventListener("click", (e) => {
-      const targetSection = e.currentTarget.dataset.targetSection;
-      showSection(targetSection);
+      e.preventDefault(); // Prevent default link behavior
+      const submenu = e.currentTarget.nextElementSibling; // Get the sibling submenu
+      const arrowIcon = e.currentTarget.querySelector(".submenu-arrow");
+
+      if (submenu && submenu.classList.contains("sidebar-submenu")) {
+        submenu.classList.toggle("hidden");
+        arrowIcon?.classList.toggle("fa-chevron-down");
+        arrowIcon?.classList.toggle("fa-chevron-up");
+      }
     });
   });
 
+  // Sidebar Buttons (for direct section navigation within sub-menus or main menu)
+  document.querySelectorAll(".sidebar-button").forEach((button) => {
+    button.addEventListener("click", (e) => {
+      const targetSection = e.currentTarget.dataset.targetSection;
+      // Ensure targetSection exists before calling showSection
+      if (targetSection) {
+        showSection(targetSection);
+      }
+    });
+  });
+
+  // Logout Buttons
   document
-    .getElementById("logout-admin-btn")
+    .getElementById("logout-admin-btn-mobile")
+    ?.addEventListener("click", handleAdminLogout);
+  document
+    .getElementById("logout-admin-btn-desktop")
     ?.addEventListener("click", handleAdminLogout);
 
   const closeSidebarBtn = document.getElementById("close-sidebar-btn");
@@ -2691,7 +2913,6 @@ function addAllEventListeners() {
     .getElementById("tugas-mata_pelajaran")
     ?.addEventListener("change", updateTugasIdField);
 
-  // Updated to submit form, not just toggle. The modal is opened via onclick in HTML.
   document
     .getElementById("catatan-form")
     ?.addEventListener("submit", (e) => handleSubmitForm(e, "Catatan_Guru"));
@@ -2702,7 +2923,6 @@ function addAllEventListeners() {
     .getElementById("catatan-minggu_ke")
     ?.addEventListener("input", updateCatatanIdField);
 
-  // Updated to submit form, not just toggle. The modal is opened via onclick in HTML.
   document
     .getElementById("jadwal-form")
     ?.addEventListener("submit", (e) =>
@@ -2715,50 +2935,35 @@ function addAllEventListeners() {
     .getElementById("jadwal-hari")
     ?.addEventListener("change", updateJadwalIdField);
 
-  // Updated to submit form, not just toggle. The modal is opened via onclick in HTML.
   document
     .getElementById("pengumuman-form")
     ?.addEventListener("submit", (e) => handleSubmitForm(e, "Pengumuman"));
 
-  const inputTabButtons = document.querySelectorAll(
-    "#input-nilai-kehadiran-section .tab-button"
-  );
-  inputTabButtons.forEach((button) => {
-    button.addEventListener("click", (event) => {
-      switchTab(event.target.dataset.target, "input-nilai-kehadiran-section");
-    });
-  });
-
-  // Removed all individual input logic as per request:
-  // - continue-nilai-input-btn
-  // - cancel-nilai-selection-btn
-  // - cancel-individual-nilai-input-btn
-  // - nilai-form submit listener
-  // - nilai-nis change listener
-  // - nilai-id_tugas change listener (was already less critical)
+  // No longer needed as input tabs are removed and replaced by sidebar sub-menus:
+  // const inputTabButtons = document.querySelectorAll("#input-nilai-kehadiran-section .tab-button");
+  // inputTabButtons.forEach((button) => {
+  //   button.addEventListener("click", (event) => {
+  //     switchTab(event.target.dataset.target, "input-nilai-kehadiran-section");
+  //   });
+  // });
 
   // NEW: Nilai massal form submission and filter events
   document
     .getElementById("nilai-massal-form")
     ?.addEventListener("submit", (e) => handleSubmitForm(e, "Nilai", "add"));
-  // These filter changes no longer auto-render, only populate filters
+  // These filter changes now trigger table rendering directly
   document
     .getElementById("massal-filter-mapel")
     ?.addEventListener("change", (event) => {
       updateMassalTugasFilter(event.target.value); // Update tugas filter based on mapel selection
-      // Clear massal table content and show instruction message
-      document.getElementById("massal-nilai-inputs").innerHTML = `
-      <p class="text-gray-500 text-center p-4">
-          Pilih Mata Pelajaran dan Tugas, lalu klik "Terapkan Filter"
-          untuk menampilkan data.
-      </p>
-    `;
-      updateMassalNavigationData(); // Clear navigation data
+      renderMassalNilaiTable(); // Render table dynamically
     });
-  // document.getElementById("massal-filter-tugas")?.addEventListener("change", renderMassalNilaiTable);
   document
-    .getElementById("apply-massal-filter-btn")
-    ?.addEventListener("click", renderMassalNilaiTable); // Only this button renders
+    .getElementById("massal-filter-tugas")
+    ?.addEventListener("change", renderMassalNilaiTable); // Render table dynamically
+  document
+    .getElementById("massal-filter-nama-siswa")
+    ?.addEventListener("change", renderMassalNilaiTable); // Render table dynamically
 
   document
     .getElementById("cancel-massal-input-btn")
@@ -2769,8 +2974,7 @@ function addAllEventListeners() {
       if (massalInputsContainer) {
         massalInputsContainer.innerHTML = `
                 <p class="text-gray-500 text-center p-4">
-                    Pilih Mata Pelajaran dan Tugas, lalu klik "Terapkan Filter"
-                    untuk menampilkan data.
+                    Pilih Mata Pelajaran dan Tugas untuk menampilkan data.
                 </p>
             `;
         // Clear filters
@@ -2778,6 +2982,13 @@ function addAllEventListeners() {
         document.getElementById("massal-filter-tugas").value = "";
         document.getElementById("massal-filter-nama-siswa").value = ""; // NEW: Clear nama siswa filter
         updateMassalNavigationData(); // Clear navigation data
+        // Sembunyikan tombol "Batal" dan "Simpan Nilai Massal"
+        const saveMassalBtn = document.getElementById("save-massal-nilai-btn");
+        const cancelMassalBtn = document.getElementById(
+          "cancel-massal-input-btn"
+        );
+        if (saveMassalBtn) saveMassalBtn.classList.add("section-hidden");
+        if (cancelMassalBtn) cancelMassalBtn.classList.add("section-hidden");
       }
     });
 
@@ -2789,11 +3000,6 @@ function addAllEventListeners() {
       handleMassalInputNavigation
     );
   }
-
-  // NEW: Add event listener for massal student name filter (now a select dropdown)
-  document
-    .getElementById("massal-filter-nama-siswa")
-    ?.addEventListener("change", renderMassalNilaiTable);
 
   document
     .getElementById("kehadiran-form")
@@ -2839,16 +3045,31 @@ function addAllEventListeners() {
   window.addEventListener("resize", () => {
     const sidebar = document.getElementById("main-sidebar");
     const mainContentWrapper = document.getElementById("main-content-wrapper");
-    if (sidebar && mainContentWrapper) {
-      // Add null checks
-      if (sidebar.classList.contains("active")) {
-        if (window.innerWidth >= 768) {
-          mainContentWrapper.classList.add("sidebar-active-desktop");
-        } else {
-          mainContentWrapper.classList.remove("sidebar-active-desktop");
-        }
+    const header = document.querySelector("header");
+    const sidebarWidth = 256;
+
+    if (sidebar && mainContentWrapper && header) {
+      if (window.innerWidth >= 768) {
+        // Jika lebar layar >= 768px (desktop)
+        // Pastikan sidebar terlihat dan atur offset konten
+        sidebar.style.transform = "translateX(0%)";
+        mainContentWrapper.style.marginLeft = `${sidebarWidth}px`;
+        mainContentWrapper.style.transform = "translateX(0%)";
+        header.style.left = `${sidebarWidth}px`;
+        header.style.width = `calc(100% - ${sidebarWidth}px)`;
+        header.style.transform = "translateX(0%)";
       } else {
-        mainContentWrapper.classList.remove("sidebar-active-desktop");
+        // Jika lebar layar < 768px (mobile)
+        // Atur ulang offset dan sembunyikan sidebar jika tidak aktif
+        mainContentWrapper.style.marginLeft = "0px";
+        header.style.left = "0px";
+        header.style.width = "100%";
+        mainContentWrapper.style.transform = "translateX(0%)"; // Pastikan konten utama tidak digeser
+        header.style.transform = "translateX(0%)"; // Pastikan header tidak digeser
+
+        // Sidebar tetap dikelola oleh kelas 'active' dan properti 'transform' di CSS
+        // Tidak perlu mengatur sidebar.style.transform di sini kecuali ada logika khusus
+        // yang mengoverride CSS.
       }
     }
   });
@@ -2862,7 +3083,8 @@ document.addEventListener("DOMContentLoaded", async () => {
   const loggedInEmailFromSession = sessionStorage.getItem("loggedInAdminEmail");
   if (loggedInEmailFromSession) {
     currentLoggedInEmail = loggedInEmailFromSession;
-    showLoadingOverlay();
+    startGlobalRefreshAnimation(); // Mulai animasi ikon refresh saat sesi dipulihkan
+
     try {
       dataCache.guru = await fetchSheetData("Guru");
       const teacherFound = dataCache.guru.find(
@@ -2921,29 +3143,26 @@ document.addEventListener("DOMContentLoaded", async () => {
         }
 
         showToast("Sesi dipulihkan. Selamat datang kembali!", "info");
-        // await fetchInitialDashboardData(); // No longer needed here as dashboard insights are pre-calculated
 
         const hash = window.location.hash.substring(1);
-        const defaultSection = "guru-dashboard-section";
+        const defaultSection = "guru-dashboard-section"; // Default to dashboard
 
-        if (hash && document.getElementById(hash)) {
-          const allowedSections = [
-            "guru-dashboard-section",
-            "manajemen-data-section",
-            "input-nilai-kehadiran-section",
-            "rekap-data-section",
-            "settings-section",
-          ];
-          if (allowedSections.includes(hash)) {
-            showSection(hash);
-          } else {
-            showSection(defaultSection);
-            history.replaceState(
-              null,
-              "",
-              window.location.pathname + "#" + defaultSection
-            );
-          }
+        // Update logic to check for new section IDs directly
+        const allowedSections = [
+          "guru-dashboard-section",
+          "manajemen-data-section",
+          "input-nilai-massal-section", // New section
+          "input-kehadiran-section", // New section
+          "rekap-data-section",
+          "settings-section",
+        ];
+
+        if (
+          hash &&
+          document.getElementById(hash) &&
+          allowedSections.includes(hash)
+        ) {
+          showSection(hash);
         } else {
           showSection(defaultSection);
           history.replaceState(
@@ -2964,16 +3183,16 @@ document.addEventListener("DOMContentLoaded", async () => {
       showToast("Gagal memulihkan sesi. Silakan login kembali.", "error");
       handleAdminLogout();
     } finally {
-      hideLoadingOverlay();
+      stopGlobalRefreshAnimation(); // Hentikan animasi ikon refresh setelah preloading selesai
     }
   } else {
     showSection("login-section");
     history.replaceState(null, "", window.location.pathname);
   }
 
-  // Initial tab switching logic for sections that are not the login section
-  // This is a fallback to ensure tabs are correctly displayed on load/refresh
+  // Initial display setup (removed old tab logic)
   setTimeout(() => {
+    // For manajemen-data-section, ensure default tab is shown if active
     const manajemenTabsContainer = document.getElementById(
       "tab-content-container-manajemen"
     );
@@ -2984,18 +3203,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       switchTab("manajemen-data-tugas", "manajemen-data-section");
     }
 
-    const inputTabsContainer = document.getElementById(
-      "tab-content-container-input"
-    );
-    // This part now correctly calls switchTab, which handles the default view for input-nilai-massal
-    if (
-      inputTabsContainer &&
-      !inputTabsContainer.classList.contains("section-hidden")
-    ) {
-      // Initialize with massal input view, which will show "select filters" message
-      switchTab("input-nilai-massal", "input-nilai-kehadiran-section");
-    }
-
+    // For settings-section, ensure default tab is shown if active
     const settingsTabsContainer = document.getElementById(
       "tab-content-container-settings"
     );
@@ -3005,5 +3213,8 @@ document.addEventListener("DOMContentLoaded", async () => {
     ) {
       switchTab("profile-settings", "settings-section");
     }
+
+    // No longer need explicit switchTab for 'input-nilai-kehadiran-section'
+    // as sub-menus will directly trigger showSection for 'input-nilai-massal-section' or 'input-kehadiran-section'
   }, 100);
 });

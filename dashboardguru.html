@@ -21,55 +21,59 @@
     <link rel="stylesheet" href="guru.css" />
     <!-- Chart.js CDN for graphs -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-
-    <!--
-      CATATAN: Blok <style> internal di sini telah dihapus sepenuhnya di iterasi sebelumnya.
-      Semua gaya terkait tata letak sidebar dan konten utama
-      sekarang sepenuhnya dikelola oleh file guru.css untuk menghindari konflik.
-    -->
   </head>
-  <body class="bg-white font-sans antialiased guru-dashboard-layout">
-    <!-- Loading Overlay -->
+  <body class="bg-white min-h-screen guru-dashboard-layout">
+    <!-- Overlay Pemuatan -->
     <div
       id="loading-overlay"
-      class="fixed inset-0 bg-white bg-opacity-90 flex flex-col items-center justify-center z-40 section-hidden"
+      class="fixed inset-0 bg-gray-800 bg-opacity-50 flex items-center justify-center z-50 hidden section-hidden"
     >
-      <div
-        class="animate-spin rounded-full h-16 w-16 border-t-4 border-b-4 border-blue-600 mb-4"
-      ></div>
-      <p class="text-gray-800 text-lg font-semibold">Memuat data...</p>
+      <div class="flex items-center text-white text-lg font-semibold">
+        <svg
+          class="animate-spin -ml-1 mr-3 h-8 w-8 text-white"
+          xmlns="http://www.w3.org/2000/svg"
+          fill="none"
+          viewBox="0 0 24 24"
+        >
+          <circle
+            class="opacity-25"
+            cx="12"
+            cy="12"
+            r="10"
+            stroke="currentColor"
+            stroke-width="4"
+          ></circle>
+          <path
+            class="opacity-75"
+            fill="currentColor"
+            d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+          ></path>
+        </svg>
+        Memuat...
+      </div>
     </div>
 
     <!-- Toast Container -->
     <div
       id="toast-container"
-      class="fixed top-4 right-4 z-50 flex flex-col space-y-2"
+      class="fixed top-4 right-4 z-50 space-y-2 w-full max-w-xs"
     ></div>
 
-    <!-- Confirm Modal -->
+    <!-- Message Box Overlay -->
     <div
-      id="confirm-modal"
-      class="modal fixed inset-0 bg-gray-900 bg-opacity-50 flex items-center justify-center z-40 section-hidden"
+      id="message-box-overlay"
+      class="fixed inset-0 bg-gray-800 bg-opacity-75 flex items-center justify-center z-50 hidden"
     >
-      <div
-        class="modal-content bg-white p-6 rounded-lg shadow-xl max-w-sm w-full"
-      >
-        <h3 id="confirm-modal-title" class="text-lg font-bold mb-4">
-          Konfirmasi
-        </h3>
-        <p id="confirm-modal-message" class="mb-6">
-          Anda yakin ingin melanjutkan?
-        </p>
-        <div class="flex justify-end space-x-3">
+      <div class="bg-white rounded-lg shadow-xl p-6 w-full max-w-sm mx-4">
+        <h3
+          id="message-box-title"
+          class="text-lg font-semibold mb-4 text-gray-800"
+        ></h3>
+        <p id="message-box-message" class="text-sm text-gray-700 mb-6"></p>
+        <div class="flex justify-end">
           <button
-            id="confirm-cancel-btn"
-            class="px-4 py-2 bg-gray-200 text-gray-800 rounded-md hover:bg-gray-300"
-          >
-            Batal
-          </button>
-          <button
-            id="confirm-ok-btn"
-            class="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700"
+            id="message-box-close-btn"
+            class="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-50"
           >
             OK
           </button>
@@ -77,107 +81,226 @@
       </div>
     </div>
 
-    <!-- Header (Fixed at Top) -->
-    <header
-      class="fixed top-0 left-0 w-full bg-white shadow-md p-4 flex items-center justify-between z-30 transition-all duration-300 ease-in-out"
+    <!-- Confirm Modal -->
+    <div id="confirm-modal" class="modal">
+      <div class="modal-content">
+        <h3 id="confirm-modal-title">Konfirmasi</h3>
+        <p id="confirm-modal-message">Apakah Anda yakin?</p>
+        <div class="modal-actions">
+          <button id="confirm-cancel-btn" class="btn-cancel">Batal</button>
+          <button id="confirm-ok-btn" class="btn-primary">OK</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Main Sidebar -->
+    <aside
+      id="main-sidebar"
+      class="fixed z-40 h-screen w-64 bg-white shadow-lg overflow-y-auto transform -translate-x-full md:translate-x-0 transition-transform duration-300 ease-in-out"
     >
-      <div class="flex items-center space-x-4">
+      <div class="p-5 border-b flex items-center justify-between">
+        <h1 class="text-2xl font-bold text-blue-600">SiswaLink</h1>
         <button
-          id="sidebar-toggle-btn"
-          class="text-gray-600 focus:outline-none md:hidden"
+          id="close-sidebar-btn"
+          class="md:hidden text-gray-500 hover:text-gray-700"
         >
-          <i class="fas fa-bars text-xl"></i>
-        </button>
-        <div class="text-xl font-bold text-gray-800" id="header-title"></div>
-      </div>
-      <div class="flex items-center space-x-3">
-        <span id="guru-name-display" class="font-medium text-gray-700"
-          >Nama Guru</span
-        >
-        <span id="guru-title-display" class="text-sm text-gray-500"
-          >Jabatan</span
-        >
-        <button
-          id="global-refresh-btn"
-          class="p-2 text-blue-600 hover:text-blue-800 transition-colors duration-200"
-          title="Refresh Data"
-        >
-          <i class="fas fa-sync-alt"></i>
-        </button>
-        <button
-          id="logout-admin-btn"
-          class="bg-red-500 hover:bg-red-600 text-white py-1 px-3 rounded-md text-sm transition-colors duration-200"
-        >
-          Logout
+          <i class="fas fa-times text-lg"></i>
         </button>
       </div>
-    </header>
+      <nav class="mt-5">
+        <ul>
+          <li>
+            <a
+              href="#"
+              class="sidebar-button flex items-center p-3 rounded-lg hover:bg-gray-100 text-gray-700 font-semibold"
+              data-target-section="guru-dashboard-section"
+            >
+              <i class="fas fa-chart-line mr-3"></i>
+              <span>Dashboard</span>
+            </a>
+          </li>
+          <li>
+            <div class="sidebar-menu-item">
+              <a
+                href="#"
+                class="flex items-center p-3 rounded-lg hover:bg-gray-100 text-gray-700 submenu-toggle"
+              >
+                <i class="fas fa-keyboard mr-3"></i>
+                <span>Input Nilai & Kehadiran</span>
+                <i class="fas fa-chevron-down ml-auto submenu-arrow"></i>
+              </a>
+              <div
+                class="sidebar-submenu pl-4 py-2 hidden"
+                id="input-nilai-kehadiran-submenu"
+              >
+                <a
+                  href="#"
+                  class="sidebar-button flex items-center p-3 rounded-lg hover:bg-gray-100 text-gray-700"
+                  data-target-section="input-nilai-massal-section"
+                >
+                  <i class="fas fa-file-excel mr-3 text-sm"></i>
+                  <span class="text-sm">Input Nilai Massal</span>
+                </a>
+                <a
+                  href="#"
+                  class="sidebar-button flex items-center p-3 rounded-lg hover:bg-gray-100 text-gray-700"
+                  data-target-section="input-kehadiran-section"
+                >
+                  <i class="fas fa-calendar-check mr-3 text-sm"></i>
+                  <span class="text-sm">Input Kehadiran</span>
+                </a>
+              </div>
+            </div>
+          </li>
+          <li>
+            <div class="sidebar-menu-item">
+              <a
+                href="#"
+                class="flex items-center p-3 rounded-lg hover:bg-gray-100 text-gray-700 submenu-toggle"
+              >
+                <i class="fas fa-database mr-3"></i>
+                <span>Manajemen Data</span>
+                <i class="fas fa-chevron-down ml-auto submenu-arrow"></i>
+              </a>
+              <div
+                class="sidebar-submenu pl-4 py-2 hidden"
+                id="manajemen-data-submenu"
+              >
+                <a
+                  href="#"
+                  class="sidebar-button flex items-center p-3 rounded-lg hover:bg-gray-100 text-gray-700"
+                  data-target-section="manajemen-data-section"
+                  data-target-tab="manajemen-data-tugas"
+                >
+                  <i class="fas fa-tasks mr-3 text-sm"></i>
+                  <span class="text-sm">Tugas</span>
+                </a>
+                <a
+                  href="#"
+                  class="sidebar-button flex items-center p-3 rounded-lg hover:bg-gray-100 text-gray-700"
+                  data-target-section="manajemen-data-section"
+                  data-target-tab="manajemen-data-catatan-guru"
+                >
+                  <i class="fas fa-clipboard-list mr-3 text-sm"></i>
+                  <span class="text-sm">Catatan Guru</span>
+                </a>
+                <a
+                  href="#"
+                  class="sidebar-button flex items-center p-3 rounded-lg hover:bg-gray-100 text-gray-700"
+                  data-target-section="manajemen-data-section"
+                  data-target-tab="manajemen-data-jadwal-pelajaran"
+                >
+                  <i class="fas fa-calendar-alt mr-3 text-sm"></i>
+                  <span class="text-sm">Jadwal Pelajaran</span>
+                </a>
+                <a
+                  href="#"
+                  class="sidebar-button flex items-center p-3 rounded-lg hover:bg-gray-100 text-gray-700"
+                  data-target-section="manajemen-data-section"
+                  data-target-tab="manajemen-data-pengumuman"
+                >
+                  <i class="fas fa-bullhorn mr-3 text-sm"></i>
+                  <span class="text-sm">Pengumuman</span>
+                </a>
+              </div>
+            </div>
+          </li>
+          <li>
+            <a
+              href="#"
+              class="sidebar-button flex items-center p-3 rounded-lg hover:bg-gray-100 text-gray-700"
+              data-target-section="rekap-data-section"
+            >
+              <i class="fas fa-file-invoice mr-3"></i>
+              <span>Rekap Data</span>
+            </a>
+          </li>
+          <li>
+            <a
+              href="#"
+              class="sidebar-button flex items-center p-3 rounded-lg hover:bg-gray-100 text-gray-700"
+              data-target-section="settings-section"
+            >
+              <i class="fas fa-cogs mr-3"></i>
+              <span>Pengaturan</span>
+            </a>
+          </li>
+          <li class="mt-auto">
+            <!-- Logout Button (for Desktop) -->
+            <button
+              id="logout-admin-btn-desktop"
+              class="flex items-center p-3 rounded-lg text-gray-700 hover:bg-gray-100 w-full text-left"
+            >
+              <i class="fas fa-sign-out-alt mr-3"></i>
+              <span>Logout</span>
+            </button>
+          </li>
+        </ul>
+      </nav>
+    </aside>
 
     <!-- Sidebar Overlay (for mobile) -->
     <div
       id="sidebar-overlay"
-      class="fixed inset-0 bg-gray-900 bg-opacity-50 z-20 md:hidden section-hidden"
+      class="fixed inset-0 bg-gray-800 bg-opacity-75 z-30 hidden md:hidden"
     ></div>
 
-    <!-- Main Wrapper for Sidebar and Content -->
+    <!-- Main Content Wrapper -->
     <div
       id="main-content-wrapper"
-      class="min-h-screen pt-14 transition-transform duration-300 ease-in-out"
+      class="flex-1 transition-all duration-300 ease-in-out md:ml-64"
     >
-      <!-- Sidebar -->
-      <aside
-        id="main-sidebar"
-        class="fixed inset-y-0 left-0 w-64 bg-white shadow-lg z-30 transform -translate-x-full md:translate-x-0 md:relative md:flex-shrink-0 transition-transform duration-300 ease-in-out py-4 px-3"
+      <!-- Header -->
+      <header
+        class="bg-white p-4 flex items-center justify-between z-10 w-full fixed top-0 left-0 md:left-64 md:w-[calc(100%-16rem)]"
       >
-        <div class="flex items-center justify-between mb-6 px-4">
-          <h2 class="text-2xl font-bold text-blue-600">SiswaLink</h2>
-          <button id="close-sidebar-btn" class="text-gray-600 md:hidden">
-            <i class="fas fa-times"></i>
+        <div class="flex items-center">
+          <button id="sidebar-toggle-btn" class="text-gray-500 md:hidden mr-4">
+            <i class="fas fa-bars text-xl"></i>
+          </button>
+          <h2 id="header-title" class="text-xl font-semibold text-gray-800">
+            SiswaLink Dashboard
+          </h2>
+        </div>
+        <div class="flex items-center space-x-4">
+          <button
+            id="global-refresh-btn-desktop"
+            class="text-gray-500 hover:text-blue-600 focus:outline-none hidden md:block"
+          >
+            <i class="fas fa-sync-alt text-lg"></i>
+          </button>
+          <button
+            id="global-refresh-btn-mobile"
+            class="text-gray-500 hover:text-blue-600 focus:outline-none md:hidden"
+          >
+            <i class="fas fa-sync-alt text-lg"></i>
+          </button>
+          <div class="flex flex-col items-end">
+            <span id="guru-name-display" class="font-semibold text-gray-800"
+              >Nama Guru</span
+            >
+            <span id="guru-title-display" class="text-sm text-gray-500"
+              >Guru Kelas X</span
+            >
+          </div>
+          <button
+            id="logout-admin-btn-mobile"
+            class="text-gray-500 hover:text-blue-600 focus:outline-none md:hidden"
+          >
+            <i class="fas fa-sign-out-alt text-lg"></i>
           </button>
         </div>
-        <nav class="space-y-2">
-          <button
-            class="sidebar-button flex items-center w-full py-2 px-4 rounded-md text-gray-700 hover:bg-gray-100 transition-colors duration-200"
-            data-target-section="guru-dashboard-section"
-          >
-            <i class="fas fa-tachometer-alt mr-3"></i> Dashboard
-          </button>
-          <button
-            class="sidebar-button flex items-center w-full py-2 px-4 rounded-md text-gray-700 hover:bg-gray-100 transition-colors duration-200"
-            data-target-section="manajemen-data-section"
-          >
-            <i class="fas fa-database mr-3"></i> Manajemen Data
-          </button>
-          <button
-            class="sidebar-button flex items-center w-full py-2 px-4 rounded-md text-gray-700 hover:bg-gray-100 transition-colors duration-200"
-            data-target-section="input-nilai-kehadiran-section"
-          >
-            <i class="fas fa-edit mr-3"></i> Input Nilai & Kehadiran
-          </button>
-          <button
-            class="sidebar-button flex items-center w-full py-2 px-4 rounded-md text-gray-700 hover:bg-gray-100 transition-colors duration-200"
-            data-target-section="rekap-data-section"
-          >
-            <i class="fas fa-chart-bar mr-3"></i> Rekap Data
-          </button>
-          <button
-            class="sidebar-button flex items-center w-full py-2 px-4 rounded-md text-gray-700 hover:bg-gray-100 transition-colors duration-200"
-            data-target-section="settings-section"
-          >
-            <i class="fas fa-cog mr-3"></i> Pengaturan
-          </button>
-        </nav>
-      </aside>
+      </header>
 
-      <!-- Main Content Area -->
-      <main class="flex-1 p-6 md:p-8 bg-white overflow-y-auto">
+      <!-- Main Content -->
+      <main class="p-4 pt-16 md:pt-4 overflow-y-auto">
         <!-- Login Section -->
         <section
           id="login-section"
-          class="flex items-center justify-center min-h-screen bg-white"
+          class="flex items-center justify-center min-h-screen"
         >
-          <div class="w-full max-w-md bg-white p-8 rounded-lg shadow-md">
-            <h2 class="text-2xl font-bold text-center text-gray-800 mb-6">
+          <div class="bg-white p-8 rounded-lg shadow-md w-full max-w-md">
+            <h2 class="text-2xl font-bold text-center text-blue-600 mb-6">
               Login Guru
             </h2>
             <form id="login-form">
@@ -199,320 +322,136 @@
               <div class="flex items-center justify-between">
                 <button
                   type="submit"
-                  class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-md focus:outline-none focus:shadow-outline w-full"
+                  class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-md focus:outline-none focus:shadow-outline"
                 >
                   Login
                 </button>
               </div>
             </form>
-
-            <div class="mt-6 text-center">
-              <p class="text-gray-600 text-sm mb-2">Atau cari data siswa:</p>
-              <form id="nis-search-form" class="flex">
-                <input
-                  type="text"
-                  id="nis-search-input"
-                  placeholder="Masukkan NIS Siswa"
-                  class="shadow appearance-none border rounded-l w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
-                />
-                <button
-                  type="submit"
-                  class="bg-purple-600 hover:bg-purple-700 text-white font-bold py-2 px-4 rounded-r-md focus:outline-none focus:shadow-outline"
-                >
-                  Cari
-                </button>
+            <div class="mt-6 pt-6 border-t border-gray-200">
+              <h3 class="text-lg font-semibold text-gray-700 mb-4">
+                Cari Siswa Berdasarkan NIS
+              </h3>
+              <form id="nis-search-form">
+                <div class="mb-4">
+                  <label
+                    for="nis-search-input"
+                    class="block text-gray-700 text-sm font-bold mb-2"
+                    >NIS Siswa:</label
+                  >
+                  <input
+                    type="text"
+                    id="nis-search-input"
+                    name="nis"
+                    class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
+                    placeholder="Masukkan NIS siswa"
+                    required
+                  />
+                </div>
+                <div class="flex items-center justify-end">
+                  <button
+                    type="submit"
+                    class="bg-green-500 hover:bg-green-600 text-white font-bold py-2 px-4 rounded-md focus:outline-none focus:shadow-outline"
+                  >
+                    Cari Siswa
+                  </button>
+                </div>
               </form>
             </div>
           </div>
         </section>
 
         <!-- Guru Dashboard Section -->
-        <section id="guru-dashboard-section" class="section-hidden">
-          <!-- H2 element removed from here -->
-          <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+        <section id="guru-dashboard-section" class="hidden section-hidden">
+          <!-- Hapus h2 duplikat di sini -->
+          <div
+            class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-6"
+          >
+            <!-- Card Total Siswa Diampu -->
             <div
-              class="bg-white p-6 rounded-lg shadow-md flex items-center space-x-4"
+              class="bg-white p-6 rounded-lg shadow-md flex items-center justify-between"
             >
-              <div
-                class="flex-shrink-0 bg-blue-100 text-blue-600 rounded-full p-3"
-              >
-                <i class="fas fa-users fa-2x"></i>
-              </div>
               <div>
-                <p class="text-gray-500 text-sm">Total Siswa Diampu</p>
+                <p class="text-sm font-medium text-gray-500">
+                  Total Siswa Diampu
+                </p>
                 <p
                   id="total-siswa-diampu"
-                  class="text-2xl font-bold text-gray-800"
+                  class="text-3xl font-bold text-gray-900 mt-1"
                 >
                   0
                 </p>
               </div>
-            </div>
-            <div
-              class="bg-white p-6 rounded-lg shadow-md flex items-center space-x-4"
-            >
-              <div
-                class="flex-shrink-0 bg-red-100 text-red-600 rounded-full p-3"
-              >
-                <i class="fas fa-tasks fa-2x"></i>
+              <div class="bg-blue-100 p-3 rounded-full text-blue-600">
+                <i class="fas fa-users text-2xl"></i>
               </div>
+            </div>
+
+            <!-- Card Total Tugas Belum Selesai -->
+            <div
+              class="bg-white p-6 rounded-lg shadow-md flex items-center justify-between"
+            >
               <div>
-                <p class="text-gray-500 text-sm">Tugas Belum Selesai</p>
+                <p class="text-sm font-medium text-gray-500">
+                  Tugas Belum Selesai
+                </p>
                 <p
                   id="total-tugas-belum-selesai"
-                  class="text-2xl font-bold text-gray-800"
+                  class="text-3xl font-bold text-gray-900 mt-1"
                 >
                   0
                 </p>
               </div>
-            </div>
-            <div
-              class="bg-white p-6 rounded-lg shadow-md flex items-center space-x-4"
-            >
-              <div
-                class="flex-shrink-0 bg-yellow-100 text-yellow-600 rounded-full p-3"
-              >
-                <i class="fas fa-star fa-2x"></i>
+              <div class="bg-red-100 p-3 rounded-full text-red-600">
+                <i class="fas fa-exclamation-triangle text-2xl"></i>
               </div>
+            </div>
+
+            <!-- Card Rata-rata Nilai Global -->
+            <div
+              class="bg-white p-6 rounded-lg shadow-md flex items-center justify-between"
+            >
               <div>
-                <p class="text-gray-500 text-sm">Rata-rata Nilai Global</p>
+                <p class="text-sm font-medium text-gray-500">
+                  Rata-rata Nilai Global
+                </p>
                 <p
                   id="rata-rata-nilai-global"
-                  class="text-2xl font-bold text-gray-800"
+                  class="text-3xl font-bold text-gray-900 mt-1"
                 >
-                  N/A
+                  0.00
                 </p>
+              </div>
+              <div class="bg-green-100 p-3 rounded-full text-green-600">
+                <i class="fas fa-award text-2xl"></i>
               </div>
             </div>
           </div>
 
-          <div class="bg-white p-6 rounded-lg shadow-md">
-            <h3 class="text-xl font-semibold text-gray-800 mb-4">
-              Rata-rata Nilai Per Mata Pelajaran
+          <!-- Chart Nilai Per Mata Pelajaran -->
+          <div class="bg-white p-6 rounded-lg shadow-md mb-6">
+            <h3 class="text-lg font-semibold text-gray-800 mb-4">
+              Rata-rata Nilai per Mata Pelajaran
             </h3>
-            <div class="relative h-80">
+            <div class="relative h-64">
               <canvas id="nilaiPerMapelChart"></canvas>
               <p
                 id="no-nilai-chart-message"
-                class="absolute inset-0 flex items-center justify-center text-gray-500 text-lg section-hidden"
+                class="absolute inset-0 flex items-center justify-center text-gray-500 hidden"
               >
-                Data nilai tidak tersedia untuk grafik.
+                Tidak ada data nilai untuk ditampilkan.
               </p>
             </div>
           </div>
         </section>
 
-        <!-- Manajemen Data Section -->
-        <section id="manajemen-data-section" class="section-hidden">
-          <!-- H2 element removed from here -->
-
-          <!-- Tab Navigation for Manajemen Data -->
-          <div
-            class="tabs flex space-x-2 border-b border-gray-200 mb-6"
-            id="tab-content-container-manajemen"
-          >
-            <button
-              class="tab-button py-2 px-4 text-gray-600 hover:text-blue-600 border-b-2 border-transparent hover:border-blue-600 transition-colors duration-300 active"
-              data-target="manajemen-data-tugas"
-            >
-              Tugas
-            </button>
-            <button
-              class="tab-button py-2 px-4 text-gray-600 hover:text-blue-600 border-b-2 border-transparent hover:border-blue-600 transition-colors duration-300"
-              data-target="manajemen-data-catatan"
-            >
-              Catatan Guru
-            </button>
-            <button
-              class="tab-button py-2 px-4 text-gray-600 hover:text-blue-600 border-b-2 border-transparent hover:border-blue-600 transition-colors duration-300"
-              data-target="manajemen-data-jadwal"
-            >
-              Jadwal Pelajaran
-            </button>
-            <button
-              class="tab-button py-2 px-4 text-gray-600 hover:text-blue-600 border-b-2 border-transparent hover:border-blue-600 transition-colors duration-300"
-              data-target="manajemen-data-pengumuman"
-            >
-              Pengumuman
-            </button>
-          </div>
-
-          <!-- Tugas Tab Content -->
-          <div id="manajemen-data-tugas" class="tab-content">
-            <div
-              class="bg-white p-6 rounded-lg shadow-md mb-6 flex justify-between items-center"
-            >
-              <h3 class="text-xl font-semibold text-gray-800">Daftar Tugas</h3>
-              <button
-                id="add-tugas-btn"
-                class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-md focus:outline-none focus:shadow-outline"
-              >
-                Tambah Tugas Baru
-              </button>
-            </div>
-
-            <!-- New: Task Subject Selection Area -->
-            <div
-              id="tugas-subject-selection-area"
-              class="section-hidden p-6 bg-white rounded-lg shadow-md mb-6"
-            >
-              <h4 class="text-xl font-semibold text-gray-800 mb-4">
-                Pilih Mata Pelajaran untuk Tugas Baru
-              </h4>
-              <div class="mb-4">
-                <label
-                  for="tugas-selection-mata_pelajaran"
-                  class="block text-gray-700 text-sm font-bold mb-2"
-                >
-                  Mata Pelajaran:</label
-                >
-                <select
-                  id="tugas-selection-mata_pelajaran"
-                  class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
-                >
-                  <option value="">Pilih Mata Pelajaran</option>
-                  <!-- Options will be populated by JS -->
-                </select>
-              </div>
-              <div class="flex justify-end space-x-3">
-                <button
-                  id="cancel-tugas-selection-btn"
-                  class="px-4 py-2 bg-gray-200 text-gray-800 rounded-md hover:bg-gray-300"
-                >
-                  Batal
-                </button>
-                <button
-                  id="continue-add-tugas-btn"
-                  class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-md focus:outline-none focus:shadow-outline"
-                >
-                  Lanjutkan
-                </button>
-              </div>
-            </div>
-
-            <!-- Tugas Table (placeholder as it's not dynamically rendered here yet) -->
-            <div
-              class="bg-white p-6 rounded-lg shadow-md overflow-x-auto text-center"
-            >
-              <p id="no-tugas-data-message" class="text-gray-500">
-                Tidak ada data tugas.
-              </p>
-              <!-- Implement actual table rendering for tasks here if needed -->
-            </div>
-          </div>
-
-          <!-- Catatan Guru Tab Content -->
-          <div id="manajemen-data-catatan" class="tab-content section-hidden">
-            <div
-              class="bg-white p-6 rounded-lg shadow-md mb-6 flex justify-between items-center"
-            >
-              <h3 class="text-xl font-semibold text-gray-800">
-                Daftar Catatan Guru
-              </h3>
-              <button
-                onclick="openModal('catatan-modal')"
-                class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-md focus:outline-none focus:shadow-outline"
-              >
-                Tambah Catatan Baru
-              </button>
-            </div>
-            <div
-              class="bg-white p-6 rounded-lg shadow-md overflow-x-auto text-center"
-            >
-              <p id="no-catatan-data-message" class="text-gray-500">
-                Tidak ada data catatan guru.
-              </p>
-            </div>
-          </div>
-
-          <!-- Jadwal Pelajaran Tab Content -->
-          <div id="manajemen-data-jadwal" class="tab-content section-hidden">
-            <div
-              class="bg-white p-6 rounded-lg shadow-md mb-6 flex justify-between items-center"
-            >
-              <h3 class="text-xl font-semibold text-gray-800">
-                Daftar Jadwal Pelajaran
-              </h3>
-              <button
-                onclick="openModal('jadwal-modal')"
-                class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-md focus:outline-none focus:shadow-outline"
-              >
-                Tambah Jadwal Baru
-              </button>
-            </div>
-            <div
-              class="bg-white p-6 rounded-lg shadow-md overflow-x-auto text-center"
-            >
-              <p id="no-jadwal-data-message" class="text-gray-500">
-                Tidak ada data jadwal pelajaran.
-              </p>
-            </div>
-          </div>
-
-          <!-- Pengumuman Tab Content -->
-          <div
-            id="manajemen-data-pengumuman"
-            class="tab-content section-hidden"
-          >
-            <div
-              class="bg-white p-6 rounded-lg shadow-md mb-6 flex justify-between items-center"
-            >
-              <h3 class="text-xl font-semibold text-gray-800">
-                Daftar Pengumuman
-              </h3>
-              <button
-                onclick="openModal('pengumuman-modal')"
-                class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-md focus:outline-none focus:shadow-outline"
-              >
-                Tambah Pengumuman Baru
-              </button>
-            </div>
-            <div
-              class="bg-white p-6 rounded-lg shadow-md overflow-x-auto text-center"
-            >
-              <p id="no-pengumuman-data-message" class="text-gray-500">
-                Tidak ada data pengumuman.
-              </p>
-            </div>
-          </div>
-        </section>
-
-        <!-- Input Nilai & Kehadiran Section -->
-        <section id="input-nilai-kehadiran-section" class="section-hidden">
-          <!-- H2 element removed from here -->
-
-          <!-- Tab Navigation for Input Nilai & Kehadiran -->
-          <div
-            id="tab-content-container-input"
-            class="tabs flex space-x-2 border-b border-gray-200 mb-6"
-          >
-            <button
-              class="tab-button py-2 px-4 text-gray-600 hover:text-blue-600 border-b-2 border-transparent hover:border-blue-600 transition-colors duration-300 active"
-              data-target="input-nilai-massal"
-            >
-              Input Nilai Massal
-            </button>
-            <button
-              class="tab-button py-2 px-4 text-gray-600 hover:text-blue-600 border-b-2 border-transparent hover:border-blue-600 transition-colors duration-300"
-              data-target="input-nilai-individu"
-            >
-              Input Per Anak
-            </button>
-            <button
-              class="tab-button py-2 px-4 text-gray-600 hover:text-blue-600 border-b-2 border-transparent hover:border-blue-600 transition-colors duration-300"
-              data-target="input-kehadiran"
-            >
-              Input Kehadiran
-            </button>
-          </div>
-
-          <!-- Input Nilai Massal Tab Content -->
-          <div id="input-nilai-massal" class="tab-content">
-            <div
-              id="massal-nilai-area"
-              class="p-6 bg-white rounded-lg shadow-md"
-            >
-              <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+        <!-- Input Nilai Massal Section (New) -->
+        <section id="input-nilai-massal-section" class="hidden section-hidden">
+          <!-- Hapus h2 duplikat di sini -->
+          <div class="bg-white p-6 rounded-lg shadow-md mb-6">
+            <form id="nilai-massal-form">
+              <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                <!-- Filter Mata Pelajaran -->
                 <div>
                   <label
                     for="massal-filter-mapel"
@@ -523,26 +462,12 @@
                     id="massal-filter-mapel"
                     class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
                   >
-                    <option value="all">Semua Mata Pelajaran</option>
+                    <option value="">Pilih Mata Pelajaran</option>
                     <!-- Options will be populated by JS -->
                   </select>
                 </div>
+                <!-- Filter Tugas -->
                 <div>
-                  <!-- Filter Nama Siswa (Tambahkan ini di dalam form filter nilai massal, misalnya di samping filter Mapel/Tugas) -->
-                  <div class="col-span-1">
-                    <label
-                      for="massal-filter-nama-siswa"
-                      class="block text-gray-700 text-sm font-bold mb-2"
-                    >
-                      Filter Nama Siswa:
-                    </label>
-                    <input
-                      type="text"
-                      id="massal-filter-nama-siswa"
-                      class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
-                      placeholder="Ketik nama siswa..."
-                    />
-                  </div>
                   <label
                     for="massal-filter-tugas"
                     class="block text-gray-700 text-sm font-bold mb-2"
@@ -552,244 +477,64 @@
                     id="massal-filter-tugas"
                     class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
                   >
-                    <option value="all">Semua Tugas</option>
+                    <option value="">Pilih Tugas</option>
                     <!-- Options will be populated by JS -->
                   </select>
                 </div>
-                <div class="flex items-end justify-end">
-                  <button
-                    id="apply-massal-filter-btn"
-                    class="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 w-full md:w-auto"
+                <!-- Filter Nama Siswa -->
+                <div>
+                  <label
+                    for="massal-filter-nama-siswa"
+                    class="block text-gray-700 text-sm font-bold mb-2"
+                    >Filter Nama Siswa:</label
                   >
-                    Terapkan Filter
-                  </button>
+                  <select
+                    id="massal-filter-nama-siswa"
+                    class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
+                  >
+                    <option value="">Semua Siswa</option>
+                    <!-- Options will be populated by JS -->
+                  </select>
                 </div>
               </div>
-              <form id="nilai-massal-form">
-                <div id="massal-nilai-inputs" class="overflow-x-auto">
-                  <!-- Table will be rendered here by JavaScript -->
-                  <p class="text-gray-500 text-center p-4">
-                    Pilih filter untuk menampilkan data.
-                  </p>
-                </div>
-                <div class="flex justify-end space-x-3 mt-6">
-                  <button
-                    type="button"
-                    id="cancel-massal-input-btn"
-                    class="px-4 py-2 bg-gray-200 text-gray-800 rounded-md hover:bg-gray-300"
-                  >
-                    Batal
-                  </button>
-                  <button
-                    type="submit"
-                    class="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-md focus:outline-none focus:shadow-outline"
-                  >
-                    Simpan Nilai Massal
-                  </button>
-                </div>
-              </form>
-            </div>
-          </div>
 
-          <!-- Input Per Anak Tab Content -->
-          <div id="input-nilai-individu" class="tab-content section-hidden">
-            <!-- Area for Individual Input Task Selection -->
-            <div
-              id="nilai-task-selection-area"
-              class="p-6 bg-white rounded-lg shadow-md mb-6"
-            >
-              <h4 class="text-xl font-semibold text-gray-800 mb-4">
-                Pilih Tugas untuk Input Nilai Individu
-              </h4>
-              <div class="mb-4">
-                <label
-                  for="nilai-selection-id_tugas"
-                  class="block text-gray-700 text-sm font-bold mb-2"
-                >
-                  Pilih Tugas:</label
-                >
-                <select
-                  id="nilai-selection-id_tugas"
-                  class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
-                  required
-                >
-                  <option value="">Pilih Tugas</option>
-                  <!-- Options will be populated by JS -->
-                </select>
+              <div
+                id="massal-nilai-inputs"
+                class="overflow-x-auto bg-gray-50 rounded-lg p-4 mb-4 max-h-[calc(100vh-250px)]"
+              >
+                <!-- Table for massal input will be rendered here by JS -->
+                <p class="text-gray-500 text-center p-4">
+                  Pilih Mata Pelajaran dan Tugas untuk menampilkan data.
+                </p>
               </div>
-              <div class="flex justify-end space-x-3">
+
+              <div class="flex justify-end space-x-3 mt-4">
                 <button
-                  id="cancel-nilai-selection-btn"
-                  class="px-4 py-2 bg-gray-200 text-gray-800 rounded-md hover:bg-gray-300"
+                  type="button"
+                  id="cancel-massal-input-btn"
+                  class="px-4 py-2 bg-gray-200 text-gray-800 rounded-md hover:bg-gray-300 section-hidden"
                 >
                   Batal
                 </button>
                 <button
-                  id="continue-nilai-input-btn"
-                  class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-md focus:outline-none focus:shadow-outline"
+                  type="submit"
+                  id="save-massal-nilai-btn"
+                  class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-md focus:outline-none focus:shadow-outline section-hidden"
                 >
-                  Lanjutkan
+                  Simpan Nilai Massal
                 </button>
               </div>
-            </div>
-
-            <!-- Individual Nilai Input Form - Moved from nilai-modal, now inline -->
-            <div
-              id="individual-nilai-form-area"
-              class="section-hidden p-6 bg-white rounded-lg shadow-md"
-            >
-              <h3 class="text-xl font-bold mb-4">Input Nilai Individu</h3>
-              <form id="nilai-form">
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                  <div>
-                    <label
-                      for="nilai-id_nilai"
-                      class="block text-gray-700 text-sm font-bold mb-2"
-                      >ID Nilai:</label
-                    >
-                    <input
-                      type="text"
-                      id="nilai-id_nilai"
-                      name="id_nilai"
-                      class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline bg-gray-100 cursor-not-allowed"
-                      readonly
-                      required
-                    />
-                  </div>
-                  <div>
-                    <label
-                      for="nilai-nis"
-                      class="block text-gray-700 text-sm font-bold mb-2"
-                      >Siswa (NIS - Nama):</label
-                    >
-                    <select
-                      id="nilai-nis"
-                      name="nis"
-                      class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
-                      required
-                    >
-                      <option value="">Pilih Siswa</option>
-                      <!-- Options populated by JS -->
-                    </select>
-                  </div>
-                  <div>
-                    <label
-                      for="nilai-id_tugas"
-                      class="block text-gray-700 text-sm font-bold mb-2"
-                      >Tugas (ID - Nama Tugas):</label
-                    >
-                    <select
-                      id="nilai-id_tugas"
-                      name="id_tugas"
-                      class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
-                      required
-                    >
-                      <option value="">Pilih Tugas</option>
-                      <!-- Options populated by JS -->
-                    </select>
-                  </div>
-                  <div>
-                    <label
-                      for="nilai-nilai"
-                      class="block text-gray-700 text-sm font-bold mb-2"
-                      >Nilai:</label
-                    >
-                    <input
-                      type="number"
-                      id="nilai-nilai"
-                      name="nilai"
-                      class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
-                      placeholder="Masukkan nilai"
-                      min="0"
-                      max="100"
-                      required
-                    />
-                  </div>
-                  <div>
-                    <label
-                      for="nilai-status_pengerjaan"
-                      class="block text-gray-700 text-sm font-bold mb-2"
-                      >Status Pengerjaan:</label
-                    >
-                    <select
-                      id="nilai-status_pengerjaan"
-                      name="status_pengerjaan"
-                      class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
-                      required
-                    >
-                      <option value="">Pilih Status</option>
-                      <option value="Tuntas">Tuntas</option>
-                      <option value="Belum Tuntas">Belum Tuntas</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label
-                      for="nilai-tanggal_input"
-                      class="block text-gray-700 text-sm font-bold mb-2"
-                      >Tanggal Input:</label
-                    >
-                    <input
-                      type="date"
-                      id="nilai-tanggal_input"
-                      name="tanggal_input"
-                      class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
-                      value="<%= new Date().toISOString().split('T')[0] %>"
-                      required
-                    />
-                  </div>
-                </div>
-                <div class="flex justify-end space-x-3 mt-6">
-                  <button
-                    type="button"
-                    id="cancel-individual-nilai-input-btn"
-                    class="px-4 py-2 bg-gray-200 text-gray-800 rounded-md hover:bg-gray-300"
-                  >
-                    Batal
-                  </button>
-                  <button
-                    type="submit"
-                    class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-md focus:outline-none focus:shadow-outline"
-                  >
-                    Simpan Nilai
-                  </button>
-                </div>
-              </form>
-            </div>
+            </form>
           </div>
+        </section>
 
-          <!-- Input Kehadiran Tab Content -->
-          <div id="input-kehadiran" class="tab-content section-hidden">
-            <div
-              class="bg-white p-6 rounded-lg shadow-md mb-6 flex justify-between items-center"
-            >
-              <h3 class="text-xl font-semibold text-gray-800">
-                Input Kehadiran
-              </h3>
-              <button
-                onclick="openModal('kehadiran-modal')"
-                class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-md focus:outline-none focus:shadow-outline"
-              >
-                Tambah Kehadiran Baru
-              </button>
-            </div>
-            <form id="kehadiran-form" class="bg-white p-6 rounded-lg shadow-md">
+        <!-- Input Kehadiran Section (New) -->
+        <section id="input-kehadiran-section" class="hidden section-hidden">
+          <!-- Hapus h2 duplikat di sini -->
+          <div class="bg-white p-6 rounded-lg shadow-md mb-6">
+            <form id="kehadiran-form">
               <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label
-                    for="kehadiran-id_kehadiran"
-                    class="block text-gray-700 text-sm font-bold mb-2"
-                    >ID Kehadiran:</label
-                  >
-                  <input
-                    type="text"
-                    id="kehadiran-id_kehadiran"
-                    name="id_kehadiran"
-                    class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline bg-gray-100 cursor-not-allowed"
-                    readonly
-                    required
-                  />
-                </div>
-                <div>
+                <div class="mb-4">
                   <label
                     for="kehadiran-nis"
                     class="block text-gray-700 text-sm font-bold mb-2"
@@ -802,10 +547,10 @@
                     required
                   >
                     <option value="">Pilih Siswa</option>
-                    <!-- Options populated by JS -->
+                    <!-- Populated by JS -->
                   </select>
                 </div>
-                <div>
+                <div class="mb-4">
                   <label
                     for="kehadiran-tanggal"
                     class="block text-gray-700 text-sm font-bold mb-2"
@@ -819,33 +564,45 @@
                     required
                   />
                 </div>
-                <div>
-                  <label
-                    for="kehadiran-status"
-                    class="block text-gray-700 text-sm font-bold mb-2"
-                    >Status Kehadiran:</label
-                  >
-                  <select
-                    id="kehadiran-status"
-                    name="status_kehadiran"
-                    class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
-                    required
-                  >
-                    <option value="">Pilih Status</option>
-                    <option value="Hadir">Hadir</option>
-                    <option value="Sakit">Sakit</option>
-                    <option value="Izin">Izin</option>
-                    <option value="Alfa">Alfa</option>
-                  </select>
-                </div>
               </div>
-              <div class="flex justify-end space-x-3 mt-6">
-                <button
-                  type="reset"
-                  class="px-4 py-2 bg-gray-200 text-gray-800 rounded-md hover:bg-gray-300"
+              <div class="mb-4">
+                <label
+                  for="kehadiran-status"
+                  class="block text-gray-700 text-sm font-bold mb-2"
+                  >Status Kehadiran:</label
                 >
-                  Reset
-                </button>
+                <select
+                  id="kehadiran-status"
+                  name="status_kehadiran"
+                  class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
+                  required
+                >
+                  <option value="Hadir">Hadir</option>
+                  <option value="Izin">Izin</option>
+                  <option value="Sakit">Sakit</option>
+                  <option value="Alpha">Alpha</option>
+                </select>
+              </div>
+              <div class="mb-4">
+                <label
+                  for="kehadiran-keterangan"
+                  class="block text-gray-700 text-sm font-bold mb-2"
+                  >Keterangan (Opsional):</label
+                >
+                <textarea
+                  id="kehadiran-keterangan"
+                  name="keterangan"
+                  rows="3"
+                  class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
+                  placeholder="Contoh: Izin pulang lebih awal karena sakit"
+                ></textarea>
+              </div>
+              <input
+                type="hidden"
+                id="kehadiran-id_kehadiran"
+                name="id_kehadiran"
+              />
+              <div class="flex justify-end">
                 <button
                   type="submit"
                   class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-md focus:outline-none focus:shadow-outline"
@@ -857,26 +614,416 @@
           </div>
         </section>
 
-        <!-- Rekap Data Section -->
-        <section id="rekap-data-section" class="section-hidden">
-          <!-- H2 element removed from here -->
+        <!-- Manajemen Data Section -->
+        <section id="manajemen-data-section" class="hidden section-hidden">
+          <!-- Hapus h2 duplikat di sini -->
 
-          <div class="bg-white p-6 rounded-lg shadow-md mb-6">
-            <div class="flex justify-between items-center mb-4">
-              <h3 class="text-xl font-semibold text-gray-800">
-                Filter Rekap Nilai
-              </h3>
-              <button
-                onclick="openModal('rekap-filter-modal')"
-                class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-md focus:outline-none focus:shadow-outline"
-              >
-                Atur Filter
-              </button>
+          <!-- Tabs for Manajemen Data -->
+          <div class="flex mb-4 border-b border-gray-200">
+            <button
+              class="tab-button py-2 px-4 text-sm font-medium text-gray-600 border-b-2 border-transparent hover:border-blue-500 hover:text-blue-500 active"
+              data-target="manajemen-data-tugas"
+            >
+              Manajemen Tugas
+            </button>
+            <button
+              class="tab-button py-2 px-4 text-sm font-medium text-gray-600 border-b-2 border-transparent hover:border-blue-500 hover:text-blue-500"
+              data-target="manajemen-data-catatan-guru"
+            >
+              Manajemen Catatan Guru
+            </button>
+            <button
+              class="tab-button py-2 px-4 text-sm font-medium text-gray-600 border-b-2 border-transparent hover:border-blue-500 hover:text-blue-500"
+              data-target="manajemen-data-jadwal-pelajaran"
+            >
+              Manajemen Jadwal Pelajaran
+            </button>
+            <button
+              class="tab-button py-2 px-4 text-sm font-medium text-gray-600 border-b-2 border-transparent hover:border-blue-500 hover:text-blue-500"
+              data-target="manajemen-data-pengumuman"
+            >
+              Manajemen Pengumuman
+            </button>
+          </div>
+
+          <!-- Tab Content Container for Manajemen Data -->
+          <div id="tab-content-container-manajemen">
+            <!-- Manajemen Tugas Tab Content -->
+            <div id="manajemen-data-tugas" class="tab-content">
+              <div class="bg-white p-6 rounded-lg shadow-md mb-6">
+                <h3 class="text-lg font-semibold text-gray-800 mb-4">
+                  Data Tugas
+                </h3>
+                <!-- Add Tugas Button -->
+                <div class="flex justify-end mb-4">
+                  <button
+                    id="add-tugas-btn"
+                    class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-md focus:outline-none focus:shadow-outline"
+                  >
+                    Tambah Tugas Baru
+                  </button>
+                </div>
+
+                <!-- Tugas Subject Selection Area (Initially hidden) -->
+                <div
+                  id="tugas-subject-selection-area"
+                  class="bg-gray-50 p-4 rounded-md mb-4 section-hidden"
+                >
+                  <h4 class="text-md font-semibold text-gray-700 mb-3">
+                    Pilih Mata Pelajaran untuk Tugas Baru:
+                  </h4>
+                  <div class="flex items-center space-x-3">
+                    <select
+                      id="tugas-selection-mata_pelajaran"
+                      class="shadow appearance-none border rounded py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline flex-grow"
+                    >
+                      <option value="">Pilih Mata Pelajaran</option>
+                    </select>
+                    <button
+                      id="continue-add-tugas-btn"
+                      class="bg-green-500 hover:bg-green-600 text-white font-bold py-2 px-4 rounded-md focus:outline-none focus:shadow-outline"
+                    >
+                      Lanjutkan
+                    </button>
+                    <button
+                      id="cancel-tugas-selection-btn"
+                      class="bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold py-2 px-4 rounded-md focus:outline-none focus:shadow-outline"
+                    >
+                      Batal
+                    </button>
+                  </div>
+                </div>
+
+                <div
+                  class="overflow-x-auto max-h-96 relative shadow ring-1 ring-black ring-opacity-5 sm:rounded-lg"
+                >
+                  <table class="min-w-full divide-y divide-gray-200">
+                    <thead class="bg-gray-50">
+                      <tr>
+                        <th
+                          scope="col"
+                          class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                        >
+                          ID Tugas
+                        </th>
+                        <th
+                          scope="col"
+                          class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                        >
+                          Nama Tugas
+                        </th>
+                        <th
+                          scope="col"
+                          class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                        >
+                          Mata Pelajaran
+                        </th>
+                        <th
+                          scope="col"
+                          class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                        >
+                          Untuk Kelas
+                        </th>
+                        <th
+                          scope="col"
+                          class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                        >
+                          Tanggal Dibuat
+                        </th>
+                        <th
+                          scope="col"
+                          class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                        >
+                          Batas Waktu
+                        </th>
+                        <th
+                          scope="col"
+                          class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                        >
+                          Aksi
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody
+                      id="tugas-table-body"
+                      class="bg-white divide-y divide-gray-200"
+                    >
+                      <!-- Data Tugas akan dimuat di sini oleh JS -->
+                    </tbody>
+                  </table>
+                  <p
+                    id="no-tugas-data-message"
+                    class="text-gray-500 text-center py-4 section-hidden"
+                  >
+                    Tidak ada data tugas.
+                  </p>
+                </div>
+              </div>
             </div>
 
+            <!-- Manajemen Catatan Guru Tab Content -->
             <div
-              class="bg-white p-6 rounded-lg shadow-md overflow-x-auto text-center"
+              id="manajemen-data-catatan-guru"
+              class="tab-content section-hidden"
             >
+              <div class="bg-white p-6 rounded-lg shadow-md mb-6">
+                <h3 class="text-lg font-semibold text-gray-800 mb-4">
+                  Data Catatan Guru
+                </h3>
+                <div class="flex justify-end mb-4">
+                  <button
+                    id="add-catatan-btn"
+                    class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-md focus:outline-none focus:shadow-outline"
+                    onclick="openModal('catatan-modal', false)"
+                  >
+                    Tambah Catatan Baru
+                  </button>
+                </div>
+                <div
+                  class="overflow-x-auto max-h-96 relative shadow ring-1 ring-black ring-opacity-5 sm:rounded-lg"
+                >
+                  <table class="min-w-full divide-y divide-gray-200">
+                    <thead class="bg-gray-50">
+                      <tr>
+                        <th
+                          scope="col"
+                          class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                        >
+                          ID Catatan
+                        </th>
+                        <th
+                          scope="col"
+                          class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                        >
+                          NIS Siswa
+                        </th>
+                        <th
+                          scope="col"
+                          class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                        >
+                          Minggu Ke
+                        </th>
+                        <th
+                          scope="col"
+                          class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                        >
+                          Catatan
+                        </th>
+                        <th
+                          scope="col"
+                          class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                        >
+                          Tanggal Catat
+                        </th>
+                        <th
+                          scope="col"
+                          class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                        >
+                          Aksi
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody
+                      id="catatan-table-body"
+                      class="bg-white divide-y divide-gray-200"
+                    >
+                      <!-- Data Catatan Guru akan dimuat di sini oleh JS -->
+                    </tbody>
+                  </table>
+                  <p
+                    id="no-catatan-data-message"
+                    class="text-gray-500 text-center py-4 section-hidden"
+                  >
+                    Tidak ada data catatan guru.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <!-- Manajemen Jadwal Pelajaran Tab Content -->
+            <div
+              id="manajemen-data-jadwal-pelajaran"
+              class="tab-content section-hidden"
+            >
+              <div class="bg-white p-6 rounded-lg shadow-md mb-6">
+                <h3 class="text-lg font-semibold text-gray-800 mb-4">
+                  Data Jadwal Pelajaran
+                </h3>
+                <div class="flex justify-end mb-4">
+                  <button
+                    id="add-jadwal-btn"
+                    class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-md focus:outline-none focus:shadow-outline"
+                    onclick="openModal('jadwal-modal', false)"
+                  >
+                    Tambah Jadwal Baru
+                  </button>
+                </div>
+                <div
+                  class="overflow-x-auto max-h-96 relative shadow ring-1 ring-black ring-opacity-5 sm:rounded-lg"
+                >
+                  <table class="min-w-full divide-y divide-gray-200">
+                    <thead class="bg-gray-50">
+                      <tr>
+                        <th
+                          scope="col"
+                          class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                        >
+                          ID Jadwal
+                        </th>
+                        <th
+                          scope="col"
+                          class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                        >
+                          Kelas
+                        </th>
+                        <th
+                          scope="col"
+                          class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                        >
+                          Hari
+                        </th>
+                        <th
+                          scope="col"
+                          class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                        >
+                          Waktu Mulai
+                        </th>
+                        <th
+                          scope="col"
+                          class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                        >
+                          Waktu Selesai
+                        </th>
+                        <th
+                          scope="col"
+                          class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                        >
+                          Mata Pelajaran
+                        </th>
+                        <th
+                          scope="col"
+                          class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                        >
+                          Guru
+                        </th>
+                        <th
+                          scope="col"
+                          class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                        >
+                          Aksi
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody
+                      id="jadwal-table-body"
+                      class="bg-white divide-y divide-gray-200"
+                    >
+                      <!-- Data Jadwal Pelajaran akan dimuat di sini oleh JS -->
+                    </tbody>
+                  </table>
+                  <p
+                    id="no-jadwal-data-message"
+                    class="text-gray-500 text-center py-4 section-hidden"
+                  >
+                    Tidak ada data jadwal pelajaran.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <!-- Manajemen Pengumuman Tab Content -->
+            <div
+              id="manajemen-data-pengumuman"
+              class="tab-content section-hidden"
+            >
+              <div class="bg-white p-6 rounded-lg shadow-md mb-6">
+                <h3 class="text-lg font-semibold text-gray-800 mb-4">
+                  Data Pengumuman
+                </h3>
+                <div class="flex justify-end mb-4">
+                  <button
+                    id="add-pengumuman-btn"
+                    class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-md focus:outline-none focus:shadow-outline"
+                    onclick="openModal('pengumuman-modal', false)"
+                  >
+                    Tambah Pengumuman Baru
+                  </button>
+                </div>
+                <div
+                  class="overflow-x-auto max-h-96 relative shadow ring-1 ring-black ring-opacity-5 sm:rounded-lg"
+                >
+                  <table class="min-w-full divide-y divide-gray-200">
+                    <thead class="bg-gray-50">
+                      <tr>
+                        <th
+                          scope="col"
+                          class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                        >
+                          ID Pengumuman
+                        </th>
+                        <th
+                          scope="col"
+                          class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                        >
+                          Judul
+                        </th>
+                        <th
+                          scope="col"
+                          class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                        >
+                          Isi
+                        </th>
+                        <th
+                          scope="col"
+                          class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                        >
+                          Tanggal Posting
+                        </th>
+                        <th
+                          scope="col"
+                          class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                        >
+                          Aksi
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody
+                      id="pengumuman-table-body"
+                      class="bg-white divide-y divide-gray-200"
+                    >
+                      <!-- Data Pengumuman akan dimuat di sini oleh JS -->
+                    </tbody>
+                  </table>
+                  <p
+                    id="no-pengumuman-data-message"
+                    class="text-gray-500 text-center py-4 section-hidden"
+                  >
+                    Tidak ada data pengumuman.
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- Rekap Data Section -->
+        <section id="rekap-data-section" class="hidden section-hidden">
+          <!-- Hapus h2 duplikat di sini -->
+
+          <div class="bg-white p-6 rounded-lg shadow-md mb-6">
+            <h3 class="text-lg font-semibold text-gray-800 mb-4">
+              Rekap Nilai Siswa
+            </h3>
+            <div class="flex justify-end mb-4">
+              <button
+                id="open-rekap-filter-modal-btn"
+                class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-md focus:outline-none focus:shadow-outline"
+                onclick="openModal('rekap-filter-modal')"
+              >
+                Filter Rekap
+              </button>
+            </div>
+            <div class="overflow-x-auto">
               <table class="min-w-full divide-y divide-gray-200">
                 <thead class="bg-gray-50">
                   <tr>
@@ -914,7 +1061,7 @@
                       scope="col"
                       class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
                     >
-                      Status
+                      Status Pengerjaan
                     </th>
                     <th
                       scope="col"
@@ -928,208 +1075,228 @@
                   id="rekap-nilai-table-body"
                   class="bg-white divide-y divide-gray-200"
                 >
-                  <!-- Data will be populated by JavaScript -->
+                  <!-- Data rekap nilai akan dimuat di sini oleh JS -->
                 </tbody>
               </table>
               <p
                 id="no-rekap-data-message"
-                class="text-gray-500 mt-4 section-hidden"
+                class="text-gray-500 text-center py-4 section-hidden"
               >
-                Tidak ada data rekap nilai ditemukan.
+                Tidak ada data nilai ditemukan.
               </p>
             </div>
           </div>
         </section>
 
         <!-- Settings Section -->
-        <section id="settings-section" class="section-hidden">
-          <!-- H2 element removed from here -->
+        <section id="settings-section" class="hidden section-hidden">
+          <!-- Hapus h2 duplikat di sini -->
 
-          <!-- Tab Navigation for Settings -->
-          <div
-            class="tabs flex space-x-2 border-b border-gray-200 mb-6"
-            id="tab-content-container-settings"
-          >
+          <!-- Tabs for Settings -->
+          <div class="flex mb-4 border-b border-gray-200">
             <button
-              class="tab-button py-2 px-4 text-gray-600 hover:text-blue-600 border-b-2 border-transparent hover:border-blue-600 transition-colors duration-300 active"
+              class="tab-button py-2 px-4 text-sm font-medium text-gray-600 border-b-2 border-transparent hover:border-blue-500 hover:text-blue-500 active"
               data-target="profile-settings"
             >
-              Profil
+              Profil Saya
             </button>
             <button
-              class="tab-button py-2 px-4 text-gray-600 hover:text-blue-600 border-b-2 border-transparent hover:border-blue-600 transition-colors duration-300"
+              class="tab-button py-2 px-4 text-sm font-medium text-gray-600 border-b-2 border-transparent hover:border-blue-500 hover:text-blue-500"
               data-target="account-settings"
             >
               Akun
             </button>
           </div>
 
-          <!-- Profile Settings Tab Content -->
-          <div id="profile-settings" class="tab-content">
-            <div class="bg-white p-6 rounded-lg shadow-md mb-6">
-              <h3 class="text-xl font-semibold text-gray-800 mb-4">
-                Profil Guru
-              </h3>
-              <div class="space-y-4">
-                <div>
-                  <p class="text-gray-500 text-sm">Nama Guru:</p>
-                  <p id="profile-nama-guru" class="text-gray-800 font-medium">
-                    -
+          <!-- Tab Content Container for Settings -->
+          <div id="tab-content-container-settings">
+            <!-- Profile Settings Tab Content -->
+            <div id="profile-settings" class="tab-content">
+              <div class="bg-white p-6 rounded-lg shadow-md mb-6">
+                <h3 class="text-lg font-semibold text-gray-800 mb-4">
+                  Informasi Profil
+                </h3>
+                <div class="mb-4">
+                  <p class="text-gray-700">
+                    <span class="font-semibold">Nama:</span>
+                    <span id="profile-nama-guru">-</span>
                   </p>
                 </div>
-                <div>
-                  <p class="text-gray-500 text-sm">Email:</p>
-                  <p id="profile-email-guru" class="text-gray-800 font-medium">
-                    -
+                <div class="mb-4">
+                  <p class="text-gray-700">
+                    <span class="font-semibold">Email:</span>
+                    <span id="profile-email-guru">-</span>
                   </p>
                 </div>
-                <div>
-                  <p class="text-gray-500 text-sm">Status:</p>
-                  <p id="profile-status-guru" class="text-gray-800 font-medium">
-                    -
+                <div class="mb-4">
+                  <p class="text-gray-700">
+                    <span class="font-semibold">Kelas Diampu:</span>
+                    <span id="profile-kelas-diampu">-</span>
                   </p>
                 </div>
-                <div>
-                  <p class="text-gray-500 text-sm">Kelas Diampu:</p>
-                  <p
-                    id="profile-kelas-diampu"
-                    class="text-gray-800 font-medium"
-                  >
-                    -
+                <div class="mb-4">
+                  <p class="text-gray-700">
+                    <span class="font-semibold">Status:</span>
+                    <span id="profile-status-guru">-</span>
                   </p>
                 </div>
               </div>
-              <button
-                class="mt-6 bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-md focus:outline-none focus:shadow-outline"
-              >
-                Edit Profil (Coming Soon)
-              </button>
             </div>
-          </div>
 
-          <!-- Account Settings Tab Content -->
-          <div id="account-settings" class="tab-content section-hidden">
-            <div class="bg-white p-6 rounded-lg shadow-md mb-6">
-              <h3 class="text-xl font-semibold text-gray-800 mb-4">
-                Pengaturan Akun
-              </h3>
-              <p class="text-gray-600">
-                Fitur pengaturan akun seperti perubahan password akan tersedia
-                di versi selanjutnya.
-              </p>
-              <button
-                class="mt-6 bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-md focus:outline-none focus:shadow-outline"
-              >
-                Ganti Password (Coming Soon)
-              </button>
+            <!-- Account Settings Tab Content -->
+            <div id="account-settings" class="tab-content section-hidden">
+              <div class="bg-white p-6 rounded-lg shadow-md mb-6">
+                <h3 class="text-lg font-semibold text-gray-800 mb-4">
+                  Pengaturan Akun
+                </h3>
+                <p class="text-gray-700">
+                  Fitur pengaturan akun (misalnya, ganti password, ganti email)
+                  akan ditambahkan di sini. Untuk saat ini, pengaturan akun
+                  dikelola oleh administrator sistem.
+                </p>
+                <!-- Example: Password Change Form (future implementation) -->
+                <!--
+                <form class="mt-6">
+                  <div class="mb-4">
+                    <label for="current-password" class="block text-gray-700 text-sm font-bold mb-2">Password Saat Ini:</label>
+                    <input type="password" id="current-password" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline" required>
+                  </div>
+                  <div class="mb-4">
+                    <label for="new-password" class="block text-gray-700 text-sm font-bold mb-2">Password Baru:</label>
+                    <input type="password" id="new-password" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline" required>
+                  </div>
+                  <div class="mb-6">
+                    <label for="confirm-password" class="block text-gray-700 text-sm font-bold mb-2">Konfirmasi Password Baru:</label>
+                    <input type="password" id="confirm-password" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline" required>
+                  </div>
+                  <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-md focus:outline-none focus:shadow-outline">Ganti Password</button>
+                </form>
+                -->
+              </div>
             </div>
           </div>
         </section>
       </main>
     </div>
 
-    <!-- Modals (Overlay for forms) - Only non-nilai modals remain here -->
+    <!-- Modals -->
 
     <!-- Tugas Modal -->
-    <div
-      id="tugas-modal"
-      class="modal fixed inset-0 bg-gray-900 bg-opacity-50 flex items-center justify-center z-40 section-hidden"
-    >
-      <div
-        class="modal-content bg-white p-6 rounded-lg shadow-xl max-w-lg w-full relative"
-      >
-        <button
-          class="modal-close-button absolute top-3 right-3 text-gray-600 hover:text-gray-800"
-        >
-          <i class="fas fa-times"></i>
-        </button>
-        <h3 id="tugas-modal-title" class="text-lg font-bold mb-4">
-          Tambah Tugas Baru
+    <div id="tugas-modal" class="modal">
+      <div class="modal-content">
+        <h3 class="text-lg font-semibold text-gray-800 mb-4">
+          Tambah/Edit Tugas
         </h3>
         <form id="tugas-form">
-          <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-            <div>
-              <label
-                for="tugas-id_tugas"
-                class="block text-gray-700 text-sm font-bold mb-2"
-                >ID Tugas:</label
-              >
-              <input
-                type="text"
-                id="tugas-id_tugas"
-                name="id_tugas"
-                class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline bg-gray-100 cursor-not-allowed"
-                readonly
-                required
-              />
-            </div>
-            <div>
-              <label
-                for="tugas-nama_tugas"
-                class="block text-gray-700 text-sm font-bold mb-2"
-                >Nama Tugas:</label
-              >
-              <input
-                type="text"
-                id="tugas-nama_tugas"
-                name="nama_tugas"
-                class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
-                placeholder="Masukkan nama tugas"
-                required
-              />
-            </div>
-            <div>
-              <label
-                for="tugas-mata_pelajaran"
-                class="block text-gray-700 text-sm font-bold mb-2"
-                >Mata Pelajaran:</label
-              >
-              <select
-                id="tugas-mata_pelajaran"
-                name="mata_pelajaran"
-                class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
-                required
-              >
-                <option value="">Pilih Mata Pelajaran</option>
-                <!-- Options populated by JS -->
-              </select>
-            </div>
-            <div>
-              <label
-                for="tugas-untuk_kelas"
-                class="block text-gray-700 text-sm font-bold mb-2"
-                >Untuk Kelas (pisahkan koma):</label
-              >
-              <input
-                type="text"
-                id="tugas-untuk_kelas"
-                name="untuk_kelas"
-                class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
-                placeholder="Contoh: 1A, 1B, Semua"
-                required
-              />
-            </div>
-            <div>
-              <label
-                for="tugas-deskripsi"
-                class="block text-gray-700 text-sm font-bold mb-2"
-                >Deskripsi (Opsional):</label
-              >
-              <textarea
-                id="tugas-deskripsi"
-                name="deskripsi"
-                rows="3"
-                class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
-                placeholder="Deskripsi singkat tugas"
-              ></textarea>
-            </div>
-          </div>
-          <div class="flex justify-end space-x-3 mt-6">
-            <button
-              type="reset"
-              class="px-4 py-2 bg-gray-200 text-gray-800 rounded-md hover:bg-gray-300"
+          <div class="mb-4">
+            <label
+              for="tugas-id_tugas"
+              class="block text-gray-700 text-sm font-bold mb-2"
+              >ID Tugas:</label
             >
-              Reset
+            <input
+              type="text"
+              id="tugas-id_tugas"
+              name="id_tugas"
+              class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 bg-gray-100 cursor-not-allowed leading-tight focus:outline-none focus:shadow-outline"
+              readonly
+              required
+            />
+          </div>
+          <div class="mb-4">
+            <label
+              for="tugas-nama_tugas"
+              class="block text-gray-700 text-sm font-bold mb-2"
+              >Nama Tugas:</label
+            >
+            <input
+              type="text"
+              id="tugas-nama_tugas"
+              name="nama_tugas"
+              class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
+              placeholder="Contoh: Ulangan Harian Bab 1"
+              required
+            />
+          </div>
+          <div class="mb-4">
+            <label
+              for="tugas-deskripsi"
+              class="block text-gray-700 text-sm font-bold mb-2"
+              >Deskripsi:</label
+            >
+            <textarea
+              id="tugas-deskripsi"
+              name="deskripsi"
+              rows="3"
+              class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
+              placeholder="Jelaskan detail tugas"
+            ></textarea>
+          </div>
+          <div class="mb-4">
+            <label
+              for="tugas-mata_pelajaran"
+              class="block text-gray-700 text-sm font-bold mb-2"
+              >Mata Pelajaran:</label
+            >
+            <select
+              id="tugas-mata_pelajaran"
+              name="mata_pelajaran"
+              class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
+              required
+            >
+              <option value="">Pilih Mata Pelajaran</option>
+              <!-- Options will be populated by JS -->
+            </select>
+          </div>
+          <div class="mb-4">
+            <label
+              for="tugas-untuk_kelas"
+              class="block text-gray-700 text-sm font-bold mb-2"
+              >Untuk Kelas (pisahkan dengan koma, atau 'Semua'):</label
+            >
+            <input
+              type="text"
+              id="tugas-untuk_kelas"
+              name="untuk_kelas"
+              class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
+              placeholder="Contoh: 7A, 7B, Semua"
+              required
+            />
+          </div>
+          <div class="mb-4">
+            <label
+              for="tugas-tanggal_dibuat"
+              class="block text-gray-700 text-sm font-bold mb-2"
+              >Tanggal Dibuat:</label
+            >
+            <input
+              type="date"
+              id="tugas-tanggal_dibuat"
+              name="tanggal_dibuat"
+              class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
+              required
+            />
+          </div>
+          <div class="mb-4">
+            <label
+              for="tugas-batas_waktu"
+              class="block text-gray-700 text-sm font-bold mb-2"
+              >Batas Waktu (Tanggal):</label
+            >
+            <input
+              type="date"
+              id="tugas-batas_waktu"
+              name="batas_waktu"
+              class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
+              required
+            />
+          </div>
+          <div class="flex justify-end space-x-3">
+            <button
+              type="button"
+              class="px-4 py-2 bg-gray-200 text-gray-800 rounded-md hover:bg-gray-300 modal-close-button"
+            >
+              Batal
             </button>
             <button
               type="submit"
@@ -1143,92 +1310,95 @@
     </div>
 
     <!-- Catatan Guru Modal -->
-    <div
-      id="catatan-modal"
-      class="modal fixed inset-0 bg-gray-900 bg-opacity-50 flex items-center justify-center z-40 section-hidden"
-    >
-      <div
-        class="modal-content bg-white p-6 rounded-lg shadow-xl max-w-lg w-full relative"
-      >
-        <button
-          class="modal-close-button absolute top-3 right-3 text-gray-600 hover:text-gray-800"
-        >
-          <i class="fas fa-times"></i>
-        </button>
-        <h3 id="catatan-modal-title" class="text-lg font-bold mb-4">
-          Tambah Catatan Baru
+    <div id="catatan-modal" class="modal">
+      <div class="modal-content">
+        <h3 class="text-lg font-semibold text-gray-800 mb-4">
+          Tambah/Edit Catatan Guru
         </h3>
         <form id="catatan-form">
-          <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-            <div>
-              <label
-                for="catatan-id_catatan"
-                class="block text-gray-700 text-sm font-bold mb-2"
-                >ID Catatan:</label
-              >
-              <input
-                type="text"
-                id="catatan-id_catatan"
-                name="id_catatan"
-                class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline bg-gray-100 cursor-not-allowed"
-                readonly
-                required
-              />
-            </div>
-            <div>
-              <label
-                for="catatan-nis"
-                class="block text-gray-700 text-sm font-bold mb-2"
-                >Siswa (NIS - Nama):</label
-              >
-              <select
-                id="catatan-nis"
-                name="nis"
-                class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
-                required
-              >
-                <option value="">Pilih Siswa</option>
-                <!-- Options populated by JS -->
-              </select>
-            </div>
-            <div>
-              <label
-                for="catatan-minggu_ke"
-                class="block text-gray-700 text-sm font-bold mb-2"
-                >Minggu Ke:</label
-              >
-              <input
-                type="number"
-                id="catatan-minggu_ke"
-                name="minggu_ke"
-                class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
-                placeholder="Misal: 1"
-                min="1"
-                required
-              />
-            </div>
-            <div class="md:col-span-2">
-              <label
-                for="catatan-catatan"
-                class="block text-gray-700 text-sm font-bold mb-2"
-                >Catatan:</label
-              >
-              <textarea
-                id="catatan-catatan"
-                name="catatan"
-                rows="4"
-                class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
-                placeholder="Masukkan catatan tentang siswa"
-                required
-              ></textarea>
-            </div>
-          </div>
-          <div class="flex justify-end space-x-3 mt-6">
-            <button
-              type="reset"
-              class="px-4 py-2 bg-gray-200 text-gray-800 rounded-md hover:bg-gray-300"
+          <div class="mb-4">
+            <label
+              for="catatan-id_catatan"
+              class="block text-gray-700 text-sm font-bold mb-2"
+              >ID Catatan:</label
             >
-              Reset
+            <input
+              type="text"
+              id="catatan-id_catatan"
+              name="id_catatan"
+              class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 bg-gray-100 cursor-not-allowed leading-tight focus:outline-none focus:shadow-outline"
+              readonly
+              required
+            />
+          </div>
+          <div class="mb-4">
+            <label
+              for="catatan-nis"
+              class="block text-gray-700 text-sm font-bold mb-2"
+              >Siswa (NIS - Nama):</label
+            >
+            <select
+              id="catatan-nis"
+              name="nis"
+              class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
+              required
+            >
+              <option value="">Pilih Siswa</option>
+              <!-- Populated by JS -->
+            </select>
+          </div>
+          <div class="mb-4">
+            <label
+              for="catatan-minggu_ke"
+              class="block text-gray-700 text-sm font-bold mb-2"
+              >Minggu Ke-:</label
+            >
+            <input
+              type="number"
+              id="catatan-minggu_ke"
+              name="minggu_ke"
+              min="1"
+              max="52"
+              class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
+              placeholder="Contoh: 1 (minggu pertama)"
+              required
+            />
+          </div>
+          <div class="mb-4">
+            <label
+              for="catatan-catatan"
+              class="block text-gray-700 text-sm font-bold mb-2"
+              >Catatan:</label
+            >
+            <textarea
+              id="catatan-catatan"
+              name="catatan"
+              rows="5"
+              class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
+              placeholder="Masukkan catatan tentang siswa ini. Contoh: Siswa menunjukkan peningkatan dalam partisipasi kelas."
+              required
+            ></textarea>
+          </div>
+          <div class="mb-4">
+            <label
+              for="catatan-tanggal_catat"
+              class="block text-gray-700 text-sm font-bold mb-2"
+              >Tanggal Catat:</label
+            >
+            <input
+              type="date"
+              id="catatan-tanggal_catat"
+              name="tanggal_catat"
+              class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
+              required
+            />
+          </div>
+          <div class="flex justify-end space-x-3">
+            <button
+              type="button"
+              class="px-4 py-2 bg-gray-200 text-gray-800 rounded-md hover:bg-gray-300 modal-close-button"
+            >
+              Batal
             </button>
             <button
               type="submit"
@@ -1242,139 +1412,127 @@
     </div>
 
     <!-- Jadwal Pelajaran Modal -->
-    <div
-      id="jadwal-modal"
-      class="modal fixed inset-0 bg-gray-900 bg-opacity-50 flex items-center justify-center z-40 section-hidden"
-    >
-      <div
-        class="modal-content bg-white p-6 rounded-lg shadow-xl max-w-lg w-full relative"
-      >
-        <button
-          class="modal-close-button absolute top-3 right-3 text-gray-600 hover:text-gray-800"
-        >
-          <i class="fas fa-times"></i>
-        </button>
-        <h3 id="jadwal-modal-title" class="text-lg font-bold mb-4">
-          Tambah Jadwal Baru
+    <div id="jadwal-modal" class="modal">
+      <div class="modal-content">
+        <h3 class="text-lg font-semibold text-gray-800 mb-4">
+          Tambah/Edit Jadwal Pelajaran
         </h3>
         <form id="jadwal-form">
-          <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-            <div>
-              <label
-                for="jadwal-id_jadwal"
-                class="block text-gray-700 text-sm font-bold mb-2"
-                >ID Jadwal:</label
-              >
-              <input
-                type="text"
-                id="jadwal-id_jadwal"
-                name="id_jadwal"
-                class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline bg-gray-100 cursor-not-allowed"
-                readonly
-                required
-              />
-            </div>
-            <div>
-              <label
-                for="jadwal-kelas"
-                class="block text-gray-700 text-sm font-bold mb-2"
-                >Kelas:</label
-              >
-              <input
-                type="text"
-                id="jadwal-kelas"
-                name="kelas"
-                class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
-                placeholder="Contoh: 1A"
-                required
-              />
-            </div>
-            <div>
-              <label
-                for="jadwal-hari"
-                class="block text-gray-700 text-sm font-bold mb-2"
-                >Hari:</label
-              >
-              <select
-                id="jadwal-hari"
-                name="hari"
-                class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
-                required
-              >
-                <option value="">Pilih Hari</option>
-                <option value="Senin">Senin</option>
-                <option value="Selasa">Selasa</option>
-                <option value="Rabu">Rabu</option>
-                <option value="Kamis">Kamis</option>
-                <option value="Jumat">Jumat</option>
-              </select>
-            </div>
-            <div>
-              <label
-                for="jadwal-jam_mulai"
-                class="block text-gray-700 text-sm font-bold mb-2"
-                >Jam Mulai:</label
-              >
-              <input
-                type="time"
-                id="jadwal-jam_mulai"
-                name="jam_mulai"
-                class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
-                required
-              />
-            </div>
-            <div>
-              <label
-                for="jadwal-jam_selesai"
-                class="block text-gray-700 text-sm font-bold mb-2"
-                >Jam Selesai:</label
-              >
-              <input
-                type="time"
-                id="jadwal-jam_selesai"
-                name="jam_selesai"
-                class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
-                required
-              />
-            </div>
-            <div>
-              <label
-                for="jadwal-mata_pelajaran"
-                class="block text-gray-700 text-sm font-bold mb-2"
-                >Mata Pelajaran:</label
-              >
-              <select
-                id="jadwal-mata_pelajaran"
-                name="mata_pelajaran"
-                class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
-                required
-              >
-                <option value="">Pilih Mata Pelajaran</option>
-                <!-- Options populated by JS -->
-              </select>
-            </div>
-            <div class="md:col-span-2">
-              <label
-                for="jadwal-guru"
-                class="block text-gray-700 text-sm font-bold mb-2"
-                >Guru Pengampu:</label
-              >
-              <input
-                type="text"
-                id="jadwal-guru"
-                name="guru_pengampu"
-                class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
-                placeholder="Nama Guru"
-                required
-              />
-            </div>
-          </div>
-          <div class="flex justify-end space-x-3 mt-6">
-            <button
-              type="reset"
-              class="px-4 py-2 bg-gray-200 text-gray-800 rounded-md hover:bg-gray-300"
+          <div class="mb-4">
+            <label
+              for="jadwal-id_jadwal"
+              class="block text-gray-700 text-sm font-bold mb-2"
+              >ID Jadwal:</label
             >
-              Reset
+            <input
+              type="text"
+              id="jadwal-id_jadwal"
+              name="id_jadwal"
+              class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 bg-gray-100 cursor-not-allowed leading-tight focus:outline-none focus:shadow-outline"
+              readonly
+              required
+            />
+          </div>
+          <div class="mb-4">
+            <label
+              for="jadwal-kelas"
+              class="block text-gray-700 text-sm font-bold mb-2"
+              >Kelas:</label
+            >
+            <input
+              type="text"
+              id="jadwal-kelas"
+              name="kelas"
+              class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
+              placeholder="Contoh: 7A"
+              required
+            />
+          </div>
+          <div class="mb-4">
+            <label
+              for="jadwal-hari"
+              class="block text-gray-700 text-sm font-bold mb-2"
+              >Hari:</label
+            >
+            <select
+              id="jadwal-hari"
+              name="hari"
+              class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
+              required
+            >
+              <option value="">Pilih Hari</option>
+              <option value="Senin">Senin</option>
+              <option value="Selasa">Selasa</option>
+              <option value="Rabu">Rabu</option>
+              <option value="Kamis">Kamis</option>
+              <option value="Jumat">Jumat</option>
+            </select>
+          </div>
+          <div class="mb-4">
+            <label
+              for="jadwal-waktu_mulai"
+              class="block text-gray-700 text-sm font-bold mb-2"
+              >Waktu Mulai:</label
+            >
+            <input
+              type="time"
+              id="jadwal-waktu_mulai"
+              name="waktu_mulai"
+              class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
+              required
+            />
+          </div>
+          <div class="mb-4">
+            <label
+              for="jadwal-waktu_selesai"
+              class="block text-gray-700 text-sm font-bold mb-2"
+              >Waktu Selesai:</label
+            >
+            <input
+              type="time"
+              id="jadwal-waktu_selesai"
+              name="waktu_selesai"
+              class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
+              required
+            />
+          </div>
+          <div class="mb-4">
+            <label
+              for="jadwal-mata_pelajaran"
+              class="block text-gray-700 text-sm font-bold mb-2"
+              >Mata Pelajaran:</label
+            >
+            <select
+              id="jadwal-mata_pelajaran"
+              name="mata_pelajaran"
+              class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
+              required
+            >
+              <option value="">Pilih Mata Pelajaran</option>
+              <!-- Options populated by JS -->
+            </select>
+          </div>
+          <div class="mb-4">
+            <label
+              for="jadwal-guru"
+              class="block text-gray-700 text-sm font-bold mb-2"
+              >Guru:</label
+            >
+            <input
+              type="text"
+              id="jadwal-guru"
+              name="guru"
+              class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
+              placeholder="Nama Guru"
+              required
+            />
+          </div>
+          <div class="flex justify-end space-x-3">
+            <button
+              type="button"
+              class="px-4 py-2 bg-gray-200 text-gray-800 rounded-md hover:bg-gray-300 modal-close-button"
+            >
+              Batal
             </button>
             <button
               type="submit"
@@ -1388,90 +1546,77 @@
     </div>
 
     <!-- Pengumuman Modal -->
-    <div
-      id="pengumuman-modal"
-      class="modal fixed inset-0 bg-gray-900 bg-opacity-50 flex items-center justify-center z-40 section-hidden"
-    >
-      <div
-        class="modal-content bg-white p-6 rounded-lg shadow-xl max-w-lg w-full relative"
-      >
-        <button
-          class="modal-close-button absolute top-3 right-3 text-gray-600 hover:text-gray-800"
-        >
-          <i class="fas fa-times"></i>
-        </button>
-        <h3 id="pengumuman-modal-title" class="text-lg font-bold mb-4">
-          Tambah Pengumuman Baru
+    <div id="pengumuman-modal" class="modal">
+      <div class="modal-content">
+        <h3 class="text-lg font-semibold text-gray-800 mb-4">
+          Tambah/Edit Pengumuman
         </h3>
         <form id="pengumuman-form">
-          <div class="grid grid-cols-1 gap-4 mb-4">
-            <div>
-              <label
-                for="pengumuman-id_pengumuman"
-                class="block text-gray-700 text-sm font-bold mb-2"
-                >ID Pengumuman:</label
-              >
-              <input
-                type="text"
-                id="pengumuman-id_pengumuman"
-                name="id_pengumuman"
-                class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline bg-gray-100 cursor-not-allowed"
-                readonly
-                required
-              />
-            </div>
-            <div>
-              <label
-                for="pengumuman-judul"
-                class="block text-gray-700 text-sm font-bold mb-2"
-                >Judul Pengumuman:</label
-              >
-              <input
-                type="text"
-                id="pengumuman-judul"
-                name="judul"
-                class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
-                placeholder="Masukkan judul pengumuman"
-                required
-              />
-            </div>
-            <div>
-              <label
-                for="pengumuman-konten"
-                class="block text-gray-700 text-sm font-bold mb-2"
-                >Konten Pengumuman:</label
-              >
-              <textarea
-                id="pengumuman-konten"
-                name="konten"
-                rows="5"
-                class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
-                placeholder="Tulis konten pengumuman di sini"
-                required
-              ></textarea>
-            </div>
-            <div>
-              <label
-                for="pengumuman-tanggal_publikasi"
-                class="block text-gray-700 text-sm font-bold mb-2"
-                >Tanggal Publikasi:</label
-              >
-              <input
-                type="date"
-                id="pengumuman-tanggal_publikasi"
-                name="tanggal_publikasi"
-                class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
-                value="<%= new Date().toISOString().split('T')[0] %>"
-                required
-              />
-            </div>
-          </div>
-          <div class="flex justify-end space-x-3 mt-6">
-            <button
-              type="reset"
-              class="px-4 py-2 bg-gray-200 text-gray-800 rounded-md hover:bg-gray-300"
+          <div class="mb-4">
+            <label
+              for="pengumuman-id_pengumuman"
+              class="block text-gray-700 text-sm font-bold mb-2"
+              >ID Pengumuman:</label
             >
-              Reset
+            <input
+              type="text"
+              id="pengumuman-id_pengumuman"
+              name="id_pengumuman"
+              class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 bg-gray-100 cursor-not-allowed leading-tight focus:outline-none focus:shadow-outline"
+              readonly
+              required
+            />
+          </div>
+          <div class="mb-4">
+            <label
+              for="pengumuman-judul"
+              class="block text-gray-700 text-sm font-bold mb-2"
+              >Judul:</label
+            >
+            <input
+              type="text"
+              id="pengumuman-judul"
+              name="judul"
+              class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
+              placeholder="Contoh: Libur Nasional"
+              required
+            />
+          </div>
+          <div class="mb-4">
+            <label
+              for="pengumuman-isi"
+              class="block text-gray-700 text-sm font-bold mb-2"
+              >Isi Pengumuman:</label
+            >
+            <textarea
+              id="pengumuman-isi"
+              name="isi"
+              rows="5"
+              class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
+              placeholder="Masukkan detail pengumuman. Contoh: Hari Raya Idul Fitri..."
+              required
+            ></textarea>
+          </div>
+          <div class="mb-4">
+            <label
+              for="pengumuman-tanggal_posting"
+              class="block text-gray-700 text-sm font-bold mb-2"
+              >Tanggal Posting:</label
+            >
+            <input
+              type="date"
+              id="pengumuman-tanggal_posting"
+              name="tanggal_posting"
+              class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
+              required
+            />
+          </div>
+          <div class="flex justify-end space-x-3">
+            <button
+              type="button"
+              class="px-4 py-2 bg-gray-200 text-gray-800 rounded-md hover:bg-gray-300 modal-close-button"
+            >
+              Batal
             </button>
             <button
               type="submit"
@@ -1485,34 +1630,26 @@
     </div>
 
     <!-- Rekap Filter Modal -->
-    <div
-      id="rekap-filter-modal"
-      class="modal fixed inset-0 bg-gray-900 bg-opacity-50 flex items-center justify-center z-40 section-hidden"
-    >
-      <div
-        class="modal-content bg-white p-6 rounded-lg shadow-xl max-w-lg w-full relative"
-      >
-        <button
-          class="modal-close-button absolute top-3 right-3 text-gray-600 hover:text-gray-800"
-        >
-          <i class="fas fa-times"></i>
-        </button>
-        <h3 class="text-lg font-bold mb-4">Atur Filter Rekap Nilai</h3>
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-          <!-- Filter Siswa -->
+    <div id="rekap-filter-modal" class="modal">
+      <div class="modal-content">
+        <h3 class="text-lg font-semibold text-gray-800 mb-4">
+          Filter Rekap Nilai
+        </h3>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+          <!-- Filter NIS Siswa -->
           <div class="col-span-1">
             <label
               for="rekap-nis-filter-modal"
               class="block text-gray-700 text-sm font-bold mb-2"
             >
-              Filter Siswa:</label
-            >
+              Filter NIS Siswa:
+            </label>
             <select
               id="rekap-nis-filter-modal"
               class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
             >
               <option value="all">Semua Siswa</option>
-              <!-- Options populated by JS -->
+              <!-- Options will be populated by JS -->
             </select>
           </div>
           <!-- Filter Mata Pelajaran -->
@@ -1521,31 +1658,30 @@
               for="rekap-mapel-filter-modal"
               class="block text-gray-700 text-sm font-bold mb-2"
             >
-              Filter Mata Pelajaran:</label
-            >
+              Filter Mata Pelajaran:
+            </label>
             <select
               id="rekap-mapel-filter-modal"
               class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
             >
               <option value="all">Semua Mata Pelajaran</option>
-              <!-- Options populated by JS -->
+              <!-- Options will be populated by JS -->
             </select>
           </div>
-
-          <!-- Filter Tugas -->
+          <!-- Filter ID Tugas -->
           <div class="col-span-1">
             <label
               for="rekap-id-tugas-filter-modal"
               class="block text-gray-700 text-sm font-bold mb-2"
             >
-              Filter Tugas:</label
-            >
+              Filter ID Tugas:
+            </label>
             <select
               id="rekap-id-tugas-filter-modal"
               class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
             >
               <option value="all">Semua Tugas</option>
-              <!-- Options populated by JS -->
+              <!-- Options will be populated by JS -->
             </select>
           </div>
           <!-- Filter Status -->
@@ -1563,13 +1699,14 @@
               <option value="all">Semua Status</option>
               <option value="Tuntas">Tuntas</option>
               <option value="Belum Tuntas">Belum Tuntas</option>
+              <option value="Belum Input">Belum Input</option>
             </select>
           </div>
         </div>
         <div class="flex justify-end space-x-3">
           <button
             id="cancel-rekap-filter-btn"
-            class="px-4 py-2 bg-gray-200 text-gray-800 rounded-md hover:bg-gray-300"
+            class="px-4 py-2 bg-gray-200 text-gray-800 rounded-md hover:bg-gray-300 modal-close-button"
           >
             Batal
           </button>
@@ -1582,8 +1719,6 @@
         </div>
       </div>
     </div>
-
-    <!-- Script for main logic -->
     <script src="dashboardguru.js"></script>
   </body>
 </html>

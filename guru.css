@@ -17,7 +17,7 @@ body {
 
 body {
   font-family: "Inter", sans-serif;
-  background-color: #f3f4f6; /* Latar belakang body diubah menjadi abu-abu terang untuk kontras */
+  background-color: #ffffff !important; /* Latar belakang body diubah menjadi putih, dengan !important untuk memastikan override Tailwind */
   min-height: 100vh;
   /* Penting: Hapus display: flex dan flex-direction: column dari global body. */
   /* Ini agar elemen fixed tidak mengganggu alur dokumen normal dan margin-left bekerja. */
@@ -34,273 +34,435 @@ body {
   top: 0;
   bottom: 0; /* Memastikan sidebar mengambil tinggi penuh viewport */
   left: 0; /* Memastikan sidebar rata kiri */
-  width: 256px; /* Mengatur lebar sidebar (sesuai md:w-64 dari Tailwind) */
-  background-color: #ffffff; /* Latar belakang putih untuk sidebar */
-  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1); /* shadow-lg untuk memberikan efek kedalaman */
-  z-index: 30; /* Memastikan sidebar di atas konten utama, di bawah overlay */
+  width: 256px; /* Mengatur lebar sidebar (sesuai md:w-64) */
+  background-color: #ffffff;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1); /* shadow-lg */
+  overflow-y: auto; /* Memungkinkan scroll jika konten sidebar melebihi tinggi */
   transform: translateX(
     -100%
-  ); /* Sembunyikan secara default pada tampilan mobile (bergeser ke kiri di luar viewport) */
-  transition: transform 0.3s ease-in-out; /* Animasi transisi untuk saat sidebar muncul/sembunyi */
-  overflow-y: auto; /* Memungkinkan sidebar untuk digulir jika isinya lebih panjang */
-  padding-top: 0.5rem; /* Padding atas sidebar sedikit agar ada jarak dari tepi atas */
+  ); /* Sembunyikan sidebar secara default untuk mobile */
+  transition: transform 0.3s ease-in-out; /* Transisi untuk animasi geser */
+  z-index: 40; /* Pastikan sidebar di atas konten lain saat terbuka */
 }
 
-/* Mengaktifkan tampilan sidebar di mobile saat kelas 'active' ditambahkan */
+/* Sidebar aktif (terbuka) */
 .guru-dashboard-layout #main-sidebar.active {
-  transform: translateX(0); /* Tampilkan sidebar */
+  transform: translateX(0%); /* Geser ke posisi terlihat */
 }
 
-/* Overlay Sidebar untuk Mobile */
-.guru-dashboard-layout #sidebar-overlay {
-  transition: opacity 0.3s ease-in-out;
+/* Overlay Sidebar untuk mobile */
+#sidebar-overlay {
+  position: fixed;
+  inset: 0;
+  background-color: rgba(0, 0, 0, 0.75); /* bg-gray-800 bg-opacity-75 */
+  z-index: 30; /* Di bawah sidebar tapi di atas konten utama */
+  display: none; /* Sembunyikan secara default */
 }
 
-/*
- * Gaya Header (Fixed at Top)
- * Mengatur posisi header agar tetap di bagian atas viewport.
- * Penyesuaian untuk desktop akan dilakukan di media query.
- */
-.guru-dashboard-layout header {
-  position: fixed; /* Membuat header tetap */
-  top: 0;
-  left: 0; /* Default rata kiri, akan disesuaikan di desktop */
-  width: 100%; /* Lebar penuh, akan disesuaikan di desktop */
-  background-color: #f3f4f6; /* Latar belakang header disamakan dengan background konten utama */
-  box-shadow: none; /* Menghilangkan bayangan dari header */
-  z-index: 40; /* Di atas sidebar, di bawah toast/loading overlay */
-  transition: all 0.3s ease-in-out; /* Transisi untuk perubahan posisi/lebar */
-  height: 48px; /* Tinggi header ditetapkan menjadi 48px (Tailwind h-12) */
-  display: flex; /* Gunakan flexbox untuk menyelaraskan item di dalam header */
-  align-items: center; /* Selaraskan item secara vertikal di tengah */
-  padding: 0 1rem; /* Padding horizontal 1rem (16px) */
+#sidebar-overlay.active {
+  display: block; /* Tampilkan saat sidebar aktif */
 }
 
-/*
- * Gaya Wrapper Konten Utama
- * 'padding-top' adalah untuk memberi ruang header fixed.
- * Penyesuaian margin-left untuk desktop akan dilakukan di media query.
- */
-.guru-dashboard-layout #main-content-wrapper {
-  min-height: 100vh;
-  /* Sesuaikan padding-top agar sesuai dengan tinggi header yang baru */
-  padding-top: 48px; /* Memberikan padding di bagian atas agar konten tidak tertutup header fixed */
-  transition: margin-left 0.3s ease-in-out; /* Animasi untuk margin-left */
+/* Wrapper Konten Utama */
+#main-content-wrapper {
+  margin-left: 0; /* Default no margin for mobile */
+  transition: margin-left 0.3s ease-in-out;
+  flex-grow: 1; /* Allows content wrapper to take available space */
 }
 
-/*
- * Gaya Main Content Area - Mobile
- * Mengatur padding untuk mobile agar lebih rapat dan sesuai dengan header.
- */
-.guru-dashboard-layout main {
-  padding: 1rem; /* Mengatur padding 1rem (16px) untuk mobile */
-  flex-grow: 1; /* Pastikan main content area mengambil sisa ruang yang tersedia di flex container */
-  overflow-y: auto; /* Memungkinkan pengguliran jika kontennya lebih panjang */
-}
-
-/*
- * Gaya Desktop - Hanya berlaku untuk layar dengan lebar minimal 768px (md: breakpoint)
- */
+/* Penyesuaian untuk desktop: sidebar selalu terlihat, konten bergeser */
 @media (min-width: 768px) {
-  /* Pastikan body berperilaku sebagai blok di desktop untuk tata letak yang benar */
-  body.guru-dashboard-layout {
-    display: block; /* Mengembalikan body ke display block normal di desktop */
-  }
-
-  /* Sidebar Desktop: Selalu terlihat dan rata kiri */
   .guru-dashboard-layout #main-sidebar {
-    transform: translateX(
-      0
-    ) !important; /* Pastikan sidebar selalu terlihat di desktop */
-    left: 0 !important; /* Memastikan sidebar menempel rapat di kiri */
+    transform: translateX(0%); /* Selalu terlihat di desktop */
   }
-
-  /* Header Desktop: Bergeser ke kanan sidebar dan mengisi sisa lebar */
-  .guru-dashboard-layout header {
-    left: 256px !important; /* Sejajarkan header dengan konten utama */
-    width: calc(
-      100% - 256px
-    ) !important; /* Sesuaikan lebar header dengan sisa ruang */
-    height: 48px !important; /* Pastikan tinggi header yang benar di desktop */
+  #sidebar-overlay {
+    display: none; /* Selalu tersembunyi di desktop */
   }
-
-  /* Konten Utama Desktop: Bergeser ke kanan sidebar dan mengisi sisa lebar */
-  .guru-dashboard-layout #main-content-wrapper {
-    margin-left: 256px !important; /* Dorong konten utama ke kanan sebesar lebar sidebar */
-    width: auto; /* Biarkan lebar otomatis, atau 100% */
-    /* Pastikan padding-top di desktop juga sesuai tinggi header */
-    padding-top: 48px !important; /* Pastikan padding-top yang benar di desktop */
-  }
-
-  /* Gaya Main Content Area - Desktop */
-  .guru-dashboard-layout main {
-    padding: 2rem; /* Kembali ke padding 2rem (32px) untuk desktop (sesuai md:p-8) */
-    padding-top: 0; /* Hapus padding-top karena sudah diatur oleh main-content-wrapper */
-  }
-
-  /* Sembunyikan overlay sidebar di desktop */
-  .guru-dashboard-layout #sidebar-overlay {
-    display: none !important;
-  }
+  /*
+   * Mengandalkan Tailwind's md:ml-64 dan md:w-[calc(100%-16rem)]
+   * pada elemen HTML untuk mengatur margin-left dan lebar header/konten.
+   * Aturan CSS kustom di sini akan dihapus untuk menghindari konflik.
+   */
+  /* #main-content-wrapper { margin-left: 256px; } */
+  /* header { width: calc(100% - 256px); left: 256px; } */
 }
 
-/* Kelas utilitas untuk menyembunyikan bagian - Dapat digunakan secara global */
+/* Styles for header */
+header {
+  height: 64px; /* fixed height for header */
+  background-color: #ffffff;
+  box-shadow: none !important; /* Menghilangkan bayangan pada header, dengan !important untuk memastikan override Tailwind */
+  padding: 1rem; /* p-4 */
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  z-index: 10;
+  width: 100%;
+  /* Atribut posisi untuk header sudah dikelola oleh Tailwind di HTML */
+}
+
+/* Main content padding adjustment for fixed header */
+main {
+  padding-top: 64px; /* Sesuaikan dengan tinggi header agar konten tidak tertutup */
+}
+
+/* Utility classes */
+.hidden {
+  display: none !important;
+}
+
 .section-hidden {
   display: none !important;
 }
 
-/* Gaya Overlay Pemuatan - Dapat digunakan secara global */
-#loading-overlay {
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  background-color: rgba(255, 255, 255, 0.9); /* Putih semi-transparan */
+/* Sidebar Styling */
+.sidebar-button {
   display: flex;
-  flex-direction: column;
-  justify-content: center;
   align-items: center;
-  z-index: 4000; /* Lebih tinggi dari segalanya */
-  opacity: 0;
-  visibility: hidden;
-  transition: opacity 0.3s ease-in-out, visibility 0.3s ease-in-out;
+  padding: 0.75rem; /* p-3 */
+  border-radius: 0.5rem; /* rounded-lg */
+  color: #4a5568; /* text-gray-700 */
+  font-weight: 600; /* font-semibold */
+  transition: background-color 0.2s ease;
 }
 
-#loading-overlay.show {
-  opacity: 1;
-  visibility: visible;
+.sidebar-button:hover {
+  background-color: #f7fafc; /* hover:bg-gray-100 */
 }
 
-/* Gaya Notifikasi Toast - Dapat digunakan secara global */
-#toast-container {
-  z-index: 5000; /* Memastikan di atas semua modal dan overlay */
-  position: fixed; /* Membuat toast tetap di posisinya */
-  top: 1rem; /* Jarak dari atas */
-  right: 1rem; /* Jarak dari kanan */
+.sidebar-button.active {
+  background-color: #e0f2fe; /* bg-blue-100 */
+  color: #2563eb; /* text-blue-600 */
+  font-weight: 700; /* font-bold */
+}
+
+/* Submenu styling */
+.sidebar-submenu {
+  list-style: none;
+  padding-left: 1rem; /* pl-4 */
+  padding-top: 0.5rem; /* py-2 */
+  padding-bottom: 0.5rem; /* py-2 */
+}
+
+.sidebar-submenu a {
+  padding-top: 0.5rem; /* p-2.5 */
+  padding-bottom: 0.5rem; /* p-2.5 */
+  padding-left: 0.75rem; /* pl-3 */
+}
+
+.submenu-toggle {
   display: flex;
-  flex-direction: column;
-  gap: 0.5rem; /* Jarak antar toast */
+  align-items: center;
+  padding: 0.75rem;
+  border-radius: 0.5rem;
+  color: #4a5568;
+  font-weight: 600;
+  transition: background-color 0.2s ease;
+  width: 100%; /* Ensure it takes full width of its container */
 }
 
-.toast {
-  min-width: 250px;
-  max-width: 300px;
-  background-color: #333;
-  color: #fff;
-  text-align: center;
-  border-radius: 8px;
-  padding: 12px 18px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-  opacity: 0;
-  transform: translateY(20px);
-  transition: opacity 0.3s ease-in-out, transform 0.3s ease-in-out;
+.submenu-toggle:hover {
+  background-color: #f7fafc;
 }
 
-.toast.show {
-  opacity: 1;
-  transform: translateY(0);
+.submenu-arrow {
+  transition: transform 0.2s ease-in-out;
 }
 
-.toast.hide {
-  opacity: 0;
-  transform: translateY(20px);
-}
-
-.toast.toast-success {
-  background-color: #28a745;
-}
-.toast.toast-error {
-  background-color: #dc3545;
-}
-.toast.toast-info {
-  background-color: #17a2b8;
-}
-
-/* Gaya Modal - Dapat digunakan secara global */
+/* Modal Styles (General) */
 .modal {
-  position: fixed; /* Membuat modal tetap di tengah layar */
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  background-color: rgba(0, 0, 0, 0.5); /* Overlay semi-transparan */
+  position: fixed;
+  inset: 0; /* top, right, bottom, left to 0 */
+  background-color: rgba(0, 0, 0, 0.75); /* bg-gray-800 bg-opacity-75 */
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: opacity 0.3s ease-in-out, visibility 0.3s ease-in-out;
-  z-index: 1000; /* Di atas konten utama, di bawah toast/loading */
-  visibility: hidden;
+  z-index: 50;
   opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.3s ease, visibility 0.3s ease;
 }
 
 .modal.active {
-  visibility: visible;
   opacity: 1;
+  visibility: visible;
 }
 
 .modal-content {
-  position: relative;
-  max-height: 90vh; /* Membatasi tinggi modal */
-  overflow-y: auto; /* Mengaktifkan pengguliran di dalam modal jika kontennya panjang */
-  background-color: #ffffff;
-  padding: 1.5rem;
-  border-radius: 0.5rem;
-  box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
-  max-width: 500px; /* Batasi lebar modal */
-  width: 90%; /* Pastikan responsif pada perangkat kecil */
-}
-
-/* Gaya tombol umum - Dapat digunakan secara global (Tailwind @apply memastikan ini) */
-.btn-primary {
-  @apply bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-md focus:outline-none focus:shadow-outline;
-}
-
-.btn-secondary {
-  @apply bg-gray-200 text-gray-800 rounded-md hover:bg-gray-300 py-2 px-4;
-}
-
-/* Gaya tombol tab - Dapat digunakan secara global */
-.tab-button.active {
-  @apply text-blue-600 border-b-2 border-blue-600 font-semibold;
-}
-
-/*
- * Penyesuaian mobile-first untuk baris tabel agar muncul sebagai kartu - Dapat digunakan secara global
- * Ini mengubah tampilan baris tabel menjadi seperti kartu individual pada layar kecil.
- */
-.tugas-simplified-row {
-  display: block; /* Setiap baris menjadi blok terpisah */
-  background-color: #fff;
+  background-color: #ffffff; /* bg-white */
   border-radius: 0.5rem; /* rounded-lg */
-  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06); /* shadow-md */
-  margin-bottom: 1rem; /* Jarak antar kartu */
-  overflow: hidden; /* Memastikan sudut membulat memotong konten */
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1),
+    0 4px 6px -2px rgba(0, 0, 0, 0.05); /* shadow-xl */
+  padding: 1.5rem; /* p-6 */
+  width: 90%; /* w-full */
+  max-width: 500px; /* max-w-md */
+  margin: 1rem; /* mx-4 */
+  transform: translateY(-20px); /* Initial state for animation */
+  transition: transform 0.3s ease;
 }
 
-.tugas-simplified-row td {
-  display: flex; /* Mengubah sel tabel menjadi flex container */
-  justify-content: space-between; /* Memisahkan label dan nilai */
-  padding: 0.75rem 1rem; /* p-3 py-2 px-4 */
-  border-bottom: 1px solid #e2e8f0; /* border-gray-200 */
+.modal.active .modal-content {
+  transform: translateY(0); /* Final state for animation */
+}
+
+.modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.75rem; /* space-x-3 */
+  margin-top: 1.5rem; /* mt-6 */
+}
+
+/* Toast Notification Styles */
+#toast-container {
+  display: block;
+}
+
+.toast {
+  position: relative;
+  right: -100%; /* Start off-screen to the right */
+  opacity: 0;
+  transition: right 0.3s ease-out, opacity 0.3s ease-out;
+}
+
+.toast.show {
+  right: 0;
+  opacity: 1;
+}
+
+.toast.hide {
+  right: -100%;
+  opacity: 0;
+}
+
+.toast-info {
+  background-color: #3182ce; /* blue-600 */
+}
+.toast-success {
+  background-color: #38a169; /* green-600 */
+}
+.toast-error {
+  background-color: #e53e3e; /* red-600 */
+}
+
+/* Global refresh icon spinning effect */
+.fa-spin {
+  animation: fa-spin 1s infinite linear;
+}
+
+@keyframes fa-spin {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(359deg);
+  }
+}
+
+/* Tab Button Styles */
+.tab-button {
+  padding: 0.5rem 1rem; /* py-2 px-4 */
   font-size: 0.875rem; /* text-sm */
+  font-weight: 500; /* font-medium */
+  color: #4a5568; /* text-gray-600 */
+  border-bottom-width: 2px; /* border-b-2 */
+  border-bottom-color: transparent; /* border-transparent */
+  transition: all 0.2s ease-in-out;
+  background-color: transparent; /* Ensure no default button background */
+  cursor: pointer;
+  white-space: nowrap; /* Prevent wrapping */
 }
 
-.tugas-simplified-row td:last-child {
-  border-bottom: none; /* Menghilangkan border bawah pada sel terakhir */
+.tab-button:hover {
+  border-bottom-color: #3b82f6; /* hover:border-blue-500 */
+  color: #3b82f6; /* hover:text-blue-500 */
 }
 
-.tugas-simplified-row td::before {
-  content: attr(data-label); /* Menggunakan atribut data-label sebagai label */
-  font-weight: 600; /* font-semibold */
-  margin-right: 0.5rem;
-  color: #4a5568; /* text-gray-700 */
+.tab-button.active {
+  border-bottom-color: #2563eb; /* active:border-blue-600 */
+  color: #2563eb; /* active:text-blue-600 */
+  font-weight: 600; /* font-semibold for active tab */
 }
 
-/*
- * Perilaku tabel responsif untuk desktop - Dapat digunakan secara global
- * Mengembalikan tampilan ke tabel standar pada layar yang lebih besar.
- */
+/* Tab Content */
+.tab-content {
+  /* No specific styles needed here, visibility handled by JS */
+}
+
+/* Table specific styles for massal input and manajemen tables */
+.overflow-x-auto {
+  -webkit-overflow-scrolling: touch; /* Enable smooth scrolling on iOS */
+}
+
+table {
+  width: 100%; /* Ensure table takes full width of its container */
+  table-layout: auto; /* Allow column widths to adjust to content */
+  min-width: 600px; /* Ensure table is wide enough to prevent squishing on small screens */
+}
+
+/* Apply fixed table layout to the massal input table specifically */
+#massal-nilai-inputs table {
+  table-layout: fixed; /* Ensures column widths are respected */
+}
+
+th,
+td {
+  padding: 0.75rem 0.5rem; /* py-3 px-2 */
+  font-size: 0.875rem; /* text-sm */
+  text-align: left;
+  border-bottom: 1px solid #e2e8f0; /* border-gray-200 */
+}
+
+thead th {
+  background-color: #f9fafb; /* bg-gray-50 */
+  font-weight: 600; /* font-medium */
+  text-transform: uppercase;
+  letter-spacing: 0.05em; /* tracking-wider */
+  color: #6b7280; /* text-gray-500 */
+  /* Menghapus properti sticky, top, dan z-index */
+  /* position: sticky; */
+  /* top: 64px; */
+  /* z-index: 20; */
+}
+
+tbody tr:last-child td {
+  border-bottom: none; /* Remove border from last row */
+}
+
+/* New: Styles for sticky "No." column */
+.sticky-col-no {
+  position: sticky;
+  left: 0;
+  background-color: #f9fafb; /* Match thead background */
+  z-index: 2; /* Higher than normal th, lower than expanded student name */
+  min-width: 40px; /* Minimum width for the No. column */
+  max-width: 60px; /* Prevent it from becoming too wide */
+  width: 50px; /* Fixed width for consistency */
+  text-align: center;
+  overflow: hidden; /* Hide overflowing content */
+  white-space: nowrap; /* Prevent wrapping */
+  text-overflow: ellipsis; /* Add ellipsis if content overflows */
+}
+
+/* Specific styling for the student name column to handle toggling */
+.massal-nilai-input-table td:nth-child(2) {
+  /* Assuming second column is student name */
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 150px; /* Default max-width for student name */
+}
+
+.massal-nilai-input-table td:nth-child(2).student-name-expanded {
+  white-space: normal;
+  overflow: visible;
+  text-overflow: clip;
+  max-width: none; /* Allow full width when expanded */
+}
+
+/* Styles for table rows that are "card-like" on mobile, if any exist (from previous iteration) */
+@media (max-width: 767px) {
+  .tugas-simplified-row {
+    display: block; /* Mengubah perilaku menjadi seperti blok kartu */
+    background-color: #ffffff;
+    border-radius: 0.5rem;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1), 0 1px 2px rgba(0, 0, 0, 0.06);
+    margin-bottom: 1rem; /* Ruang antar kartu */
+    overflow: hidden;
+  }
+  .tugas-simplified-row td {
+    display: flex; /* Mengubah sel menjadi flex untuk tata letak baris */
+    justify-content: space-between; /* Memisahkan label dan nilai */
+    padding: 0.75rem 1rem; /* Padding internal untuk setiap "baris" di kartu */
+    border-bottom: 1px dashed #e2e8f0; /* Pemisah visual antar item */
+    text-align: right; /* Nilai di sebelah kanan */
+    font-size: 0.875rem; /* text-sm */
+    width: 100%; /* Mengisi lebar penuh kartu */
+  }
+  .tugas-simplified-row td:last-child {
+    border-bottom: none; /* Hapus border bawah pada item terakhir */
+  }
+  .tugas-simplified-row td::before {
+    content: attr(data-label); /* Tampilkan label dari atribut data */
+    font-weight: 600; /* font-semibold */
+    text-align: left; /* Label di sebelah kiri */
+    flex-shrink: 0; /* Mencegah label menyusut */
+    margin-right: 1rem; /* Jarak antara label dan nilai */
+    color: #4a5568; /* text-gray-700 */
+  }
+
+  /* Specific adjustment for action buttons in simplified row */
+  .tugas-simplified-row td.tugas-actions-cell {
+    justify-content: center; /* Center actions */
+    padding-top: 1rem;
+    padding-bottom: 1rem;
+    border-top: 1px solid #e2e8f0;
+  }
+
+  .tugas-simplified-row > td > div {
+    display: block; /* Override flex for simplified view */
+    flex-direction: column; /* Stack elements */
+    align-items: flex-start; /* Align to start */
+    justify-content: flex-start; /* Justify to start */
+    padding: 0; /* Remove custom padding */
+    border-bottom: none; /* Remove separator */
+    width: auto; /* Auto width */
+  }
+  .tugas-simplified-row > td > div > .flex-grow {
+    flex-grow: 0; /* No growth */
+    flex-basis: auto; /* Reset flex-basis */
+  }
+
+  /* --- Penyesuaian untuk Tampilan Mobile (Lebar layar hingga 767px) --- */
+  /* Header: Hilangkan tombol logout pada mobile */
+  #logout-admin-btn-mobile {
+    display: none !important; /* Memastikan tombol logout mobile tidak terlihat */
+  }
+
+  /* Header: Pastikan tombol refresh ada di paling kanan secara otomatis
+     (Tidak perlu CSS tambahan, karena tombol logout sudah disembunyikan dan flexbox akan menyesuaikan) */
+
+  /* Header: Judul memastikan 1 baris di tampilan mobile dan ukuran font dinamis */
+  #header-title {
+    white-space: nowrap; /* Memastikan teks judul tidak pecah baris */
+    overflow: hidden; /* Sembunyikan jika teks meluap */
+    /* Ukuran font dinamis: minimal 1rem (16px), ideal 5% dari lebar viewport (5vw), maksimal 1.25rem (20px) */
+    font-size: clamp(1rem, 5vw, 1.25rem);
+    /* Penting: Hapus 'text-overflow: ellipsis;' dari sini jika ada, karena tidak lagi diperlukan */
+  }
+
+  /* Header: Nama guru dan kelas pastikan 1 baris dan potong dengan elipsis jika terlalu panjang */
+  /* Targetkan div yang membungkus nama guru dan kelas */
+  header .flex.flex-col.items-end {
+    flex-direction: row; /* Mengubah tata letak menjadi baris horizontal */
+    align-items: center; /* Pusatkan item secara vertikal */
+    /* Pastikan satu baris untuk kontainer ini */
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis; /* Terapkan elipsis pada kontainer keseluruhan jika meluap */
+    gap: 0.5rem; /* Beri sedikit jarak antar nama guru dan kelas */
+  }
+
+  /* Tambahan: Pastikan masing-masing span nama guru dan kelas juga mengikuti aturan satu baris */
+  #guru-name-display,
+  #guru-title-display {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  /* Sidebar: Tulisan menu sidebar diubah jadi bukan bold (jadikan normal) */
+  .sidebar-button,
+  .submenu-toggle {
+    font-weight: normal !important; /* Mengubah teks menjadi normal (tidak bold) */
+  }
+
+  /* Pertahankan bold untuk tombol sidebar yang sedang aktif jika diinginkan */
+  .sidebar-button.active {
+    font-weight: bold; /* Contoh: Biarkan yang aktif tetap bold */
+  }
+}
+
+/* Responsive Table (General for all tables in the app) */
 @media (min-width: 768px) {
   .tugas-simplified-row {
     display: table-row; /* Kembali ke perilaku baris tabel */
@@ -331,11 +493,25 @@ body {
     flex-grow: 1; /* Memungkinkan untuk berkembang */
     flex-basis: auto; /* Mengatur ulang flex-basis */
   }
-  .tugas-simplified-row > td > div > .text-right {
-    align-self: auto; /* Mengatur ulang perataan */
-    width: auto; /* Lebar otomatis */
-  }
   .tugas-simplified-row td::before {
-    content: none; /* Menghapus label pseudo-element pada desktop */
+    content: none; /* Sembunyikan pseudo-element untuk desktop */
+  }
+  .tugas-simplified-row td.tugas-actions-cell {
+    justify-content: flex-start; /* Align actions to start for desktop */
+    border-top: none; /* Remove border */
   }
 }
+/* guru.css (Updated Content) */
+
+/* ... (existing CSS content) ... */
+
+/* Animasi untuk ikon panah sub-menu */
+.submenu-arrow {
+  transition: transform 0.3s ease-in-out;
+}
+
+.submenu-arrow.rotate-180 {
+  transform: rotate(180deg);
+}
+
+/* ... (rest of the existing CSS content) ... */
