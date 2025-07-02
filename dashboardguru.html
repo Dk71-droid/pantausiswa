@@ -678,6 +678,7 @@
                       class="shadow appearance-none border rounded py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline flex-grow"
                     >
                       <option value="">Pilih Mata Pelajaran</option>
+                      <!-- Options will be populated by JS -->
                     </select>
                     <button
                       id="continue-add-tugas-btn"
@@ -1719,6 +1720,15 @@
         </div>
       </div>
     </div>
+    <!-- Tooltip for input cells -->
+    <div
+      id="input-tooltip"
+      class="fixed bg-gray-800 text-white text-xs px-2 py-1 rounded-md shadow-lg z-50 opacity-0 transition-opacity duration-200 pointer-events-none"
+      style="transform: translateX(-50%)"
+    >
+      <!-- Content will be populated by JS -->
+    </div>
+
     <script src="dashboardguru.js"></script>
   </body>
 </html>

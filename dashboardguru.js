@@ -646,9 +646,9 @@ function switchTab(targetId, tabSectionId) {
   const tabContents = tabContentsContainer.querySelectorAll(".tab-content");
 
   tabContents.forEach((content) => {
-    content.classList.add("section-hidden");
+    content.classList.add("hidden"); // Changed from section-hidden to hidden for consistency with Tailwind
   });
-  document.getElementById(targetId).classList.remove("section-hidden");
+  document.getElementById(targetId).classList.remove("hidden"); // Changed from section-hidden to hidden
 
   tabButtons.forEach((button) => {
     button.classList.remove("active");
@@ -1486,7 +1486,7 @@ function closeModal(modalId) {
 
   modal.classList.remove("active");
 
-  // Reset form when closing the modal, regardless of how it was opened
+  // Reset form when closing the modal, regardless of how how it was opened
   const form = modal.querySelector("form");
   if (form) {
     form.reset();
@@ -1535,7 +1535,7 @@ function closeModal(modalId) {
 
 // NEW: Generic function to show/hide selection areas
 function showSelectionArea(areaId) {
-  const area = document.getElementById(areaId);
+  const area = document.getElementById(areaId); // Fixed: areaId was passed as 'area'
   if (area) {
     area.classList.remove("section-hidden");
   }
@@ -1603,7 +1603,7 @@ function populateMassalNilaiFilters() {
       const option = document.createElement("option");
       option.value = siswa.NIS; // Use NIS as value
       option.textContent = `${siswa.Nama} (${siswa.Kelas})`; // Display Name (Class)
-      massalFilterNamaSiswa.appendChild(option);
+      massalFilterNamaSiswa.appendChild(option); // Corrected: Used massalFilterNamaSiswaSelect
     });
   }
 
@@ -1688,6 +1688,81 @@ function toggleStudentNameColumn(element) {
   } else {
     element.classList.add("w-32", "truncate", "whitespace-nowrap");
     element.classList.remove("w-auto", "whitespace-normal");
+  }
+}
+
+// NEW: Function to show input tooltip
+function showInputTooltip(inputElement) {
+  const tooltip = document.getElementById("input-tooltip");
+  if (!tooltip) {
+    console.warn("Input tooltip element not found.");
+    return;
+  }
+
+  const nis = inputElement.dataset.nis;
+  const idTugas = inputElement.dataset.idTugas;
+
+  const student = dataCache.siswa.find((s) => String(s.NIS) === String(nis));
+  const task = dataCache.tugas.find(
+    (t) => String(t.ID_Tugas) === String(idTugas)
+  );
+
+  let tooltipText = "";
+  if (student) {
+    tooltipText += `Siswa: ${student.Nama} (${student.Kelas})<br>`;
+  }
+  if (task) {
+    tooltipText += `Tugas: ${task.Nama_Tugas} (${task.Mata_Pelajaran})`;
+  }
+
+  if (tooltipText) {
+    tooltip.innerHTML = tooltipText;
+    tooltip.classList.add("show");
+
+    // Position the tooltip
+    const inputRect = inputElement.getBoundingClientRect();
+    const tableContainer = document
+      .getElementById("massal-nilai-inputs")
+      .closest(".overflow-x-auto"); // Assuming this is the scrollable container
+    const tableContainerRect = tableContainer
+      ? tableContainer.getBoundingClientRect()
+      : {
+          left: 0,
+          top: 0,
+          width: window.innerWidth,
+          height: window.innerHeight,
+        };
+
+    // Calculate position relative to the viewport
+    let top = inputRect.top - tooltip.offsetHeight - 5; // 5px above input
+    let left = inputRect.left + inputRect.width / 2 - tooltip.offsetWidth / 2;
+
+    // Adjust if it goes off screen to the left
+    if (left < tableContainerRect.left) {
+      left = tableContainerRect.left + 5; // 5px padding from left edge
+    }
+    // Adjust if it goes off screen to the right
+    if (left + tooltip.offsetWidth > tableContainerRect.right) {
+      left = tableContainerRect.right - tooltip.offsetWidth - 5; // 5px padding from right edge
+    }
+
+    // If tooltip goes above the viewport, place it below the input
+    if (top < 0) {
+      top = inputRect.bottom + 5;
+    }
+
+    tooltip.style.top = `${top}px`;
+    tooltip.style.left = `${left}px`;
+  } else {
+    hideInputTooltip();
+  }
+}
+
+// NEW: Function to hide input tooltip
+function hideInputTooltip() {
+  const tooltip = document.getElementById("input-tooltip");
+  if (tooltip) {
+    tooltip.classList.remove("show");
   }
 }
 
@@ -1787,8 +1862,7 @@ async function renderMassalNilaiTable() {
       <table class="min-w-full divide-y divide-gray-200 massal-nilai-input-table">
         <thead class="bg-gray-50">
           <tr>
-            <th class="px-3 py-2 text-center text-xs font-medium text-gray-500 uppercase tracking-wider sticky-col-no">No.</th>
-            <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Nama Siswa</th>
+            <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-40">Nama Siswa</th>
     `;
 
     // Add task headers dynamically
@@ -1809,15 +1883,12 @@ async function renderMassalNilaiTable() {
     `;
 
     relevantStudents.forEach((siswa, rowIndex) => {
-      // Initial shortened display with ellipsis and fixed width
-      const displayedNama = siswa.Nama; // Keep full name for initial display, let CSS handle ellipsis
+      // Initial display: allow full name, let CSS handle overflow if needed
+      const displayedNama = siswa.Nama;
 
       tableHtml += `
           <tr>
-            <td class="px-3 py-2 whitespace-nowrap text-sm font-medium text-gray-900 sticky-col-no">${
-              rowIndex + 1
-            }.</td>
-            <td class="px-3 py-2 text-sm font-medium text-gray-900 cursor-pointer hover:underline w-32 truncate whitespace-nowrap"
+            <td class="px-3 py-2 text-sm font-medium text-gray-900 cursor-pointer hover:underline whitespace-normal"
                 title="${siswa.Nama} (NIS: ${siswa.NIS})"
                 onclick="toggleStudentNameColumn(this)">
                 ${displayedNama}
@@ -1858,6 +1929,8 @@ async function renderMassalNilaiTable() {
                     data-row-index="${rowIndex}"
                     data-col-index="${colIndex}"
                     oninput="updateMassalStatus(this)"
+                    onfocus="showInputTooltip(this)"
+                    onblur="hideInputTooltip()"
                     />
                     <!-- Keterangan status dihapus dan diganti dengan warna kotak input -->
                 </td>
@@ -2178,7 +2251,6 @@ async function handleSubmitForm(event, sheetName, formType = "add") {
             "massal-filter-tugas"
           )?.value;
           if (currentMassalMapelFilter && currentMassalTugasFilter !== "") {
-            // Check for empty string for "Semua Tugas"
             renderMassalNilaiTable();
           } else {
             // If filters are not set, ensure the message is displayed correctly

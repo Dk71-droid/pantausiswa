@@ -304,6 +304,19 @@ table {
   table-layout: fixed; /* Ensures column widths are respected */
 }
 
+/* Menambahkan jarak di sisi kanan setiap sel di tabel input massal */
+#massal-nilai-inputs table td {
+  padding-right: 10px; /* Sesuaikan nilai ini sesuai kebutuhan */
+}
+
+/* Mengecilkan kotak input di tabel input massal untuk memberikan jarak antar kolom dan memposisikan di tengah */
+#massal-nilai-inputs table td input {
+  width: calc(100% - 20px); /* Mengurangi lebar input untuk memberikan ruang */
+  box-sizing: border-box; /* Memastikan padding dan border termasuk dalam lebar total */
+  display: block; /* Membuat input menjadi elemen blok */
+  margin: 0 auto; /* Pusatkan input secara horizontal */
+}
+
 th,
 td {
   padding: 0.75rem 0.5rem; /* py-3 px-2 */
@@ -328,36 +341,42 @@ tbody tr:last-child td {
   border-bottom: none; /* Remove border from last row */
 }
 
-/* New: Styles for sticky "No." column */
-.sticky-col-no {
+/* Menghapus gaya untuk kolom "No." karena akan dihapus */
+/* .sticky-col-no {
   position: sticky;
   left: 0;
-  background-color: #f9fafb; /* Match thead background */
-  z-index: 2; /* Higher than normal th, lower than expanded student name */
-  min-width: 40px; /* Minimum width for the No. column */
-  max-width: 60px; /* Prevent it from becoming too wide */
-  width: 50px; /* Fixed width for consistency */
+  background-color: #ffffff;
+  z-index: 10;
+  min-width: 40px;
+  max-width: 60px;
+  width: 50px;
   text-align: center;
-  overflow: hidden; /* Hide overflowing content */
-  white-space: nowrap; /* Prevent wrapping */
-  text-overflow: ellipsis; /* Add ellipsis if content overflows */
-}
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+} */
 
-/* Specific styling for the student name column to handle toggling */
-.massal-nilai-input-table td:nth-child(2) {
-  /* Assuming second column is student name */
+/* Menghapus gaya sticky untuk kolom pertama (Nama Siswa) */
+#massal-nilai-inputs table th:nth-child(2),
+#massal-nilai-inputs table td:nth-child(2) {
+  /* Menghapus properti sticky */
+  /* position: sticky; */
+  /* left: 0; */
+  /* background-color: #ffffff; */
+  /* z-index: 100; */
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  max-width: 150px; /* Default max-width for student name */
+  width: 150px; /* Menggunakan width tetap alih-alih max-width */
 }
 
-.massal-nilai-input-table td:nth-child(2).student-name-expanded {
+/* Hapus gaya student-name-expanded karena tidak lagi digunakan dengan tooltip */
+/* .massal-nilai-input-table td:nth-child(2).student-name-expanded {
   white-space: normal;
   overflow: visible;
   text-overflow: clip;
-  max-width: none; /* Allow full width when expanded */
-}
+  max-width: none;
+} */
 
 /* Styles for table rows that are "card-like" on mobile, if any exist (from previous iteration) */
 @media (max-width: 767px) {
@@ -503,8 +522,6 @@ tbody tr:last-child td {
 }
 /* guru.css (Updated Content) */
 
-/* ... (existing CSS content) ... */
-
 /* Animasi untuk ikon panah sub-menu */
 .submenu-arrow {
   transition: transform 0.3s ease-in-out;
@@ -514,4 +531,24 @@ tbody tr:last-child td {
   transform: rotate(180deg);
 }
 
-/* ... (rest of the existing CSS content) ... */
+/* Gaya untuk Tooltip (Gelembung Keterangan) */
+#input-tooltip {
+  position: absolute;
+  background-color: #333; /* Warna latar belakang gelap */
+  color: #fff; /* Warna teks putih */
+  text-align: center;
+  padding: 0.5rem 0.75rem; /* Padding internal */
+  border-radius: 0.375rem; /* rounded-md */
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1); /* shadow-lg */
+  z-index: 1000; /* Pastikan di atas elemen lain */
+  opacity: 0; /* Awalnya tersembunyi */
+  visibility: hidden; /* Awalnya tidak terlihat */
+  transition: opacity 0.2s ease, visibility 0.2s ease; /* Transisi untuk fade in/out */
+  pointer-events: none; /* Memastikan tooltip tidak mengganggu interaksi mouse */
+  white-space: nowrap; /* Pastikan teks tidak pecah baris */
+}
+
+#input-tooltip.show {
+  opacity: 1;
+  visibility: visible;
+}
